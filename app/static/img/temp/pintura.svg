@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="300" height="200">
+  <rect width="300" height="200" rx="14" fill="#111111"/>
+  <rect x="10" y="10" width="280" height="180" rx="10" fill="none" stroke="#222222" stroke-width="2"/>
+  <g transform="translate(115, 45)">
+    <!-- Rodillo de pintura -->
+    <rect x="0" y="0" width="60" height="24" rx="6" fill="#FFD100"/>
+    <path d="M60 12 L75 12 L75 40 L35 40 L35 65" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="29" y="65" width="12" height="25" rx="3" fill="#E6BC00"/>
+  </g>
+  <text x="150" y="155" font-family="'Inter', sans-serif" font-size="14" font-weight="800" fill="#FFD100" text-anchor="middle" letter-spacing="1">PINTURA Y ACABADOS</text>
+  <text x="150" y="175" font-family="'Inter', sans-serif" font-size="11" font-weight="500" fill="#9CA3AF" text-anchor="middle">Vinilos, Esmaltes y Brochas</text>
+</svg>

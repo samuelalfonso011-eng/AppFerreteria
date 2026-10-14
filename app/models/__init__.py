@@ -6,6 +6,7 @@ from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderItem, OrderStatusHistory, OrderStatus
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.setting import StoreSetting
+from app.models.contact import ContactMessage
 
 __all__ = [
     'Role',
@@ -25,4 +26,5 @@ __all__ = [
     'PaymentStatus',
     'PaymentMethod',
     'StoreSetting',
+    'ContactMessage',
 ]

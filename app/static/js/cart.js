@@ -1,8 +1,15 @@
-// Manejo asíncrono del carrito de compras
+// Manejo asíncrono del carrito de compras (v1.1.0)
 document.addEventListener('DOMContentLoaded', () => {
+    initCartAsync();
+});
+
+function initCartAsync() {
     // Interceptar botones de agregar al carrito con clase '.async-add-cart'
     const addCartButtons = document.querySelectorAll('.async-add-cart');
     addCartButtons.forEach(btn => {
+        if (btn.dataset.cartBound) return;
+        btn.dataset.cartBound = "true";
+
         btn.addEventListener('click', async (e) => {
             e.preventDefault();
             const productId = btn.dataset.productId;
@@ -29,21 +36,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
                 if (data.success) {
-                    showToast(data.message, 'success');
+                    if (typeof showToast === 'function') {
+                        showToast(data.message, 'success');
+                    }
                     // Actualizar badge del carrito en el navbar
                     const badge = document.querySelector('.cart-badge');
                     if (badge) {
                         badge.textContent = data.cart.total_items;
                     }
                 } else {
-                    showToast(data.message, 'warning');
+                    if (typeof showToast === 'function') {
+                        showToast(data.message, 'warning');
+                    }
                 }
             } catch (error) {
-                showToast('Error al comunicar con el servidor.', 'danger');
+                if (typeof showToast === 'function') {
+                    showToast('Error al comunicar con el servidor.', 'danger');
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
         });
     });
-});
+}
+
+window.initCartAsync = initCartAsync;

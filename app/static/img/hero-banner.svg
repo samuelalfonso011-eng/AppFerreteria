@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111111"/>
+      <stop offset="100%" stop-color="#1E1E1E"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFD100"/>
+      <stop offset="100%" stop-color="#FFAA00"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255, 209, 0, 0.07)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  
+  <rect width="1200" height="500" rx="20" fill="url(#bgGrad)"/>
+  <rect width="1200" height="500" rx="20" fill="url(#grid)"/>
+  
+  <!-- Formas geométricas de acento industrial -->
+  <polygon points="1200,0 950,0 800,500 1200,500" fill="rgba(255, 209, 0, 0.05)"/>
+  <polygon points="1200,80 1020,80 880,500 1200,500" fill="rgba(255, 209, 0, 0.08)"/>
+  <line x1="0" y1="495" x2="1200" y2="495" stroke="#FFD100" stroke-width="8"/>
+  
+  <!-- Ilustración de Herramientas Industriales -->
+  <g transform="translate(820, 100) scale(1.1)">
+    <!-- Taladro / Martillo Neumático estilizado -->
+    <rect x="60" y="80" width="160" height="85" rx="16" fill="#222222" stroke="#FFD100" stroke-width="4"/>
+    <rect x="40" y="105" width="25" height="35" rx="6" fill="#FFD100"/>
+    <path d="M 10 122 L 40 122" stroke="#FFD100" stroke-width="6" stroke-linecap="round"/>
+    <rect x="180" y="165" width="45" height="120" rx="10" fill="#FFD100"/>
+    <rect x="120" y="240" width="105" height="45" rx="8" fill="#111111" stroke="#FFD100" stroke-width="3"/>
+    
+    <!-- Engranaje decorativo -->
+    <circle cx="270" cy="90" r="40" fill="none" stroke="#FFD100" stroke-width="6" stroke-dasharray="14,8"/>
+    <circle cx="270" cy="90" r="16" fill="#111111" stroke="#FFD100" stroke-width="4"/>
+  </g>
+  
+  <!-- Texto y Badges -->
+  <g transform="translate(80, 110)">
+    <rect x="0" y="0" width="220" height="34" rx="17" fill="rgba(255, 209, 0, 0.15)" stroke="#FFD100" stroke-width="1.5"/>
+    <text x="20" y="22" font-family="'Inter', sans-serif" font-size="12" font-weight="800" fill="#FFD100" letter-spacing="1.5">⚡ PROVEEDOR LÍDER DE OBRA</text>
+    
+    <text x="0" y="90" font-family="'Inter', sans-serif" font-size="52" font-weight="900" fill="#FFFFFF" letter-spacing="-1">TODO PARA TU OBRA</text>
+    <text x="0" y="150" font-family="'Inter', sans-serif" font-size="52" font-weight="900" fill="url(#accentGrad)" letter-spacing="-1">Y PROYECTOS</text>
+    
+    <text x="0" y="210" font-family="'Inter', sans-serif" font-size="18" font-weight="400" fill="#B0B0B0" max-width="500">
+      Materiales pesados, herramientas industriales, acabados y ferretería técnica.
+    </text>
+    <text x="0" y="238" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#FFD100">
+      Despachos rápidos directos a tu taller o construcción.
+    </text>
+  </g>
+</svg>

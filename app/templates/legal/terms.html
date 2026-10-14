@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Términos y Condiciones — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 40px auto;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 48px; box-shadow: var(--shadow-sm);">
+        <span style="background: var(--brand-yellow); color: #111111; padding: 4px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">Condiciones Comerciales</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 16px 0 24px; color: var(--text-main);">Términos y Condiciones de Uso</h1>
+        <p style="color: var(--muted); font-size: 0.95rem;">Última actualización: Octubre de 2026</p>
+
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+        <div style="line-height: 1.8; color: var(--text-main); font-size: 0.96rem;">
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">1. Ámbito de Aplicación</h2>
+            <p>El acceso y compra de productos a través de este portal web se rige por los presentes Términos y Condiciones. Al realizar un pedido en <strong>{{ store_settings.store_name }}</strong>, el cliente acepta expresamente las cláusulas aquí estipuladas.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">2. Disponibilidad de Stock y Precios</h2>
+            <p>Los precios publicados en la tienda virtual están expresados en moneda legal (COP) e incluyen los tributos aplicables. Los precios válidos son aquellos calculados y confirmados en el servidor al momento de la orden. El inventario es auditado en tiempo real; en caso de agotamiento imprevisto, el sistema notificará inmediatamente al cliente y no procesará el cargo.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">3. Entorno de Pago de Prueba</h2>
+            <p>Esta versión de la plataforma opera en **Modo de Prueba**. Las transacciones procesadas a través del simulador de pago no representan débitos bancarios reales ni solicitan códigos de seguridad reales de tarjetas financieras.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">4. Despachos y Entregas a Domicilio</h2>
+            <p>Las entregas se efectuarán en la dirección suministrada por el cliente al momento de comprar. Las compras superiores a <strong>{{ store_settings.free_shipping_threshold | currency }}</strong> aplican para beneficio de envío sin costo adicional.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">5. Cancelaciones y Devoluciones</h2>
+            <p>El cliente podrá cancelar su pedido desde su perfil de usuario siempre que el estado se encuentre antes de preparación o despacho. Toda cancelación aprobada restituye automáticamente las existencias de los artículos al kárdex de inventario.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

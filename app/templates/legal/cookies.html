@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block title %}Política de Cookies — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 40px auto;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 48px; box-shadow: var(--shadow-sm);">
+        <span style="background: var(--brand-yellow); color: #111111; padding: 4px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">Privacidad Digital</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 16px 0 24px; color: var(--text-main);">Política de Cookies</h1>
+        <p style="color: var(--muted); font-size: 0.95rem;">Última actualización: Octubre de 2026</p>
+
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+        <div style="line-height: 1.8; color: var(--text-main); font-size: 0.96rem;">
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">1. ¿Qué son las Cookies?</h2>
+            <p>Las cookies son pequeños archivos de texto que se almacenan en su navegador web cuando visita nuestro sitio. Permiten recordar sus preferencias de navegación, mantener activa su sesión y conservar los productos agregados a su carrito de compras.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">2. Tipos de Cookies que Utilizamos</h2>
+            <table class="admin-table" style="margin: 20px 0;">
+                <thead>
+                    <tr>
+                        <th>Cookie / Clave</th>
+                        <th>Tipo</th>
+                        <th>Propósito</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>session</code></td>
+                        <td>Esencial / Técnica</td>
+                        <td>Identificación de sesión de usuario y carrito temporal de visitantes.</td>
+                    </tr>
+                    <tr>
+                        <td><code>csrf_token</code></td>
+                        <td>Seguridad</td>
+                        <td>Prevención de ataques de falsificación de peticiones en sitios cruzados.</td>
+                    </tr>
+                    <tr>
+                        <td><code>theme</code></td>
+                        <td>Preferencia</td>
+                        <td>Recuerda su selección de modo Claro o modo Oscuro.</td>
+                    </tr>
+                    <tr>
+                        <td><code>cookie_consent</code></td>
+                        <td>Preferencia</td>
+                        <td>Registra su aceptación del banner de consentimiento de cookies.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">3. Cómo Gestionar sus Preferencias</h2>
+            <p>Puede aceptar todas las cookies o configurar únicamente las esenciales a través del banner de consentimiento que aparece al navegar por primera vez en nuestra tienda, o bien limpiar las cookies y almacenamiento local desde la configuración de su navegador.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

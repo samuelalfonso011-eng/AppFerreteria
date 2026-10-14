@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Panel Administrativo{% endblock %} — {{ store_settings.store_name }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,18 +14,36 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <script>
+        (function() {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch(e) {}
+        })();
+    </script>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="admin-body">
-    <!-- SIDEBAR -->
-    <aside class="admin-sidebar">
-        <div class="admin-sidebar-brand">
-            <div class="brand-mark" style="width: 38px; height: 38px; font-size: 1.1rem;">F</div>
-            <div>
-                <strong style="display: block; font-size: 1rem; color: white;">Panel Ferretería</strong>
-                <span style="font-size: 0.75rem; color: #9ca3af;">Administración</span>
+    <!-- OVERLAY PARA MÓVILES -->
+    <div class="admin-sidebar-overlay" id="adminSidebarOverlay"></div>
+
+    <div class="admin-layout">
+        <!-- SIDEBAR -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="admin-sidebar-brand">
+                <div class="brand-mark" style="width: 38px; height: 38px; font-size: 1.1rem; background: var(--brand-yellow, #FFD100); color: #111111; font-weight: 800; border-radius: 8px; display: grid; place-items: center;">F</div>
+                <div style="flex: 1;">
+                    <strong style="display: block; font-size: 1rem; color: white;">Panel Ferretería</strong>
+                    <span style="font-size: 0.75rem; color: #9ca3af;">Administración</span>
+                </div>
+                <button class="admin-sidebar-close" id="adminSidebarClose" aria-label="Cerrar Menú" style="display: none; background: none; border: none; color: #9ca3af; font-size: 1.25rem; cursor: pointer;">✕</button>
             </div>
-        </div>
 
         <nav class="admin-sidebar-nav">
             <a href="{{ url_for('admin_dashboard.index') }}" class="admin-nav-item {% if request.endpoint == 'admin_dashboard.index' %}active{% endif %}">
@@ -66,11 +85,19 @@
     <!-- ÁREA PRINCIPAL -->
     <div class="admin-main">
         <header class="admin-topbar">
-            <div>
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <button class="admin-menu-toggle" id="adminMenuToggle" aria-label="Abrir Menú de Navegación">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
                 <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">{% block page_title %}Dashboard{% endblock %}</h2>
             </div>
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <span style="font-size: 0.88rem; color: #64748b;">Conectado como: <strong>{{ current_user.full_name }}</strong> (Admin)</span>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <!-- Botón de Modo Claro / Oscuro -->
+                <button type="button" class="theme-toggle-btn" id="themeToggleAdmin" title="Cambiar tema claro / oscuro" aria-label="Cambiar tema visual">
+                    <span class="theme-icon-light">☀️</span>
+                    <span class="theme-icon-dark">🌙</span>
+                </button>
+                <span class="admin-user-info" style="font-size: 0.88rem; color: var(--admin-muted, #64748b);">Conectado como: <strong>{{ current_user.full_name }}</strong> (Admin)</span>
             </div>
         </header>
 
@@ -91,8 +118,32 @@
             {% block content %}{% endblock %}
         </div>
     </div>
+    </div> <!-- FIN .admin-layout -->
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Controlador de menú lateral responsivo en el panel admin
+        (function() {
+            var toggleBtn = document.getElementById('adminMenuToggle');
+            var closeBtn = document.getElementById('adminSidebarClose');
+            var sidebar = document.getElementById('adminSidebar');
+            var overlay = document.getElementById('adminSidebarOverlay');
+
+            function openSidebar() {
+                if (sidebar) sidebar.classList.add('sidebar-open');
+                if (overlay) overlay.classList.add('active');
+            }
+
+            function closeSidebar() {
+                if (sidebar) sidebar.classList.remove('sidebar-open');
+                if (overlay) overlay.classList.remove('active');
+            }
+
+            if (toggleBtn) toggleBtn.addEventListener('click', openSidebar);
+            if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+            if (overlay) overlay.addEventListener('click', closeSidebar);
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

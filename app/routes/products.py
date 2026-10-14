@@ -1,6 +1,7 @@
 from decimal import Decimal
 from flask import Blueprint, render_template, request, abort
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from app.models.category import Category
 from app.models.product import Product
 
@@ -21,8 +22,8 @@ def catalog():
     availability = request.args.get('disponibilidad', '').strip()
     sort_by = request.args.get('orden', 'nuevos').strip()
 
-    # Base query: Solo productos activos para clientes
-    products_query = Product.query.filter_by(is_active=True)
+    # Base query: Solo productos activos con joinedload para evitar N+1
+    products_query = Product.query.options(joinedload(Product.category)).filter_by(is_active=True)
 
     # 1. Búsqueda por término (nombre, SKU o descripción)
     if query:

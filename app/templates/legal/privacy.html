@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Política de Privacidad — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 40px auto;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 48px; box-shadow: var(--shadow-sm);">
+        <span style="background: var(--brand-yellow); color: #111111; padding: 4px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">Marco Legal & Protección de Datos</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 16px 0 24px; color: var(--text-main);">Política de Privacidad y Tratamiento de Datos Personales</h1>
+        <p style="color: var(--muted); font-size: 0.95rem;">Última actualización: Octubre de 2026</p>
+
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+
+        <div style="line-height: 1.8; color: var(--text-main); font-size: 0.96rem;">
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">1. Responsable del Tratamiento</h2>
+            <p><strong>{{ store_settings.store_name }}</strong>, con domicilio en {{ store_settings.address }}, teléfono {{ store_settings.phone }} y correo electrónico {{ store_settings.email }}, actúa como responsable del tratamiento de los datos personales suministrados por los usuarios y clientes a través de esta plataforma digital.</p>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">2. Datos Objeto de Tratamiento</h2>
+            <p>Para la prestación del servicio de comercio electrónico y despacho de materiales de ferretería, recopilamos:</p>
+            <ul>
+                <li><strong>Datos de Identificación y Registro:</strong> Nombre completo, correo electrónico, número de teléfono.</li>
+                <li><strong>Datos de Entrega a Domicilio:</strong> Ciudad, barrio, dirección exacta, departamento e indicaciones de entrega.</li>
+                <li><strong>Datos Transaccionales:</strong> Historial de pedidos, montos facturados y estados de pago simulados.</li>
+            </ul>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">3. Finalidad del Tratamiento</h2>
+            <p>Los datos suministrados serán utilizados estrictamente para:</p>
+            <ol>
+                <li>Procesar, preparar, coordinar y entregar los pedidos de materiales y herramientas solicitados.</li>
+                <li>Emitir constancias de compra y comprobantes de pedido.</li>
+                <li>Atender solicitudes, consultas o reclamaciones de soporte.</li>
+                <li>Garantizar la seguridad de las cuentas y prevenir fraudes informáticos.</li>
+            </ol>
+
+            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">4. Derechos de los Titulares</h2>
+            <p>El cliente podrá en cualquier momento ejercer sus derechos de conocer, actualizar, rectificar y suprimir sus datos personales a través de su panel de perfil o escribiendo directamente a <strong>{{ store_settings.email }}</strong>.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

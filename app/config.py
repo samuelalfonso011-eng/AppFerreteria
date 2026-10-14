@@ -52,6 +52,9 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     REMEMBER_COOKIE_HTTPONLY = True
     WTF_CSRF_TIME_LIMIT = 3600
+    
+    # Caché y optimización de estáticos (12 horas por defecto)
+    SEND_FILE_MAX_AGE_DEFAULT = int(os.getenv("SEND_FILE_MAX_AGE_DEFAULT", 43200))
 
 
 class DevelopmentConfig(Config):

@@ -52,31 +52,33 @@
     <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">📑 Kárdex de Inventario</a>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px;">
     <!-- TOP PRODUCTOS MÁS VENDIDOS -->
     <div class="admin-card">
         <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; margin-bottom: 18px;">Top Productos Más Vendidos</h3>
         {% if top_selling %}
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th style="text-align: center;">Unidades</th>
-                        <th style="text-align: right;">Ingresos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in top_selling %}
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
                         <tr>
-                            <td><strong>{{ p.product_name }}</strong></td>
-                            <td style="text-align: center;"><span class="badge badge-info">{{ p.total_units }}</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ p.total_revenue | currency }}</td>
+                            <th>Producto</th>
+                            <th style="text-align: center;">Unidades</th>
+                            <th style="text-align: right;">Ingresos</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for p in top_selling %}
+                            <tr>
+                                <td><strong>{{ p.product_name }}</strong></td>
+                                <td style="text-align: center;"><span class="badge badge-info">{{ p.total_units }}</span></td>
+                                <td style="text-align: right; font-weight: 700;">{{ p.total_revenue | currency }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
-            <div style="padding: 24px; text-align: center; color: var(--muted); font-size: 0.9rem;">
+            <div style="padding: 24px; text-align: center; color: var(--admin-muted); font-size: 0.9rem;">
                 Aún no hay ventas registradas para generar el ranking de productos.
             </div>
         {% endif %}
@@ -86,39 +88,41 @@
     <div class="admin-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
             <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Últimos Pedidos</h3>
-            <a href="{{ url_for('admin_orders.index') }}" style="font-size: 0.85rem; color: var(--primary); font-weight: 600;">Ver todos &rarr;</a>
+            <a href="{{ url_for('admin_orders.index') }}" style="font-size: 0.85rem; color: var(--brand-yellow-hover, #d97706); font-weight: 700;">Ver todos &rarr;</a>
         </div>
         {% if recent_orders %}
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Pedido</th>
-                        <th>Cliente</th>
-                        <th>Estado</th>
-                        <th style="text-align: right;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for o in recent_orders %}
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
                         <tr>
-                            <td>
-                                <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" style="font-weight: 700; color: var(--primary);">
-                                    #{{ o.order_number }}
-                                </a>
-                            </td>
-                            <td>{{ o.shipping_recipient_name }}</td>
-                            <td>
-                                <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
-                                    {{ o.status_label }}
-                                </span>
-                            </td>
-                            <td style="text-align: right; font-weight: 700;">{{ o.total | currency }}</td>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th style="text-align: right;">Total</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for o in recent_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" style="font-weight: 700; color: var(--brand-yellow-hover, #d97706);">
+                                        #{{ o.order_number }}
+                                    </a>
+                                </td>
+                                <td>{{ o.shipping_recipient_name }}</td>
+                                <td>
+                                    <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
+                                        {{ o.status_label }}
+                                    </span>
+                                </td>
+                                <td style="text-align: right; font-weight: 700;">{{ o.total | currency }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
-            <div style="padding: 24px; text-align: center; color: var(--muted); font-size: 0.9rem;">
+            <div style="padding: 24px; text-align: center; color: var(--admin-muted); font-size: 0.9rem;">
                 No se han registrado pedidos en la tienda aún.
             </div>
         {% endif %}

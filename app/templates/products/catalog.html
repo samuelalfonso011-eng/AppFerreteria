@@ -80,12 +80,12 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px;">
                     {% for prod in products %}
                         <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;">
-                            <a href="{{ url_for('products.detail', slug=prod.slug) }}" style="display: block; background: #f3f4f6; height: 180px; display: grid; place-items: center; position: relative;">
-                                <span style="position: absolute; top: 10px; left: 10px; background: white; padding: 2px 7px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: var(--muted); border: 1px solid var(--border);">SKU: {{ prod.sku }}</span>
+                            <a href="{{ url_for('products.detail', slug=prod.slug) }}" style="display: block; background: #f8fafc; height: 180px; position: relative; overflow: hidden; border-bottom: 1px solid var(--border);">
+                                <span style="position: absolute; top: 10px; left: 10px; background: white; padding: 2px 7px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: var(--muted); border: 1px solid var(--border); z-index: 2;">SKU: {{ prod.sku }}</span>
                                 {% if prod.stock == 0 %}
-                                    <span style="position: absolute; top: 10px; right: 10px; background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">Agotado</span>
+                                    <span style="position: absolute; top: 10px; right: 10px; background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; z-index: 2;">Agotado</span>
                                 {% endif %}
-                                <div style="font-size: 3.5rem;">📦</div>
+                                <img src="{{ url_for('static', filename=prod.display_image) }}" alt="{{ prod.name }}" style="width: 100%; height: 100%; object-fit: contain; padding: 10px; transition: transform 0.25s ease;" onmouseover="this.style.transform='scale(1.05)';" onmouseout="this.style.transform='scale(1)';" onerror="this.src='/static/img/placeholder-product.svg'" loading="lazy" decoding="async">
                             </a>
 
                             <div style="padding: 16px; flex: 1; display: flex; flex-direction: column;">

@@ -46,10 +46,27 @@ class Product(db.Model):
 
     @property
     def display_image(self) -> str:
-        """Ruta de la imagen o placeholder por defecto si no tiene fotografía."""
+        """Ruta de la imagen o placeholder/ilustración de categoría por defecto."""
         if self.image_path:
             return f"uploads/products/{self.image_path}"
-        return "img/placeholder.webp"
+        
+        # Mapeo a ilustraciones vectoriales temáticas por categoría
+        if self.category and self.category.slug:
+            slug = self.category.slug.lower()
+            if 'herramienta' in slug:
+                return "img/temp/herramientas.svg"
+            if 'electric' in slug:
+                return "img/temp/electricidad.svg"
+            if 'plomer' in slug or 'tubo' in slug or 'tuber' in slug:
+                return "img/temp/plomeria.svg"
+            if 'construc' in slug:
+                return "img/temp/construccion.svg"
+            if 'pintur' in slug:
+                return "img/temp/pintura.svg"
+            if 'segur' in slug:
+                return "img/temp/seguridad.svg"
+                
+        return "img/placeholder-product.svg"
 
     def __repr__(self):
         return f"<Product {self.sku} - {self.name} - ${self.price}>"

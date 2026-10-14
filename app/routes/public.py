@@ -1,7 +1,11 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session
+from sqlalchemy.orm import joinedload
+from app.extensions import db
 from app.models.category import Category
 from app.models.product import Product
 from app.models.setting import StoreSetting
+from app.models.contact import ContactMessage
+from app.forms.contact_forms import ContactForm
 
 public_bp = Blueprint('public', __name__)
 
@@ -14,11 +18,11 @@ def home():
     # Categorías activas
     categories = Category.query.filter_by(is_active=True).all()
     
-    # Productos destacados (activos y con inventario)
-    featured_products = Product.query.filter_by(is_active=True).filter(Product.stock > 0).limit(8).all()
+    # Productos destacados (activos y con inventario) con joinedload
+    featured_products = Product.query.options(joinedload(Product.category)).filter_by(is_active=True).filter(Product.stock > 0).limit(8).all()
     
-    # Novedades (productos añadidos recientemente)
-    recent_products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).limit(4).all()
+    # Novedades (productos añadidos recientemente) con joinedload
+    recent_products = Product.query.options(joinedload(Product.category)).filter_by(is_active=True).order_by(Product.created_at.desc()).limit(4).all()
 
     return render_template(
         'home.html',
@@ -36,11 +40,26 @@ def about():
     return render_template('about.html', settings=settings)
 
 
-@public_bp.route('/contacto')
+@public_bp.route('/contacto', methods=['GET', 'POST'])
 def contact():
-    """Página de contacto y ubicación física."""
+    """Página de contacto, formulario de atención y ubicación física."""
     settings = StoreSetting.get_settings()
-    return render_template('contact.html', settings=settings)
+    form = ContactForm()
+
+    if form.validate_on_submit():
+        contact_msg = ContactMessage(
+            full_name=form.full_name.data.strip(),
+            email=form.email.data.strip().lower(),
+            phone=form.phone.data.strip() if form.phone.data else None,
+            subject=form.subject.data,
+            message=form.message.data.strip()
+        )
+        db.session.add(contact_msg)
+        db.session.commit()
+        flash("¡Gracias por contactarnos! Tu mensaje ha sido recibido exitosamente. Nos comunicaremos contigo en breve.", "success")
+        return redirect(url_for('public.contact'))
+
+    return render_template('contact.html', settings=settings, form=form)
 
 
 @public_bp.route('/entregas')
@@ -48,3 +67,41 @@ def delivery_info():
     """Información sobre políticas de entregas a domicilio y tarifas."""
     settings = StoreSetting.get_settings()
     return render_template('delivery_info.html', settings=settings)
+
+
+# ==============================================================================
+# PÁGINAS LEGALES Y PRIVACIDAD
+# ==============================================================================
+
+@public_bp.route('/politica-de-privacidad')
+def privacy_policy():
+    """Política de tratamiento de datos personales y privacidad."""
+    settings = StoreSetting.get_settings()
+    return render_template('legal/privacy.html', settings=settings)
+
+
+@public_bp.route('/terminos-y-condiciones')
+def terms_conditions():
+    """Términos y condiciones de uso de la tienda y pedidos."""
+    settings = StoreSetting.get_settings()
+    return render_template('legal/terms.html', settings=settings)
+
+
+@public_bp.route('/politica-de-cookies')
+def cookies_policy():
+    """Política de uso de cookies y preferencias técnicas."""
+    settings = StoreSetting.get_settings()
+    return render_template('legal/cookies.html', settings=settings)
+
+
+@public_bp.route('/set-language/<lang>')
+def set_language(lang):
+    """Permite alternar entre Español (es) e Inglés (en) guardándolo en la sesión."""
+    if lang in ['es', 'en']:
+        session['lang'] = lang
+    referrer = request.referrer
+    if referrer and referrer.startswith(request.host_url):
+        return redirect(referrer)
+    return redirect(url_for('public.home'))
+
+

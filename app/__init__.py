@@ -44,12 +44,17 @@ def create_app(config_name: str = None) -> Flask:
     def inject_global_data():
         settings = StoreSetting.get_settings()
         from flask_login import current_user
+        from flask import session
+        from app.translations import translate
         cart_info = CartService.get_cart_data(current_user)
+        current_lang = session.get('lang', 'es')
         return {
             'store_settings': settings,
             'cart_item_count': cart_info['total_items'],
             'cart_subtotal': cart_info['subtotal'],
-            'current_year': datetime.now().year
+            'current_year': datetime.now().year,
+            'current_lang': current_lang,
+            't': lambda key, default=None: translate(key, current_lang, default)
         }
 
     # Filtros personalizados de Jinja2

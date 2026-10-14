@@ -14,11 +14,11 @@
 
     <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; display: grid; grid-template-columns: 1fr 1.2fr; gap: 48px; margin-bottom: 50px;">
         <!-- IMAGEN PRINCIPAL -->
-        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); height: 420px; display: grid; place-items: center; position: relative;">
-            <span style="position: absolute; top: 16px; left: 16px; background: white; padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; color: var(--muted); border: 1px solid var(--border);">
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); height: 420px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+            <span style="position: absolute; top: 16px; left: 16px; background: white; padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; color: var(--muted); border: 1px solid var(--border); z-index: 2;">
                 SKU: {{ product.sku }}
             </span>
-            <div style="font-size: 7rem;">🛠️</div>
+            <img src="{{ url_for('static', filename=product.display_image) }}" alt="{{ product.name }}" style="max-width: 90%; max-height: 90%; object-fit: contain; padding: 16px;" onerror="this.src='/static/img/placeholder-product.svg'">
         </div>
 
         <!-- INFORMACIÓN COMERCIAL -->

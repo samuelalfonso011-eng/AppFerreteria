@@ -86,3 +86,26 @@ class AddressForm(FlaskForm):
     delivery_instructions = TextAreaField('Indicaciones adicionales de entrega')
     is_default = BooleanField('Establecer como dirección principal')
     submit = SubmitField('Guardar dirección')
+
+
+class ForgotPasswordForm(FlaskForm):
+    """Formulario para solicitar restablecimiento de contraseña."""
+    email = StringField('Correo electrónico', validators=[
+        DataRequired(message="El correo electrónico es obligatorio."),
+        Email(check_deliverability=False, message="Introduce un correo electrónico válido.")
+    ])
+    submit = SubmitField('Enviar enlace de recuperación')
+
+
+class ResetPasswordForm(FlaskForm):
+    """Formulario para definir una nueva contraseña con token firmado."""
+    password = PasswordField('Nueva contraseña', validators=[
+        DataRequired(message="La nueva contraseña es obligatoria."),
+        Length(min=6, message="La contraseña debe tener al menos 6 caracteres.")
+    ])
+    confirm_password = PasswordField('Confirmar nueva contraseña', validators=[
+        DataRequired(message="Por favor confirma la nueva contraseña."),
+        EqualTo('password', message="Las contraseñas no coinciden.")
+    ])
+    submit = SubmitField('Guardar nueva contraseña')
+

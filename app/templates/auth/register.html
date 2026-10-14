@@ -54,6 +54,13 @@
                 {% endfor %}
             </div>
 
+            <div style="margin-bottom: 22px; font-size: 0.86rem; color: var(--text-main);">
+                <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="accept_terms" required checked style="margin-top: 4px; accent-color: var(--brand-yellow);">
+                    <span>He leído y acepto la <a href="{{ url_for('public.privacy_policy') }}" target="_blank" style="color: var(--brand-yellow-hover, #d97706); font-weight: 700; text-decoration: underline;">Política de Privacidad</a> y los <a href="{{ url_for('public.terms_conditions') }}" target="_blank" style="color: var(--brand-yellow-hover, #d97706); font-weight: 700; text-decoration: underline;">Términos y Condiciones</a> de la ferretería.</span>
+                </label>
+            </div>
+
             {{ form.submit(class="btn btn-primary btn-full", style="padding: 12px; font-size: 1rem;") }}
         </form>
 
