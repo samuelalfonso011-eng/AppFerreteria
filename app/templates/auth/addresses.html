@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}Mis Direcciones — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h1 style="font-size: 1.8rem; font-weight: 800; margin: 0 0 4px;">Libreta de Direcciones</h1>
+            <p style="color: var(--muted); margin: 0;">Gestiona los lugares habituales de entrega para tus pedidos de ferretería.</p>
+        </div>
+        <a href="{{ url_for('auth.profile') }}" class="btn btn-outline btn-sm">&larr; Volver al perfil</a>
+    </div>
+
+    <!-- DIRECCIONES EXISTENTES -->
+    <div style="margin-bottom: 40px;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">Direcciones Guardadas</h3>
+        {% if addresses %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+                {% for addr in addresses %}
+                    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; position: relative;">
+                        {% if addr.is_default %}
+                            <span style="position: absolute; top: 12px; right: 12px; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">
+                                Principal
+                            </span>
+                        {% endif %}
+
+                        <strong style="display: block; font-size: 1rem; margin-bottom: 4px;">{{ addr.recipient_name }}</strong>
+                        <span style="display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 10px;">📞 {{ addr.phone }}</span>
+                        
+                        <p style="font-size: 0.9rem; margin: 0 0 6px;">{{ addr.street_address }} {% if addr.complement %}({{ addr.complement }}){% endif %}</p>
+                        <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 14px;">{{ addr.neighborhood }}, {{ addr.city }}, {{ addr.department }}</p>
+
+                        <div style="display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px;">
+                            {% if not addr.is_default %}
+                                <form action="{{ url_for('auth.set_default_address', address_id=addr.id) }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline btn-sm" style="font-size: 0.78rem;">Hacer principal</button>
+                                </form>
+                            {% endif %}
+                            <form action="{{ url_for('auth.delete_address', address_id=addr.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar esta dirección?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem;">Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 24px; text-align: center; color: var(--muted);">
+                Aún no tienes direcciones guardadas. Agrega una nueva a continuación.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- FORMULARIO DE NUEVA DIRECCIÓN -->
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-top: 0; margin-bottom: 20px;">Agregar Nueva Dirección</h3>
+
+        <form action="{{ url_for('auth.addresses') }}" method="POST">
+            {{ form.hidden_tag() }}
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.recipient_name.label.text }}</label>
+                    {{ form.recipient_name(class="admin-form-control", placeholder="Nombre completo") }}
+                    {% for err in form.recipient_name.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.phone.label.text }}</label>
+                    {{ form.phone(class="admin-form-control", placeholder="Número de contacto") }}
+                    {% for err in form.phone.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.department.label.text }}</label>
+                    {{ form.department(class="admin-form-control", placeholder="Ej. Antioquia") }}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.city.label.text }}</label>
+                    {{ form.city(class="admin-form-control", placeholder="Ej. Medellín") }}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.neighborhood.label.text }}</label>
+                    {{ form.neighborhood(class="admin-form-control", placeholder="Ej. Laureles") }}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="admin-form-group" style="grid-column: span 2;">
+                    <label>{{ form.street_address.label.text }}</label>
+                    {{ form.street_address(class="admin-form-control", placeholder="Ej. Circular 4 # 73-20") }}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.complement.label.text }}</label>
+                    {{ form.complement(class="admin-form-control", placeholder="Ej. Apto 302") }}
+                </div>
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.delivery_instructions.label.text }}</label>
+                {{ form.delivery_instructions(class="admin-form-control", rows="2", placeholder="Indicaciones para el domiciliario...") }}
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
+                    {{ form.is_default() }}
+                    <span>{{ form.is_default.label.text }}</span>
+                </label>
+            </div>
+
+            {{ form.submit(class="btn btn-primary") }}
+        </form>
+    </div>
+</div>
+{% endblock %}

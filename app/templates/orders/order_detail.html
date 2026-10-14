@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de Pedido #{{ order.order_number }} — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h1 style="font-size: 1.8rem; font-weight: 800; margin: 0 0 4px;">Pedido #{{ order.order_number }}</h1>
+            <span style="color: var(--muted); font-size: 0.9rem;">Realizado el {{ order.created_at | date_format }}</span>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge {% if order.status == 'DELIVERED' %}badge-success{% elif order.status == 'CANCELLED' %}badge-danger{% elif order.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}" style="font-size: 0.9rem; padding: 6px 14px;">
+                {{ order.status_label }}
+            </span>
+            <a href="{{ url_for('orders.my_orders') }}" class="btn btn-outline btn-sm">&larr; Volver</a>
+        </div>
+    </div>
+
+    <!-- TARJETA PRINCIPAL DEL PEDIDO -->
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; margin-bottom: 30px;">
+        <!-- INFORMACIÓN DE ENTREGA -->
+        <div style="margin-bottom: 28px; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 12px;">Datos de Entrega (Snapshot Histórico)</h3>
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-size: 0.92rem;">
+                <p style="margin: 0 0 6px;"><strong>Recibe:</strong> {{ order.shipping_recipient_name }} | 📞 {{ order.shipping_phone }}</p>
+                <p style="margin: 0 0 6px;"><strong>Dirección:</strong> {{ order.formatted_shipping_address() }}</p>
+                {% if order.shipping_instructions %}
+                    <p style="margin: 0; color: var(--muted);"><strong>Instrucciones:</strong> {{ order.shipping_instructions }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- PRODUCTOS COMPRADOS -->
+        <div style="margin-bottom: 28px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 14px;">Artículos Adquiridos</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.92rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--muted);">
+                        <th style="padding: 10px 0;">Producto</th>
+                        <th style="padding: 10px 0; text-align: center;">Cantidad</th>
+                        <th style="padding: 10px 0; text-align: right;">Precio Histórico</th>
+                        <th style="padding: 10px 0; text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px 0;">
+                                <strong style="display: block;">{{ item.product_name }}</strong>
+                                <span style="font-size: 0.75rem; color: var(--muted);">SKU: {{ item.product_sku }}</span>
+                            </td>
+                            <td style="padding: 12px 0; text-align: center;">{{ item.quantity }}</td>
+                            <td style="padding: 12px 0; text-align: right;">{{ item.unit_price | currency }}</td>
+                            <td style="padding: 12px 0; text-align: right; font-weight: 700;">{{ item.subtotal | currency }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TOTALES -->
+        <div style="border-top: 2px solid var(--border); padding-top: 16px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: var(--muted);">Subtotal:</span>
+                <strong>{{ order.subtotal | currency }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: var(--muted);">Costo de Envío:</span>
+                <strong>{{ order.shipping_cost | currency }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 800; color: var(--secondary);">
+                <span>Total:</span>
+                <span style="color: var(--primary);">{{ order.total | currency }}</span>
+            </div>
+        </div>
+
+        <!-- ESTADO DEL PAGO DE PRUEBA -->
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-size: 0.88rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>Pago de Prueba (Simulado):</strong>
+                    {% if latest_payment %}
+                        <span style="margin-left: 8px;" class="badge {% if latest_payment.status == 'APPROVED' %}badge-success{% else %}badge-warning{% endif %}">
+                            {{ latest_payment.status_label }}
+                        </span>
+                        <span style="color: var(--muted); font-size: 0.78rem; display: block; margin-top: 4px;">Ref: {{ latest_payment.transaction_reference }}</span>
+                    {% else %}
+                        <span class="badge badge-secondary" style="margin-left: 8px;">Pendiente</span>
+                    {% endif %}
+                </div>
+                {% if order.status == 'PENDING_CONFIRMATION' %}
+                    <a href="{{ url_for('checkout.payment_view', order_number=order.order_number) }}" class="btn btn-primary btn-sm">
+                        Completar Pago de Prueba
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- TRAZABILIDAD E HISTORIAL DE ESTADOS -->
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 30px;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 16px;">Trazabilidad del Pedido</h3>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            {% for h in order.status_history %}
+                <div style="display: flex; gap: 16px; align-items: flex-start;">
+                    <div style="width: 10px; height: 10px; border-radius: 999px; background: var(--primary); margin-top: 6px;"></div>
+                    <div>
+                        <strong style="font-size: 0.92rem;">{{ labels.get(h.new_status, h.new_status) if labels else h.new_status }}</strong>
+                        <span style="font-size: 0.78rem; color: var(--muted); margin-left: 8px;">{{ h.created_at | date_format }}</span>
+                        {% if h.comment %}
+                            <p style="font-size: 0.85rem; color: #4b5563; margin: 4px 0 0;">{{ h.comment }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- CANCELACIÓN POR PARTE DEL CLIENTE -->
+    {% if order.can_cancel_by_customer %}
+        <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: var(--radius-lg); padding: 24px;">
+            <h3 style="font-size: 1.05rem; font-weight: 700; color: #9b2c2c; margin-top: 0; margin-bottom: 8px;">Cancelar Pedido</h3>
+            <p style="font-size: 0.88rem; color: #742a2a; margin-bottom: 16px;">
+                Como el pedido aún no ha entrado en preparación o despacho, puedes solicitar su cancelación. Las unidades reservadas serán repuestas automáticamente al inventario.
+            </p>
+            <form action="{{ url_for('orders.cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas cancelar este pedido?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div style="display: flex; gap: 12px;">
+                    <input type="text" name="reason" placeholder="Motivo de la cancelación (opcional)" class="admin-form-control" style="max-width: 400px;">
+                    <button type="submit" class="btn btn-danger">Confirmar Cancelación</button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Configuración de la Tienda{% endblock %}
+{% block page_title %}Configuración Comercial e Institucional{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div class="admin-card">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-top: 0; margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                Identidad y Contacto
+            </h3>
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.store_name.label.text }} *</label>
+                    {{ form.store_name(class="admin-form-control") }}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.phone.label.text }} *</label>
+                    {{ form.phone(class="admin-form-control") }}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.email.label.text }} *</label>
+                    {{ form.email(class="admin-form-control") }}
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.address.label.text }} *</label>
+                    {{ form.address(class="admin-form-control") }}
+                </div>
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.business_hours.label.text }} *</label>
+                {{ form.business_hours(class="admin-form-control") }}
+            </div>
+
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-top: 32px; margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                Tarifas y Reglas de Entrega a Domicilio
+            </h3>
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.default_shipping_cost.label.text }} *</label>
+                    {{ form.default_shipping_cost(class="admin-form-control") }}
+                    <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Tarifa fija para pedidos estándar.</span>
+                </div>
+                <div class="admin-form-group">
+                    <label>{{ form.free_shipping_threshold.label.text }}</label>
+                    {{ form.free_shipping_threshold(class="admin-form-control") }}
+                    <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Pedidos iguales o superiores a este monto tendrán envío gratis.</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 24px;">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

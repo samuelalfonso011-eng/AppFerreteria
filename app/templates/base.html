@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ store_settings.store_name }}{% endblock %}</title>
+    <meta name="description" content="Tienda virtual y catálogo ferretero profesional con entrega a domicilio.">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="topbar">
+        <a href="{{ url_for('public.home') }}" class="brand">
+            <div class="brand-mark">F</div>
+            <div class="brand-text">
+                <h1>{{ store_settings.store_name }}</h1>
+                <span>Materiales & Herramientas</span>
+            </div>
+        </a>
+
+        <div class="search-box">
+            <form action="{{ url_for('products.catalog') }}" method="GET" class="search-form">
+                <span class="search-icon">🔍</span>
+                <input type="search" name="q" placeholder="Buscar herramientas, materiales o SKU..." value="{{ request.args.get('q', '') }}" aria-label="Buscar productos">
+            </form>
+        </div>
+
+        <nav class="nav-links">
+            <a href="{{ url_for('products.catalog') }}" class="nav-item">Catálogo</a>
+            <a href="{{ url_for('public.delivery_info') }}" class="nav-item">Entregas</a>
+            <a href="{{ url_for('public.about') }}" class="nav-item">Nosotros</a>
+            <a href="{{ url_for('public.contact') }}" class="nav-item">Contacto</a>
+        </nav>
+
+        <div class="header-actions">
+            {% if current_user.is_authenticated %}
+                {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin_dashboard.index') }}" class="btn btn-outline btn-sm">⚙️ Modo Admin</a>
+                {% endif %}
+                <a href="{{ url_for('orders.my_orders') }}" class="nav-item">Mis Pedidos</a>
+                <a href="{{ url_for('auth.profile') }}" class="nav-item">{{ current_user.full_name.split()[0] }}</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm">Salir</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}" class="btn btn-outline btn-sm">Ingresar</a>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">Registrarse</a>
+            {% endif %}
+
+            <a href="{{ url_for('cart.view') }}" class="cart-button" aria-label="Ver carrito">
+                <span>🛒</span>
+                <span>Carrito</span>
+                <span class="cart-badge">{{ cart_item_count }}</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Contenedor de mensajes flash -->
+    <div class="flash-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" role="alert">
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-grid">
+            <div class="footer-column">
+                <h3>{{ store_settings.store_name }}</h3>
+                <p>Materiales de construcción de alta calidad, herramientas y suministros para proyectos residenciales e industriales.</p>
+            </div>
+            <div class="footer-column">
+                <h3>Atención al Cliente</h3>
+                <p>📞 {{ store_settings.phone }}</p>
+                <p>✉️ {{ store_settings.email }}</p>
+                <p>📍 {{ store_settings.address }}</p>
+            </div>
+            <div class="footer-column">
+                <h3>Horarios de Despacho</h3>
+                <p>{{ store_settings.business_hours }}</p>
+            </div>
+            <div class="footer-column">
+                <h3>Enlaces Rápidos</h3>
+                <a href="{{ url_for('products.catalog') }}">Catálogo Completo</a>
+                <a href="{{ url_for('public.delivery_info') }}">Políticas de Entrega</a>
+                <a href="{{ url_for('auth.login') }}">Acceso a Clientes</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; {{ current_year }} {{ store_settings.store_name }}. Todos los derechos reservados. Desarrollado con Flask y PostgreSQL.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

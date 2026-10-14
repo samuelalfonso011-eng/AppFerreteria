@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Panel Administrativo{% endblock %} — {{ store_settings.store_name }}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="admin-body">
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-brand">
+            <div class="brand-mark" style="width: 38px; height: 38px; font-size: 1.1rem;">F</div>
+            <div>
+                <strong style="display: block; font-size: 1rem; color: white;">Panel Ferretería</strong>
+                <span style="font-size: 0.75rem; color: #9ca3af;">Administración</span>
+            </div>
+        </div>
+
+        <nav class="admin-sidebar-nav">
+            <a href="{{ url_for('admin_dashboard.index') }}" class="admin-nav-item {% if request.endpoint == 'admin_dashboard.index' %}active{% endif %}">
+                <span>📊</span> <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('admin_products.index') }}" class="admin-nav-item {% if 'admin_products' in request.endpoint %}active{% endif %}">
+                <span>📦</span> <span>Productos</span>
+            </a>
+            <a href="{{ url_for('admin_categories.index') }}" class="admin-nav-item {% if 'admin_categories' in request.endpoint %}active{% endif %}">
+                <span>🏷️</span> <span>Categorías</span>
+            </a>
+            <a href="{{ url_for('admin_inventory.index') }}" class="admin-nav-item {% if 'admin_inventory' in request.endpoint %}active{% endif %}">
+                <span>📋</span> <span>Inventario (Kárdex)</span>
+            </a>
+            <a href="{{ url_for('admin_orders.index') }}" class="admin-nav-item {% if 'admin_orders' in request.endpoint %}active{% endif %}">
+                <span>🛒</span> <span>Pedidos</span>
+            </a>
+            <a href="{{ url_for('admin_customers.index') }}" class="admin-nav-item {% if 'admin_customers' in request.endpoint %}active{% endif %}">
+                <span>👥</span> <span>Clientes</span>
+            </a>
+            <a href="{{ url_for('admin_payments.index') }}" class="admin-nav-item {% if 'admin_payments' in request.endpoint %}active{% endif %}">
+                <span>💳</span> <span>Pagos de Prueba</span>
+            </a>
+            <a href="{{ url_for('admin_settings.index') }}" class="admin-nav-item {% if 'admin_settings' in request.endpoint %}active{% endif %}">
+                <span>⚙️</span> <span>Configuración</span>
+            </a>
+        </nav>
+
+        <div class="admin-sidebar-footer">
+            <a href="{{ url_for('public.home') }}" class="btn btn-outline btn-sm btn-full" style="color: white; border-color: #374151; background: transparent;">
+                🌐 Ver Tienda Pública
+            </a>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-danger btn-sm btn-full">
+                Cerrar Sesión
+            </a>
+        </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL -->
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div>
+                <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">{% block page_title %}Dashboard{% endblock %}</h2>
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px;">
+                <span style="font-size: 0.88rem; color: #64748b;">Conectado como: <strong>{{ current_user.full_name }}</strong> (Admin)</span>
+            </div>
+        </header>
+
+        <!-- Mensajes Flash -->
+        <div style="padding: 18px 32px 0;">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="admin-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

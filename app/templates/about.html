@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Nosotros — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 30px auto;">
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-sm);">
+        <span style="color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.05em;">Nuestra Historia & Compromiso</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 8px 0 20px;">Sobre {{ store_settings.store_name }}</h1>
+
+        <p style="font-size: 1.05rem; line-height: 1.7; color: #374151; margin-bottom: 20px;">
+            En <strong>{{ store_settings.store_name }}</strong> somos especialistas en el suministro confiable de materiales de construcción, herramientas de alto rendimiento, tuberías, pintura e insumos eléctricos para contratistas, maestros de obra y proyectos residenciales.
+        </p>
+
+        <p style="font-size: 1rem; line-height: 1.7; color: #4b5563; margin-bottom: 28px;">
+            Nuestro objetivo es conectar la experiencia de la ferretería tradicional con la agilidad de los canales digitales, permitiéndote cotizar, gestionar pedidos y programar entregas a domicilio con total transparencia y respaldo.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 32px;">
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px;">
+                <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--secondary);">Misión</h3>
+                <p style="font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.5;">Proveer soluciones oportunas y materiales de primera calidad para que cada obra y remodelación se realice con seguridad.</p>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px;">
+                <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--secondary);">Visión</h3>
+                <p style="font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.5;">Ser el aliado de abastecimiento ferretero preferido por constructores y hogares en nuestra región.</p>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px;">
+                <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--secondary);">Valores</h3>
+                <p style="font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.5;">Honestidad comercial, cumplimiento en las entregas, asesoría técnica y atención personalizada.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

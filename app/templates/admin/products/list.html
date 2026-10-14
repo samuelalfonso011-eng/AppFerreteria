@@ -1,0 +1,116 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Gestión de Productos{% endblock %}
+{% block page_title %}Catálogo de Productos{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <!-- FILTROS -->
+    <form action="{{ url_for('admin_products.index') }}" method="GET" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <input type="text" name="q" placeholder="Buscar por nombre o SKU..." value="{{ current_search }}" class="admin-form-control" style="width: 240px;">
+        <select name="categoria" class="admin-form-control" style="width: 180px;">
+            <option value="">Todas las categorías</option>
+            {% for c in categories %}
+                <option value="{{ c.id }}" {% if current_cat == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <select name="estado" class="admin-form-control" style="width: 140px;">
+            <option value="">Todos</option>
+            <option value="activo" {% if current_status == 'activo' %}selected{% endif %}>Activos</option>
+            <option value="inactivo" {% if current_status == 'inactivo' %}selected{% endif %}>Inactivos</option>
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        {% if current_search or current_cat or current_status %}
+            <a href="{{ url_for('admin_products.index') }}" class="btn btn-outline btn-sm">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <a href="{{ url_for('admin_products.create') }}" class="btn btn-primary">
+        + Nuevo Producto
+    </a>
+</div>
+
+<div class="admin-card">
+    {% if products %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th style="text-align: center;">Stock</th>
+                    <th style="text-align: center;">Estado</th>
+                    <th style="text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                    <tr>
+                        <td><code style="font-weight: 700;">{{ p.sku }}</code></td>
+                        <td>
+                            <strong>{{ p.name }}</strong>
+                            {% if p.image_path %}
+                                <span style="font-size: 0.72rem; color: var(--muted); display: block;">📷 Foto cargada</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.category.name }}</td>
+                        <td style="font-weight: 700;">{{ p.price | currency }}</td>
+                        <td style="text-align: center;">
+                            {% if p.stock == 0 %}
+                                <span class="badge badge-danger">Agotado (0)</span>
+                            {% elif p.is_low_stock %}
+                                <span class="badge badge-warning">Bajo ({{ p.stock }})</span>
+                            {% else %}
+                                <span class="badge badge-success">{{ p.stock }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center;">
+                            {% if p.is_active %}
+                                <span class="badge badge-success">Activo</span>
+                            {% else %}
+                                <span class="badge badge-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: inline-flex; gap: 8px;">
+                                <a href="{{ url_for('admin_products.edit', product_id=p.id) }}" class="btn btn-outline btn-sm" title="Editar">✏️</a>
+                                
+                                <form action="{{ url_for('admin_products.toggle_status', product_id=p.id) }}" method="POST" style="display: inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline btn-sm" title="{% if p.is_active %}Desactivar{% else %}Activar{% endif %}">
+                                        {% if p.is_active %}⏸️{% else %}▶️{% endif %}
+                                    </button>
+                                </form>
+
+                                <form action="{{ url_for('admin_products.delete', product_id=p.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('¿Deseas eliminar este producto? (Si tiene historial de pedidos, el sistema preservará los datos y sugerirá desactivarlo).');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar">🗑️</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- PAGINACIÓN -->
+        {% if pagination.pages > 1 %}
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+                {% if pagination.has_prev %}
+                    <a href="{{ url_for('admin_products.index', page=pagination.prev_num, q=current_search, categoria=current_cat, estado=current_status) }}" class="btn btn-outline btn-sm">&larr; Anterior</a>
+                {% endif %}
+                <span style="padding: 6px 14px; align-self: center; font-weight: 600; font-size: 0.88rem;">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+                {% if pagination.has_next %}
+                    <a href="{{ url_for('admin_products.index', page=pagination.next_num, q=current_search, categoria=current_cat, estado=current_status) }}" class="btn btn-outline btn-sm">Siguiente &rarr;</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: var(--muted);">
+            No hay productos registrados que coincidan con los criterios.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

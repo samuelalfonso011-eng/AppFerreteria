@@ -1,0 +1,49 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Ajuste de Inventario — {{ product.name }}{% endblock %}
+{% block page_title %}Ajuste Manual de Existencias{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">&larr; Volver al Kárdex</a>
+    </div>
+
+    <div class="admin-card">
+        <div style="border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px;">
+            <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Producto Seleccionado</span>
+            <h3 style="margin: 4px 0 6px; font-size: 1.2rem;">{{ product.name }}</h3>
+            <span style="font-size: 0.85rem; color: var(--muted);">SKU: <code>{{ product.sku }}</code> | Stock actual registrado: <strong>{{ product.stock }} unidades</strong></span>
+        </div>
+
+        <form method="POST">
+            {{ form.hidden_tag() }}
+
+            <div class="admin-form-group">
+                <label>{{ form.target_stock.label.text }} *</label>
+                {{ form.target_stock(class="admin-form-control", placeholder="Ingresa la nueva cantidad física") }}
+                {% for err in form.target_stock.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.reason.label.text }} *</label>
+                {{ form.reason(class="admin-form-control", placeholder="Ej. Conteo físico periódico / Merma por rotura / Entrada de proveedor") }}
+                {% for err in form.reason.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 24px; font-size: 0.82rem; color: var(--muted);">
+                ℹ️ Todo ajuste manual queda auditado permanentemente en el Kárdex con la firma de tu usuario administrador y la fecha exacta.
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

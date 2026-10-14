@@ -1,0 +1,103 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Kárdex de Inventario{% endblock %}
+{% block page_title %}Kárdex y Auditoría de Movimientos de Inventario{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+    <!-- FILTROS -->
+    <form method="GET" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <select name="producto_id" class="admin-form-control" style="width: 240px;">
+            <option value="">Todos los productos</option>
+            {% for p in products %}
+                <option value="{{ p.id }}" {% if current_prod_id == p.id %}selected{% endif %}>{{ p.name }} ({{ p.sku }})</option>
+            {% endfor %}
+        </select>
+        <select name="tipo" class="admin-form-control" style="width: 220px;">
+            <option value="">Todos los tipos</option>
+            {% for t in movement_types %}
+                <option value="{{ t }}" {% if current_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        {% if current_prod_id or current_type %}
+            <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">Limpiar</a>
+        {% endif %}
+    </form>
+
+    <div style="display: flex; gap: 10px;">
+        <a href="{{ url_for('admin_inventory.alerts') }}" class="btn btn-outline btn-sm">⚠️ Ver Alertas de Stock</a>
+    </div>
+</div>
+
+<div class="admin-card">
+    {% if movements %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Producto</th>
+                    <th>Tipo de Movimiento</th>
+                    <th style="text-align: center;">Stock Ant.</th>
+                    <th style="text-align: center;">Movimiento</th>
+                    <th style="text-align: center;">Stock Nuevo</th>
+                    <th>Responsable</th>
+                    <th>Motivo / Referencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movements %}
+                    <tr>
+                        <td style="font-size: 0.82rem; color: var(--muted);">{{ m.created_at | date_format }}</td>
+                        <td>
+                            <strong>{{ m.product.name }}</strong>
+                            <span style="font-size: 0.75rem; color: var(--muted); display: block;">SKU: {{ m.product.sku }}</span>
+                        </td>
+                        <td>
+                            {% if m.movement_type in ['PURCHASE_ENTRY', 'ORDER_CANCEL_RESTORE', 'ADJUSTMENT_IN'] %}
+                                <span class="badge badge-success">{{ m.movement_type }}</span>
+                            {% else %}
+                                <span class="badge badge-danger">{{ m.movement_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; color: var(--muted);">{{ m.previous_stock }}</td>
+                        <td style="text-align: center; font-weight: 800;">
+                            {% if m.movement_type in ['PURCHASE_ENTRY', 'ORDER_CANCEL_RESTORE', 'ADJUSTMENT_IN'] %}
+                                <span style="color: var(--success);">+{{ m.quantity }}</span>
+                            {% else %}
+                                <span style="color: var(--danger);">-{{ m.quantity }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; font-weight: 700;">{{ m.new_stock }}</td>
+                        <td style="font-size: 0.85rem;">{{ m.user.full_name }}</td>
+                        <td style="font-size: 0.85rem;">
+                            {{ m.reason }}
+                            {% if m.reference_id %}
+                                <span style="display: block; font-size: 0.75rem; color: var(--muted);">Ref: {{ m.reference_id }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- PAGINACIÓN -->
+        {% if pagination.pages > 1 %}
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+                {% if pagination.has_prev %}
+                    <a href="{{ url_for('admin_inventory.index', page=pagination.prev_num, producto_id=current_prod_id, tipo=current_type) }}" class="btn btn-outline btn-sm">&larr; Anterior</a>
+                {% endif %}
+                <span style="padding: 6px 14px; align-self: center; font-weight: 600; font-size: 0.88rem;">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+                {% if pagination.has_next %}
+                    <a href="{{ url_for('admin_inventory.index', page=pagination.next_num, producto_id=current_prod_id, tipo=current_type) }}" class="btn btn-outline btn-sm">Siguiente &rarr;</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: var(--muted);">
+            No hay registros de movimientos en el Kárdex que coincidan con la búsqueda.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

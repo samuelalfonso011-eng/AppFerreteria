@@ -1,0 +1,87 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Gestión de Pedidos{% endblock %}
+{% block page_title %}Administración de Pedidos y Entregas{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+    <!-- FILTROS -->
+    <form method="GET" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <input type="text" name="q" placeholder="Buscar por #pedido o cliente..." value="{{ current_search }}" class="admin-form-control" style="width: 260px;">
+        <select name="estado" class="admin-form-control" style="width: 200px;">
+            <option value="">Todos los estados</option>
+            {% for s in statuses %}
+                <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ labels[s] }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+        {% if current_search or current_status %}
+            <a href="{{ url_for('admin_orders.index') }}" class="btn btn-outline btn-sm">Limpiar</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="admin-card">
+    {% if orders %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Destinatario / Cliente</th>
+                    <th>Ciudad / Destino</th>
+                    <th style="text-align: center;">Estado</th>
+                    <th style="text-align: right;">Total</th>
+                    <th style="text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" style="font-weight: 700; color: var(--primary);">
+                                #{{ o.order_number }}
+                            </a>
+                        </td>
+                        <td style="font-size: 0.85rem; color: var(--muted);">{{ o.created_at | date_format("%d/%m/%Y %H:%M") }}</td>
+                        <td>
+                            <strong>{{ o.shipping_recipient_name }}</strong>
+                            <span style="font-size: 0.75rem; color: var(--muted); display: block;">{{ o.user.email }}</span>
+                        </td>
+                        <td style="font-size: 0.85rem;">{{ o.shipping_city }}, {{ o.shipping_department }}</td>
+                        <td style="text-align: center;">
+                            <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
+                                {{ o.status_label }}
+                            </span>
+                        </td>
+                        <td style="text-align: right; font-weight: 800;">{{ o.total | currency }}</td>
+                        <td style="text-align: right;">
+                            <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" class="btn btn-outline btn-sm">
+                                Gestionar
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- PAGINACIÓN -->
+        {% if pagination.pages > 1 %}
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+                {% if pagination.has_prev %}
+                    <a href="{{ url_for('admin_orders.index', page=pagination.prev_num, q=current_search, estado=current_status) }}" class="btn btn-outline btn-sm">&larr; Anterior</a>
+                {% endif %}
+                <span style="padding: 6px 14px; align-self: center; font-weight: 600; font-size: 0.88rem;">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+                {% if pagination.has_next %}
+                    <a href="{{ url_for('admin_orders.index', page=pagination.next_num, q=current_search, estado=current_status) }}" class="btn btn-outline btn-sm">Siguiente &rarr;</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: var(--muted);">
+            No se encontraron pedidos con los criterios indicados.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

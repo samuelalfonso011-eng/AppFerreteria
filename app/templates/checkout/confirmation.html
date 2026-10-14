@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Comprobante de Pedido #{{ order.order_number }} — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 30px auto;">
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-sm);">
+        <div style="text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 24px;">
+            <div style="width: 60px; height: 60px; background: #dcfce7; color: #16a34a; border-radius: 999px; display: grid; place-items: center; font-size: 2rem; margin: 0 auto 16px;">✓</div>
+            <h1 style="font-size: 1.8rem; font-weight: 800; margin: 0 0 6px;">¡Pedido Registrado con Éxito!</h1>
+            <p style="color: var(--muted); margin: 0;">Número de Seguimiento: <strong style="color: var(--secondary); font-size: 1.1rem;">#{{ order.order_number }}</strong></p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;">
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+                <span style="font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px;">Estado del Pedido</span>
+                <span class="badge badge-info" style="font-size: 0.85rem;">{{ order.status_label }}</span>
+                <p style="font-size: 0.82rem; color: var(--muted); margin: 8px 0 0;">Fecha: {{ order.created_at | date_format }}</p>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+                <span style="font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: var(--muted); display: block; margin-bottom: 6px;">Estado del Pago de Prueba</span>
+                {% if latest_payment %}
+                    <span class="badge {% if latest_payment.status == 'APPROVED' %}badge-success{% elif latest_payment.status == 'REJECTED' %}badge-danger{% else %}badge-warning{% endif %}" style="font-size: 0.85rem;">
+                        {{ latest_payment.status_label }}
+                    </span>
+                    <span style="display: block; font-size: 0.78rem; color: var(--muted); margin-top: 6px;">Ref: {{ latest_payment.transaction_reference }}</span>
+                {% else %}
+                    <span class="badge badge-warning">Sin registro de pago</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- DETALLE DE ENTREGA -->
+        <div style="margin-bottom: 28px;">
+            <h3 style="font-size: 1.05rem; font-weight: 700; margin-top: 0; margin-bottom: 10px;">Dirección de Entrega Registrada</h3>
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-size: 0.9rem;">
+                <p style="margin: 0 0 4px;"><strong>Destinatario:</strong> {{ order.shipping_recipient_name }} (📞 {{ order.shipping_phone }})</p>
+                <p style="margin: 0 0 4px;"><strong>Dirección:</strong> {{ order.formatted_shipping_address() }}</p>
+                {% if order.shipping_instructions %}
+                    <p style="margin: 0; color: var(--muted);"><strong>Indicaciones:</strong> {{ order.shipping_instructions }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ARTÍCULOS COMPRADOS -->
+        <div style="margin-bottom: 28px;">
+            <h3 style="font-size: 1.05rem; font-weight: 700; margin-top: 0; margin-bottom: 10px;">Artículos del Pedido</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--muted);">
+                        <th style="padding: 8px 0;">Producto</th>
+                        <th style="padding: 8px 0; text-align: center;">Cantidad</th>
+                        <th style="padding: 8px 0; text-align: right;">Precio Unit.</th>
+                        <th style="padding: 8px 0; text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 10px 0;">
+                                <strong>{{ item.product_name }}</strong>
+                                <span style="display: block; font-size: 0.75rem; color: var(--muted);">SKU: {{ item.product_sku }}</span>
+                            </td>
+                            <td style="padding: 10px 0; text-align: center;">{{ item.quantity }}</td>
+                            <td style="padding: 10px 0; text-align: right;">{{ item.unit_price | currency }}</td>
+                            <td style="padding: 10px 0; text-align: right; font-weight: 600;">{{ item.subtotal | currency }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TOTALES -->
+        <div style="border-top: 2px solid var(--border); padding-top: 14px; margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.92rem;">
+                <span style="color: var(--muted);">Subtotal:</span>
+                <strong>{{ order.subtotal | currency }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.92rem;">
+                <span style="color: var(--muted);">Costo de Envío:</span>
+                <strong>{{ order.shipping_cost | currency }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 800; color: var(--secondary);">
+                <span>Total Confirmado:</span>
+                <span style="color: var(--primary);">{{ order.total | currency }}</span>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; justify-content: center;">
+            <a href="{{ url_for('orders.my_orders') }}" class="btn btn-primary">Ir a Mis Pedidos</a>
+            <a href="{{ url_for('products.catalog') }}" class="btn btn-outline">Volver a la Tienda</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

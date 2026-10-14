@@ -1,0 +1,99 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}{{ title }} — Panel Administrativo{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('admin_products.index') }}" class="btn btn-outline btn-sm">&larr; Volver a la lista</a>
+    </div>
+
+    <div class="admin-card">
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+
+            <div class="form-row">
+                <div class="admin-form-group" style="grid-column: span 2;">
+                    <label>{{ form.name.label.text }} *</label>
+                    {{ form.name(class="admin-form-control", placeholder="Ej. Pulidora Angular 4-1/2 850W") }}
+                    {% for err in form.name.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-form-group">
+                    <label>{{ form.category_id.label.text }} *</label>
+                    {{ form.category_id(class="admin-form-control") }}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="admin-form-group">
+                    <label>{{ form.sku.label.text }} *</label>
+                    {{ form.sku(class="admin-form-control", placeholder="Ej. HE-PUL-850") }}
+                    {% for err in form.sku.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-form-group">
+                    <label>{{ form.price.label.text }} *</label>
+                    {{ form.price(class="admin-form-control", placeholder="0.00") }}
+                    {% for err in form.price.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-form-group">
+                    <label>{{ form.stock.label.text }} *</label>
+                    {{ form.stock(class="admin-form-control", placeholder="0") }}
+                    {% for err in form.stock.errors %}
+                        <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-form-group">
+                    <label>{{ form.min_stock_alert.label.text }} *</label>
+                    {{ form.min_stock_alert(class="admin-form-control", placeholder="5") }}
+                </div>
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.description.label.text }} *</label>
+                {{ form.description(class="admin-form-control", rows="3", placeholder="Descripción comercial detallada...") }}
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.technical_specs.label.text }}</label>
+                {{ form.technical_specs(class="admin-form-control", rows="2", placeholder="Dimensiones, peso, voltaje, material...") }}
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.image.label.text }}</label>
+                {{ form.image(class="admin-form-control") }}
+                <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">
+                    Formatos admitidos: .JPG, .PNG, .WEBP. Tamaño máximo: 5 MB.
+                </span>
+                {% if product and product.image_path %}
+                    <span style="display: block; font-size: 0.82rem; color: var(--success); margin-top: 6px;">
+                        ✓ Foto actual: <code>{{ product.image_path }}</code>
+                    </span>
+                {% endif %}
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;">
+                    {{ form.is_active() }}
+                    <span>{{ form.is_active.label.text }}</span>
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('admin_products.index') }}" class="btn btn-outline">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

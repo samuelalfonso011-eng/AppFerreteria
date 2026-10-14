@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Catálogo de Productos — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- CABECERA DE SECCIÓN -->
+    <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h1 style="font-size: 2rem; font-weight: 800; margin: 0 0 6px;">Catálogo de Ferretería</h1>
+            <p style="color: var(--muted); margin: 0; font-size: 0.95rem;">
+                Mostrando {{ pagination.total }} producto(s) encontrado(s)
+                {% if selected_category %} en <strong>{{ selected_category.name }}</strong>{% endif %}
+                {% if current_query %} con la búsqueda "<strong>{{ current_query }}</strong>"{% endif %}
+            </p>
+        </div>
+        {% if current_query or current_category or current_min_price or current_max_price or current_availability %}
+            <a href="{{ url_for('products.catalog') }}" class="btn btn-outline btn-sm">Limpiar Filtros ✕</a>
+        {% endif %}
+    </div>
+
+    <div style="display: grid; grid-template-columns: 280px 1fr; gap: 32px; align-items: start;">
+        <!-- BARRA LATERAL DE FILTROS -->
+        <aside style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px;">
+            <form action="{{ url_for('products.catalog') }}" method="GET">
+                <input type="hidden" name="q" value="{{ current_query }}">
+
+                <!-- ORDENAMIENTO -->
+                <div style="margin-bottom: 22px;">
+                    <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; color: var(--muted);">Ordenar Por</label>
+                    <select name="orden" onchange="this.form.submit()" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: white;">
+                        <option value="nuevos" {% if current_sort == 'nuevos' %}selected{% endif %}>Más Recientes</option>
+                        <option value="precio_asc" {% if current_sort == 'precio_asc' %}selected{% endif %}>Precio: Menor a Mayor</option>
+                        <option value="precio_desc" {% if current_sort == 'precio_desc' %}selected{% endif %}>Precio: Mayor a Menor</option>
+                        <option value="nombre" {% if current_sort == 'nombre' %}selected{% endif %}>Nombre: A - Z</option>
+                    </select>
+                </div>
+
+                <!-- CATEGORÍAS -->
+                <div style="margin-bottom: 22px;">
+                    <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; color: var(--muted);">Categoría</label>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <a href="{{ url_for('products.catalog', q=current_query, orden=current_sort) }}" style="font-size: 0.9rem; padding: 4px 0; {% if not current_category %}color: var(--primary); font-weight: 700;{% endif %}">
+                            Todas las categorías
+                        </a>
+                        {% for cat in categories %}
+                            <a href="{{ url_for('products.catalog', categoria=cat.slug, q=current_query, orden=current_sort) }}" style="font-size: 0.9rem; padding: 4px 0; {% if current_category == cat.slug %}color: var(--primary); font-weight: 700;{% endif %}">
+                                {{ cat.name }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- DISPONIBILIDAD -->
+                <div style="margin-bottom: 22px;">
+                    <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; color: var(--muted);">Disponibilidad</label>
+                    <select name="disponibilidad" onchange="this.form.submit()" style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: white;">
+                        <option value="" {% if not current_availability %}selected{% endif %}>Todos</option>
+                        <option value="in_stock" {% if current_availability == 'in_stock' %}selected{% endif %}>Solo en existencia</option>
+                        <option value="out_of_stock" {% if current_availability == 'out_of_stock' %}selected{% endif %}>Agotados</option>
+                    </select>
+                </div>
+
+                <!-- RANGO DE PRECIO -->
+                <div style="margin-bottom: 22px;">
+                    <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; color: var(--muted);">Rango de Precio ($)</label>
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                        <input type="number" name="min_price" placeholder="Mín" value="{{ current_min_price if current_min_price is not none else '' }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+                        <span>-</span>
+                        <input type="number" name="max_price" placeholder="Máx" value="{{ current_max_price if current_max_price is not none else '' }}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+                    </div>
+                    <button type="submit" class="btn btn-secondary btn-sm btn-full">Aplicar Filtro</button>
+                </div>
+            </form>
+        </aside>
+
+        <!-- GRILLA DE PRODUCTOS -->
+        <main>
+            {% if products %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px;">
+                    {% for prod in products %}
+                        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;">
+                            <a href="{{ url_for('products.detail', slug=prod.slug) }}" style="display: block; background: #f3f4f6; height: 180px; display: grid; place-items: center; position: relative;">
+                                <span style="position: absolute; top: 10px; left: 10px; background: white; padding: 2px 7px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; color: var(--muted); border: 1px solid var(--border);">SKU: {{ prod.sku }}</span>
+                                {% if prod.stock == 0 %}
+                                    <span style="position: absolute; top: 10px; right: 10px; background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">Agotado</span>
+                                {% endif %}
+                                <div style="font-size: 3.5rem;">📦</div>
+                            </a>
+
+                            <div style="padding: 16px; flex: 1; display: flex; flex-direction: column;">
+                                <span style="font-size: 0.75rem; color: var(--muted); text-transform: uppercase; font-weight: 600;">{{ prod.category.name }}</span>
+                                <h3 style="font-size: 1rem; font-weight: 700; margin: 6px 0 8px; line-height: 1.3;">
+                                    <a href="{{ url_for('products.detail', slug=prod.slug) }}">{{ prod.name }}</a>
+                                </h3>
+
+                                <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <span style="font-size: 0.72rem; color: var(--muted); display: block;">Precio unitario</span>
+                                        <strong style="font-size: 1.2rem; color: var(--secondary);">{{ prod.price | currency }}</strong>
+                                    </div>
+
+                                    {% if prod.stock > 0 %}
+                                        <button type="button" class="btn btn-primary btn-sm async-add-cart" data-product-id="{{ prod.id }}">
+                                            + Agregar
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="btn btn-outline btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;">
+                                            Agotado
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- PAGINACIÓN -->
+                {% if pagination.pages > 1 %}
+                    <div style="display: flex; justify-content: center; gap: 8px; margin-top: 40px;">
+                        {% if pagination.has_prev %}
+                            <a href="{{ url_for('products.catalog', page=pagination.prev_num, q=current_query, categoria=current_category, orden=current_sort, min_price=current_min_price, max_price=current_max_price, disponibilidad=current_availability) }}" class="btn btn-outline btn-sm">&larr; Anterior</a>
+                        {% endif %}
+
+                        <span style="padding: 6px 14px; font-weight: 600; font-size: 0.9rem; align-self: center;">
+                            Página {{ pagination.page }} de {{ pagination.pages }}
+                        </span>
+
+                        {% if pagination.has_next %}
+                            <a href="{{ url_for('products.catalog', page=pagination.next_num, q=current_query, categoria=current_category, orden=current_sort, min_price=current_min_price, max_price=current_max_price, disponibilidad=current_availability) }}" class="btn btn-outline btn-sm">Siguiente &rarr;</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+            {% else %}
+                <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 50px; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">🔍</div>
+                    <h3 style="margin-top: 0;">No se encontraron productos</h3>
+                    <p style="color: var(--muted);">No hay productos que coincidan con los criterios de búsqueda o filtros seleccionados.</p>
+                    <a href="{{ url_for('products.catalog') }}" class="btn btn-primary btn-sm">Ver todo el catálogo</a>
+                </div>
+            {% endif %}
+        </main>
+    </div>
+</div>
+{% endblock %}

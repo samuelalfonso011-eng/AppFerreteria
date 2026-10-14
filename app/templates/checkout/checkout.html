@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Pedido — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="font-size: 2rem; font-weight: 800; margin-bottom: 24px;">Confirmación de Pedido y Entrega</h1>
+
+    <form action="{{ url_for('checkout.index') }}" method="POST">
+        {{ form.hidden_tag() }}
+
+        <div style="display: grid; grid-template-columns: 1fr 380px; gap: 36px; align-items: start;">
+            <!-- DATOS DE ENTREGA A DOMICILIO -->
+            <div>
+                <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 24px;">
+                    <h2 style="font-size: 1.25rem; font-weight: 800; margin-top: 0; margin-bottom: 20px;">1. Dirección de Entrega a Domicilio</h2>
+
+                    {% if addresses %}
+                        <div class="admin-form-group">
+                            <label>{{ form.saved_address_id.label.text }}</label>
+                            {{ form.saved_address_id(class="admin-form-control") }}
+                        </div>
+                        <div style="margin: 16px 0; border-top: 1px dashed var(--border);"></div>
+                    {% endif %}
+
+                    <div class="form-row">
+                        <div class="admin-form-group">
+                            <label>{{ form.recipient_name.label.text }}</label>
+                            {{ form.recipient_name(class="admin-form-control", placeholder="Nombre completo") }}
+                            {% for err in form.recipient_name.errors %}
+                                <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="admin-form-group">
+                            <label>{{ form.phone.label.text }}</label>
+                            {{ form.phone(class="admin-form-control", placeholder="Teléfono de contacto") }}
+                            {% for err in form.phone.errors %}
+                                <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="admin-form-group">
+                            <label>{{ form.department.label.text }}</label>
+                            {{ form.department(class="admin-form-control") }}
+                        </div>
+                        <div class="admin-form-group">
+                            <label>{{ form.city.label.text }}</label>
+                            {{ form.city(class="admin-form-control") }}
+                        </div>
+                        <div class="admin-form-group">
+                            <label>{{ form.neighborhood.label.text }}</label>
+                            {{ form.neighborhood(class="admin-form-control") }}
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="admin-form-group" style="grid-column: span 2;">
+                            <label>{{ form.street_address.label.text }}</label>
+                            {{ form.street_address(class="admin-form-control", placeholder="Calle / Carrera / Número") }}
+                            {% for err in form.street_address.errors %}
+                                <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="admin-form-group">
+                            <label>{{ form.complement.label.text }}</label>
+                            {{ form.complement(class="admin-form-control") }}
+                        </div>
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label>{{ form.delivery_instructions.label.text }}</label>
+                        {{ form.delivery_instructions(class="admin-form-control", rows="2") }}
+                    </div>
+
+                    <div class="admin-form-group">
+                        <label>{{ form.notes.label.text }}</label>
+                        {{ form.notes(class="admin-form-control", rows="2", placeholder="Comentarios especiales sobre los materiales...") }}
+                    </div>
+
+                    <div style="margin-top: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.88rem;">
+                            {{ form.save_to_address_book() }}
+                            <span>{{ form.save_to_address_book.label.text }}</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESUMEN DE ARTÍCULOS Y TOTALES -->
+            <div>
+                <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px;">
+                    <h2 style="font-size: 1.15rem; font-weight: 800; margin-top: 0; margin-bottom: 16px;">Resumen del Pedido</h2>
+
+                    <div style="max-height: 220px; overflow-y: auto; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                        {% for item in cart['items'] %}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.88rem;">
+                                <div>
+                                    <strong style="display: block;">{{ item.name }}</strong>
+                                    <span style="color: var(--muted); font-size: 0.78rem;">{{ item.quantity }} x {{ item.price | currency }}</span>
+                                </div>
+                                <strong>{{ item.subtotal | currency }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.92rem;">
+                        <span style="color: var(--muted);">Subtotal:</span>
+                        <strong>{{ cart.subtotal | currency }}</strong>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 0.92rem;">
+                        <span style="color: var(--muted);">Costo de Envío:</span>
+                        <strong>
+                            {% if shipping_cost == 0 %}
+                                <span style="color: var(--success);">GRATIS</span>
+                            {% else %}
+                                {{ shipping_cost | currency }}
+                            {% endif %}
+                        </strong>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 1.1rem; font-weight: 800;">Total:</span>
+                        <span style="font-size: 1.5rem; font-weight: 800; color: var(--primary);">{{ total | currency }}</span>
+                    </div>
+
+                    {{ form.submit(class="btn btn-primary btn-full", style="padding: 14px; font-size: 1rem;") }}
+
+                    <p style="font-size: 0.78rem; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.4;">
+                        Al hacer clic, el pedido se registrará de forma transaccional y pasarás al simulador de pago de prueba.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

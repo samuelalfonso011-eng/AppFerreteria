@@ -1,0 +1,92 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Alertas de Inventario{% endblock %}
+{% block page_title %}Productos Agotados y con Bajo Stock{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">&larr; Volver al Kárdex</a>
+</div>
+
+<!-- PRODUCTOS AGOTADOS -->
+<div class="admin-card" style="margin-bottom: 30px;">
+    <h3 style="margin-top: 0; color: var(--danger); font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">
+        🚨 Productos Totalmente Agotados (Stock = 0)
+    </h3>
+    {% if out_of_stock %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th style="text-align: center;">Mínimo Alerta</th>
+                    <th style="text-align: right;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in out_of_stock %}
+                    <tr>
+                        <td><code>{{ p.sku }}</code></td>
+                        <td><strong>{{ p.name }}</strong></td>
+                        <td>{{ p.category.name }}</td>
+                        <td>{{ p.price | currency }}</td>
+                        <td style="text-align: center;">{{ p.min_stock_alert }} unidades</td>
+                        <td style="text-align: right;">
+                            <a href="{{ url_for('admin_inventory.adjust', product_id=p.id) }}" class="btn btn-primary btn-sm">
+                                + Reponer Stock
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 24px; text-align: center; color: var(--success); font-weight: 600;">
+            ✓ ¡Excelente! No tienes productos activos con stock en cero.
+        </div>
+    {% endif %}
+</div>
+
+<!-- PRODUCTOS CON STOCK BAJO -->
+<div class="admin-card">
+    <h3 style="margin-top: 0; color: #b45309; font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">
+        ⚠️ Productos Próximos a Agotarse (Stock &le; Mínimo Permitido)
+    </h3>
+    {% if low_stock %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th style="text-align: center;">Stock Actual</th>
+                    <th style="text-align: center;">Nivel Mínimo</th>
+                    <th style="text-align: right;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in low_stock %}
+                    <tr>
+                        <td><code>{{ p.sku }}</code></td>
+                        <td><strong>{{ p.name }}</strong></td>
+                        <td>{{ p.category.name }}</td>
+                        <td style="text-align: center;"><span class="badge badge-warning">{{ p.stock }} unidades</span></td>
+                        <td style="text-align: center;">{{ p.min_stock_alert }} unidades</td>
+                        <td style="text-align: right;">
+                            <a href="{{ url_for('admin_inventory.adjust', product_id=p.id) }}" class="btn btn-outline btn-sm">
+                                Ajustar Existencias
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 24px; text-align: center; color: var(--success); font-weight: 600;">
+            ✓ Todos los productos con existencias se encuentran por encima de su umbral mínimo.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

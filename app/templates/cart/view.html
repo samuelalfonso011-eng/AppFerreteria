@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Carrito de Compras — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 style="font-size: 2rem; font-weight: 800; margin-bottom: 24px;">Mi Carrito de Compras</h1>
+
+    {% if cart['items'] %}
+        <div style="display: grid; grid-template-columns: 1fr 360px; gap: 32px; align-items: start;">
+            <!-- TABLA DE ARTÍCULOS -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 1px solid var(--border);">
+                            <th style="padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase;">Producto</th>
+                            <th style="padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase;">Precio</th>
+                            <th style="padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; text-align: center;">Cantidad</th>
+                            <th style="padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; text-align: right;">Subtotal</th>
+                            <th style="padding: 16px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cart['items'] %}
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 16px;">
+                                    <div style="display: flex; gap: 14px; align-items: center;">
+                                        <div style="width: 50px; height: 50px; background: #f3f4f6; border-radius: 8px; display: grid; place-items: center; font-size: 1.5rem;">📦</div>
+                                        <div>
+                                            <strong style="display: block; font-size: 0.95rem;">{{ item.name }}</strong>
+                                            <span style="font-size: 0.75rem; color: var(--muted);">SKU: {{ item.sku }}</span>
+                                            {% if not item.is_available %}
+                                                <span style="display: block; font-size: 0.75rem; color: var(--danger); font-weight: 700;">Stock disponible: solo {{ item.stock }} unidades</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="padding: 16px; font-weight: 600;">
+                                    {{ item.price | currency }}
+                                </td>
+                                <td style="padding: 16px; text-align: center;">
+                                    <form action="{{ url_for('cart.update') }}" method="POST" style="display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 6px;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="product_id" value="{{ item.product_id }}">
+                                        <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.stock }}" onchange="this.form.submit()" style="width: 60px; height: 36px; border: none; text-align: center; font-weight: 600; outline: none;">
+                                    </form>
+                                </td>
+                                <td style="padding: 16px; font-weight: 800; text-align: right; color: var(--secondary);">
+                                    {{ item.subtotal | currency }}
+                                </td>
+                                <td style="padding: 16px; text-align: right;">
+                                    <form action="{{ url_for('cart.remove') }}" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="product_id" value="{{ item.product_id }}">
+                                        <button type="submit" style="background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem;" title="Eliminar artículo">🗑️</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                    <a href="{{ url_for('products.catalog') }}" class="btn btn-outline btn-sm">&larr; Continuar Comprando</a>
+                    <form action="{{ url_for('cart.clear') }}" method="POST" onsubmit="return confirm('¿Deseas vaciar todo el carrito?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger);">Vaciar Carrito</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- RESUMEN DE COMPRA -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px;">
+                <h3 style="font-size: 1.15rem; font-weight: 800; margin-top: 0; margin-bottom: 20px;">Resumen del Pedido</h3>
+
+                <!-- AVISO DE ENVÍO GRATIS -->
+                {% if store_settings.free_shipping_threshold %}
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 0.85rem;">
+                        {% if cart.subtotal >= store_settings.free_shipping_threshold %}
+                            <strong style="color: #166534; display: block;">🎉 ¡Felicidades! Calificas para Envío Gratuito.</strong>
+                        {% else %}
+                            {% set remaining = store_settings.free_shipping_threshold - cart.subtotal %}
+                            <span style="color: #166534;">Agrega <strong>{{ remaining | currency }}</strong> más para obtener <strong>Envío Gratis</strong>.</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 0.95rem;">
+                    <span style="color: var(--muted);">Subtotal ({{ cart.total_items }} unidades):</span>
+                    <strong style="color: var(--secondary);">{{ cart.subtotal | currency }}</strong>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 0.95rem;">
+                    <span style="color: var(--muted);">Costo de Entrega:</span>
+                    <strong>
+                        {% if shipping_cost == 0 %}
+                            <span style="color: var(--success);">GRATIS</span>
+                        {% else %}
+                            {{ shipping_cost | currency }}
+                        {% endif %}
+                    </strong>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-size: 1.1rem; font-weight: 800;">Total a Pagar:</span>
+                    <span style="font-size: 1.6rem; font-weight: 800; color: var(--primary);">{{ total | currency }}</span>
+                </div>
+
+                <a href="{{ url_for('checkout.index') }}" class="btn btn-primary btn-full" style="padding: 14px; font-size: 1rem;">
+                    Proceder al Pago &rarr;
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 60px 20px; text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 16px;">🛒</div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Tu carrito de compras está vacío</h2>
+            <p style="color: var(--muted); margin-bottom: 24px;">No tienes productos seleccionados en este momento.</p>
+            <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">Explorar Catálogo de Ferretería</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

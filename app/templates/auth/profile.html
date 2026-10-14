@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h1 style="font-size: 1.8rem; font-weight: 800; margin: 0;">Mi Perfil</h1>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('auth.addresses') }}" class="btn btn-outline btn-sm">📍 Mis Direcciones</a>
+            <a href="{{ url_for('orders.my_orders') }}" class="btn btn-outline btn-sm">📦 Mis Pedidos</a>
+        </div>
+    </div>
+
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px;">
+        <form action="{{ url_for('auth.profile') }}" method="POST">
+            {{ form.hidden_tag() }}
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Correo Electrónico (No editable)</label>
+                <input type="email" value="{{ current_user.email }}" class="admin-form-control" disabled style="background: #f3f4f6; cursor: not-allowed;">
+                <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">El correo identifica tu cuenta de cliente.</span>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.full_name.label.text }}</label>
+                {{ form.full_name(class="admin-form-control") }}
+                {% for err in form.full_name.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.phone.label.text }}</label>
+                {{ form.phone(class="admin-form-control", placeholder="300 123 4567") }}
+                {% for err in form.phone.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            {{ form.submit(class="btn btn-primary") }}
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Clientes Registrados{% endblock %}
+{% block page_title %}Gestión de Clientes{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <form method="GET" style="display: flex; gap: 12px;">
+        <input type="text" name="q" placeholder="Buscar por nombre, correo o teléfono..." value="{{ current_search }}" class="admin-form-control" style="width: 320px;">
+        <button type="submit" class="btn btn-secondary btn-sm">Buscar</button>
+        {% if current_search %}
+            <a href="{{ url_for('admin_customers.index') }}" class="btn btn-outline btn-sm">Limpiar</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="admin-card">
+    {% if customers %}
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Correo Electrónico</th>
+                    <th>Teléfono</th>
+                    <th style="text-align: center;">Pedidos Realizados</th>
+                    <th style="text-align: center;">Estado</th>
+                    <th>Fecha de Registro</th>
+                    <th style="text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                    <tr>
+                        <td><strong>{{ c.full_name }}</strong></td>
+                        <td>{{ c.email }}</td>
+                        <td>{{ c.phone or 'No registrado' }}</td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ c.orders.count() }}</span></td>
+                        <td style="text-align: center;">
+                            {% if c.is_active %}
+                                <span class="badge badge-success">Activo</span>
+                            {% else %}
+                                <span class="badge badge-danger">Desactivado</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 0.85rem; color: var(--muted);">{{ c.created_at | date_format("%d/%m/%Y") }}</td>
+                        <td style="text-align: right;">
+                            <a href="{{ url_for('admin_customers.detail', user_id=c.id) }}" class="btn btn-outline btn-sm">
+                                Ver Perfil &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div style="padding: 40px; text-align: center; color: var(--muted);">
+            No se encontraron clientes registrados.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

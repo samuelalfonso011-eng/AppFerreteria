@@ -1,0 +1,151 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Pedido #{{ order.order_number }} — Administración{% endblock %}
+{% block page_title %}Detalle de Pedido #{{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('admin_orders.index') }}" class="btn btn-outline btn-sm">&larr; Volver al listado de pedidos</a>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 380px; gap: 28px; align-items: start;">
+    <!-- INFORMACIÓN PRINCIPAL DEL PEDIDO -->
+    <div>
+        <!-- DATOS DEL CLIENTE Y ENTREGA -->
+        <div class="admin-card">
+            <h3 style="margin-top: 0; font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">Destino y Contacto</h3>
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 18px; font-size: 0.92rem;">
+                <p style="margin: 0 0 6px;"><strong>Destinatario:</strong> {{ order.shipping_recipient_name }}</p>
+                <p style="margin: 0 0 6px;"><strong>Teléfono:</strong> 📞 {{ order.shipping_phone }}</p>
+                <p style="margin: 0 0 6px;"><strong>Dirección Exacta:</strong> {{ order.formatted_shipping_address() }}</p>
+                {% if order.shipping_instructions %}
+                    <p style="margin: 0 0 6px; color: var(--muted);"><strong>Instrucciones:</strong> {{ order.shipping_instructions }}</p>
+                {% endif %}
+                <p style="margin: 12px 0 0; padding-top: 8px; border-top: 1px dashed var(--border); color: var(--muted); font-size: 0.85rem;">
+                    Cuenta del cliente: <strong>{{ order.user.full_name }}</strong> ({{ order.user.email }})
+                </p>
+            </div>
+        </div>
+
+        <!-- LÍNEAS DE ARTÍCULOS -->
+        <div class="admin-card">
+            <h3 style="margin-top: 0; font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">Artículos Solicitados</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th style="text-align: center;">Cantidad</th>
+                        <th style="text-align: right;">Precio Congelado</th>
+                        <th style="text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product_name }}</strong>
+                                <span style="display: block; font-size: 0.75rem; color: var(--muted);">SKU: {{ item.product_sku }}</span>
+                            </td>
+                            <td style="text-align: center; font-weight: 700;">{{ item.quantity }}</td>
+                            <td style="text-align: right;">{{ item.unit_price | currency }}</td>
+                            <td style="text-align: right; font-weight: 800;">{{ item.subtotal | currency }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div style="border-top: 2px solid var(--border); padding-top: 16px; margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span style="color: var(--muted);">Subtotal:</span>
+                    <strong>{{ order.subtotal | currency }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: var(--muted);">Costo de Envío:</span>
+                    <strong>{{ order.shipping_cost | currency }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 800; color: var(--secondary);">
+                    <span>Total del Pedido:</span>
+                    <span style="color: var(--primary);">{{ order.total | currency }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORIAL DE TRAZABILIDAD -->
+        <div class="admin-card">
+            <h3 style="margin-top: 0; font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">Trazabilidad y Auditoría de Estados</h3>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                {% for h in order.status_history %}
+                    <div style="display: flex; gap: 14px; align-items: flex-start; font-size: 0.9rem;">
+                        <div style="width: 10px; height: 10px; border-radius: 999px; background: var(--primary); margin-top: 6px;"></div>
+                        <div>
+                            <strong>{{ labels[h.new_status] if labels and h.new_status in labels else h.new_status }}</strong>
+                            <span style="font-size: 0.78rem; color: var(--muted); margin-left: 8px;">{{ h.created_at | date_format }}</span>
+                            {% if h.changed_by %}
+                                <span style="font-size: 0.78rem; color: var(--muted);">| Por: {{ h.changed_by.full_name }}</span>
+                            {% endif %}
+                            {% if h.comment %}
+                                <p style="font-size: 0.85rem; color: #475569; margin: 4px 0 0;">{{ h.comment }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL LATERAL DE CAMBIO DE ESTADO Y PAGOS -->
+    <div>
+        <!-- ACTUALIZAR ESTADO -->
+        <div class="admin-card">
+            <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px;">Transición de Estado</h3>
+            <div style="margin-bottom: 14px;">
+                <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Estado Actual</span>
+                <div style="margin-top: 4px;">
+                    <span class="badge {% if order.status == 'DELIVERED' %}badge-success{% elif order.status == 'CANCELLED' %}badge-danger{% elif order.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}" style="font-size: 0.9rem; padding: 6px 12px;">
+                        {{ order.status_label }}
+                    </span>
+                </div>
+            </div>
+
+            <form action="{{ url_for('admin_orders.change_status', order_id=order.id) }}" method="POST">
+                {{ form.hidden_tag() }}
+
+                <div class="admin-form-group">
+                    <label>{{ form.new_status.label.text }}</label>
+                    {{ form.new_status(class="admin-form-control") }}
+                </div>
+
+                <div class="admin-form-group">
+                    <label>{{ form.comment.label.text }}</label>
+                    {{ form.comment(class="admin-form-control", rows="2", placeholder="Motivo u observación del cambio...") }}
+                </div>
+
+                <div style="font-size: 0.78rem; color: var(--muted); margin-bottom: 14px;">
+                    ⚠️ Si seleccionas <strong>Cancelado</strong>, las existencias reservadas se devolverán automáticamente al Kárdex de inventario.
+                </div>
+
+                {{ form.submit(class="btn btn-primary btn-full") }}
+            </form>
+        </div>
+
+        <!-- PAGOS ASOCIADOS -->
+        <div class="admin-card">
+            <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px;">Pagos de Prueba Registrados</h3>
+            {% if payments %}
+                {% for p in payments %}
+                    <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 0.85rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <strong>{{ p.method_label }}</strong>
+                            <span class="badge {% if p.status == 'APPROVED' %}badge-success{% else %}badge-warning{% endif %}">{{ p.status_label }}</span>
+                        </div>
+                        <span style="display: block; color: var(--muted); font-size: 0.78rem;">Ref: {{ p.transaction_reference }}</span>
+                        <span style="display: block; color: var(--muted); font-size: 0.78rem;">Monto: {{ p.amount | currency }} | {{ p.created_at | date_format }}</span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--muted); font-size: 0.85rem; margin: 0;">Sin intentos de pago registrados.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

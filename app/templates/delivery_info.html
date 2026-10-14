@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Entregas a Domicilio — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 30px auto;">
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-sm);">
+        <span style="color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.05em;">Logística & Envíos</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 8px 0 20px;">Políticas de Entrega a Domicilio</h1>
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 20px; margin-bottom: 28px;">
+            <h3 style="color: #166534; margin-top: 0; font-size: 1.15rem; font-weight: 700;">🚚 Tarifa Estándar y Envío Gratuito</h3>
+            <p style="margin: 0; color: #166534; font-size: 0.95rem; line-height: 1.6;">
+                Nuestra tarifa de envío estándar es de <strong>{{ store_settings.default_shipping_cost | currency }}</strong>.
+                {% if store_settings.free_shipping_threshold %}
+                    Para compras iguales o superiores a <strong>{{ store_settings.free_shipping_threshold | currency }}</strong>, ¡el costo de entrega es <strong>COMPLETAMENTE GRATIS</strong>!
+                {% endif %}
+            </p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div style="border-bottom: 1px solid var(--border); padding-bottom: 18px;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 8px;">1. Cobertura de Entrega</h3>
+                <p style="color: #4b5563; font-size: 0.92rem; line-height: 1.6; margin: 0;">
+                    Atendemos entregas en el perímetro urbano y zonas aledañas. Al momento de confirmar tu pedido en el checkout, ingresarás el departamento, municipio, barrio, dirección exacta y referencias para el domiciliario.
+                </p>
+            </div>
+
+            <div style="border-bottom: 1px solid var(--border); padding-bottom: 18px;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 8px;">2. Tiempos de Preparación y Despacho</h3>
+                <p style="color: #4b5563; font-size: 0.92rem; line-height: 1.6; margin: 0;">
+                    Los pedidos confirmados de lunes a viernes en horario laboral se preparan en bodega y se programan para ruta en un plazo estimado de 24 a 48 horas hábiles, según el volumen y peso de los materiales.
+                </p>
+            </div>
+
+            <div style="border-bottom: 1px solid var(--border); padding-bottom: 18px;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 8px;">3. Recepción en Obra o Domicilio</h3>
+                <p style="color: #4b5563; font-size: 0.92rem; line-height: 1.6; margin: 0;">
+                    Es necesario que una persona mayor de edad esté presente para verificar las referencias y cantidades recibidas según el comprobante del pedido.
+                </p>
+            </div>
+        </div>
+
+        <div style="margin-top: 32px; text-align: center;">
+            <a href="{{ url_for('products.catalog') }}" class="btn btn-primary" style="padding: 12px 28px;">Ver Productos Disponibles</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

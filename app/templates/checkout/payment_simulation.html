@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Simulador de Pago de Prueba — Pedido #{{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 640px; margin: 30px auto;">
+    <!-- BANNER DE ADVERTENCIA DE MODO DE PRUEBA -->
+    <div style="background: #fffbeb; border: 2px dashed #f59e0b; border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; text-align: center;">
+        <span style="font-size: 2rem;">⚠️</span>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #b45309; margin: 6px 0;">MÓDULO DE PAGO EN MODO DE PRUEBA</h2>
+        <p style="color: #92400e; font-size: 0.9rem; margin: 0; line-height: 1.5;">
+            Esta es una <strong>simulación controlada de pago</strong>. No se realizarán cargos monetarios reales ni se solicitarán datos bancarios privados ni CVV.
+        </p>
+    </div>
+
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm);">
+        <div style="border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Número de Pedido</span>
+                    <h3 style="font-size: 1.3rem; margin: 2px 0 0; color: var(--secondary);">{{ order.order_number }}</h3>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Monto a Pagar</span>
+                    <strong style="font-size: 1.4rem; color: var(--primary); display: block;">{{ order.total | currency }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('checkout.process_simulated_payment', order_number=order.order_number) }}" method="POST">
+            {{ form.hidden_tag() }}
+
+            <div class="admin-form-group">
+                <label>{{ form.payment_method.label.text }}</label>
+                {{ form.payment_method(class="admin-form-control") }}
+                <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Selecciona el canal de pago a simular.</span>
+            </div>
+
+            <div class="admin-form-group">
+                <label>{{ form.simulated_action.label.text }}</label>
+                {{ form.simulated_action(class="admin-form-control") }}
+                <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Permite verificar el comportamiento comercial del sistema ante éxito, rechazo o espera.</span>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin: 24px 0; font-size: 0.82rem; color: var(--muted);">
+                ℹ️ <strong>Nota Técnica de Seguridad:</strong> El resultado de la simulación se procesa y audita en el servidor. Un pago aprobado en modo prueba no constituye una transacción financiera real.
+            </div>
+
+            {{ form.submit(class="btn btn-primary btn-full", style="padding: 14px; font-size: 1rem;") }}
+        </form>
+    </div>
+</div>
+{% endblock %}

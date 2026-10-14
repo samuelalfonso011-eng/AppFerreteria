@@ -1,0 +1,78 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Cliente {{ customer.full_name }} — Administración{% endblock %}
+{% block page_title %}Perfil del Cliente: {{ customer.full_name }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('admin_customers.index') }}" class="btn btn-outline btn-sm">&larr; Volver a la lista de clientes</a>
+</div>
+
+<div style="display: grid; grid-template-columns: 340px 1fr; gap: 28px; align-items: start;">
+    <!-- TARJETA DEL CLIENTE -->
+    <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">Información de la Cuenta</h3>
+        <p style="margin: 0 0 6px;"><strong>Nombre:</strong> {{ customer.full_name }}</p>
+        <p style="margin: 0 0 6px;"><strong>Email:</strong> {{ customer.email }}</p>
+        <p style="margin: 0 0 6px;"><strong>Teléfono:</strong> {{ customer.phone or 'Sin teléfono' }}</p>
+        <p style="margin: 0 0 6px;"><strong>Registrado:</strong> {{ customer.created_at | date_format }}</p>
+        <p style="margin: 0 0 16px;">
+            <strong>Estado:</strong>
+            {% if customer.is_active %}
+                <span class="badge badge-success">Activo</span>
+            {% else %}
+                <span class="badge badge-danger">Desactivado</span>
+            {% endif %}
+        </p>
+
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+            <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Total Compras Confirmadas</span>
+            <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary);">{{ total_spent | currency }}</div>
+        </div>
+
+        <form action="{{ url_for('admin_customers.toggle_status', user_id=customer.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn {% if customer.is_active %}btn-danger{% else %}btn-primary{% endif %} btn-full btn-sm">
+                {% if customer.is_active %}Desactivar Cuenta del Cliente{% else %}Reactivar Cuenta{% endif %}
+            </button>
+        </form>
+    </div>
+
+    <!-- PEDIDOS DEL CLIENTE -->
+    <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">Historial de Pedidos Realizados</h3>
+        {% if orders %}
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th style="text-align: right;">Total</th>
+                        <th style="text-align: right;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                        <tr>
+                            <td><strong>#{{ o.order_number }}</strong></td>
+                            <td style="color: var(--muted); font-size: 0.85rem;">{{ o.created_at | date_format("%d/%m/%Y") }}</td>
+                            <td>
+                                <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
+                                    {{ o.status_label }}
+                                </span>
+                            </td>
+                            <td style="text-align: right; font-weight: 700;">{{ o.total | currency }}</td>
+                            <td style="text-align: right;">
+                                <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" class="btn btn-outline btn-sm">Ver Pedido</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color: var(--muted); margin: 0;">Este cliente aún no ha realizado ningún pedido.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

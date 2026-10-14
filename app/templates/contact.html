@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Contacto — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 30px auto;">
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-sm);">
+        <span style="color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.05em;">Estamos para servirte</span>
+        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 8px 0 20px;">Contacto & Ubicación</h1>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 28px;">
+            <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin-top: 0; margin-bottom: 16px;">Canales de Atención</h3>
+                <p style="margin-bottom: 12px; font-size: 0.95rem;">
+                    <strong>📞 Teléfono / WhatsApp:</strong><br>
+                    <span style="color: var(--muted);">{{ store_settings.phone }}</span>
+                </p>
+                <p style="margin-bottom: 12px; font-size: 0.95rem;">
+                    <strong>✉️ Correo Electrónico:</strong><br>
+                    <span style="color: var(--muted);">{{ store_settings.email }}</span>
+                </p>
+                <p style="margin-bottom: 12px; font-size: 0.95rem;">
+                    <strong>📍 Dirección Principal:</strong><br>
+                    <span style="color: var(--muted);">{{ store_settings.address }}</span>
+                </p>
+                <p style="margin-bottom: 12px; font-size: 0.95rem;">
+                    <strong>🕒 Horarios de Atención y Despacho:</strong><br>
+                    <span style="color: var(--muted);">{{ store_settings.business_hours }}</span>
+                </p>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 24px;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 12px;">Cotizaciones Especiales</h3>
+                <p style="font-size: 0.88rem; color: #4b5563; line-height: 1.6; margin-bottom: 16px;">
+                    ¿Requieres compras por volumen para obras o licitaciones? Escríbenos directamente o visita nuestro catálogo en línea para armar tu pedido.
+                </p>
+                <a href="{{ url_for('products.catalog') }}" class="btn btn-primary btn-full">Explorar Productos</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

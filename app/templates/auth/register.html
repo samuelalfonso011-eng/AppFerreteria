@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Crear Cuenta — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 520px; margin: 40px auto;">
+    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-sm);">
+        <div style="text-align: center; margin-bottom: 28px;">
+            <div class="brand-mark" style="margin: 0 auto 14px; width: 50px; height: 50px; font-size: 1.5rem;">F</div>
+            <h1 style="font-size: 1.6rem; font-weight: 800; margin: 0 0 6px;">Crear Cuenta de Cliente</h1>
+            <p style="color: var(--muted); font-size: 0.9rem; margin: 0;">Regístrate para comprar y rastrear tus entregas a domicilio.</p>
+        </div>
+
+        <form action="{{ url_for('auth.register') }}" method="POST">
+            {{ form.hidden_tag() }}
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.full_name.label.text }}</label>
+                {{ form.full_name(class="admin-form-control", placeholder="Ej. Carlos Mendoza") }}
+                {% for err in form.full_name.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.email.label.text }}</label>
+                {{ form.email(class="admin-form-control", placeholder="carlos@correo.com") }}
+                {% for err in form.email.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.phone.label.text }}</label>
+                {{ form.phone(class="admin-form-control", placeholder="Ej. 300 123 4567") }}
+                {% for err in form.phone.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.password.label.text }}</label>
+                {{ form.password(class="admin-form-control", placeholder="Mínimo 6 caracteres") }}
+                {% for err in form.password.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.confirm_password.label.text }}</label>
+                {{ form.confirm_password(class="admin-form-control", placeholder="Repite la contraseña") }}
+                {% for err in form.confirm_password.errors %}
+                    <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
+                {% endfor %}
+            </div>
+
+            {{ form.submit(class="btn btn-primary btn-full", style="padding: 12px; font-size: 1rem;") }}
+        </form>
+
+        <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.88rem; color: var(--muted);">
+            ¿Ya tienes una cuenta?
+            <a href="{{ url_for('auth.login') }}" style="color: var(--primary); font-weight: 700;">Inicia sesión</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
