@@ -5,7 +5,7 @@ from app.decorators import admin_required
 from app.extensions import db
 from app.models.product import Product
 from app.models.category import Category
-from app.models.category import generate_slug
+from app.models.category import generate_unique_slug
 from app.models.inventory import InventoryMovement, MovementType
 from app.models.order import OrderItem
 from app.forms.product_forms import ProductForm
@@ -58,7 +58,7 @@ def create():
     form = ProductForm()
     if form.validate_on_submit():
         sku_clean = form.sku.data.strip().upper()
-        slug_base = generate_slug(form.name.data)
+        slug_base = generate_unique_slug(form.name.data, Product)
 
         # Manejo de imagen local
         image_filename = None
@@ -99,7 +99,13 @@ def create():
             )
             db.session.add(movement)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            if image_filename:
+                ImageService.delete_product_image(image_filename)  # evita imágenes huérfanas
+            raise
         flash(f"Producto '{product.name}' registrado exitosamente con SKU: {product.sku}.", "success")
         return redirect(url_for('admin_products.index'))
 
@@ -110,7 +116,7 @@ def create():
 @admin_required
 def edit(product_id):
     """Edición de datos de un producto."""
-    product = Product.query.get_or_404(product_id)
+    product = db.get_or_404(Product, product_id)
     form = ProductForm(original_sku=product.sku, obj=product)
 
     if form.validate_on_submit():
@@ -124,18 +130,27 @@ def edit(product_id):
         product.is_active = form.is_active.data
 
         # Actualizar imagen si se subió una nueva
+        old_img = None
+        new_img = None
         if form.image.data:
             try:
                 new_img = ImageService.save_product_image(form.image.data)
-                # Borrar la anterior si existía
-                if product.image_path:
-                    ImageService.delete_product_image(product.image_path)
+                old_img = product.image_path
                 product.image_path = new_img
             except ValueError as e:
                 flash(f"Error en la imagen: {str(e)}", "danger")
                 return render_template('admin/products/form.html', form=form, product=product, title="Editar Producto")
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            if new_img:
+                ImageService.delete_product_image(new_img)
+            raise
+        # La imagen anterior solo se borra cuando el cambio ya quedó guardado
+        if old_img:
+            ImageService.delete_product_image(old_img)
         flash("Producto actualizado correctamente.", "success")
         return redirect(url_for('admin_products.index'))
 
@@ -146,7 +161,7 @@ def edit(product_id):
 @admin_required
 def toggle_status(product_id):
     """Activa o desactiva un producto del catálogo comercial."""
-    product = Product.query.get_or_404(product_id)
+    product = db.get_or_404(Product, product_id)
     product.is_active = not product.is_active
     db.session.commit()
     estado_str = "activado" if product.is_active else "desactivado"
@@ -162,7 +177,7 @@ def delete(product_id):
     Verifica integridad referencial. Si el producto tiene pedidos asociados,
     impide el borrado físico para conservar el historial comercial y recomienda desactivar.
     """
-    product = Product.query.get_or_404(product_id)
+    product = db.get_or_404(Product, product_id)
 
     # Verificar si tiene líneas de pedido históricas
     has_orders = OrderItem.query.filter_by(product_id=product.id).first() is not None

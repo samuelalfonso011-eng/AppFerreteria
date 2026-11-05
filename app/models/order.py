@@ -64,6 +64,12 @@ class Order(db.Model):
     shipping_complement = db.Column(db.String(100), nullable=True)
     shipping_instructions = db.Column(db.Text, nullable=True)
 
+    # Datos para Facturación Electrónica DIAN
+    fiscal_doc_type = db.Column(db.String(20), default='CC', nullable=True)
+    fiscal_doc_number = db.Column(db.String(50), nullable=True)
+    fiscal_name = db.Column(db.String(150), nullable=True)
+    fiscal_email = db.Column(db.String(150), nullable=True)
+
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
@@ -83,6 +89,7 @@ class Order(db.Model):
     items = db.relationship('OrderItem', back_populates='order', cascade='all, delete-orphan', lazy='joined')
     payments = db.relationship('Payment', back_populates='order', cascade='all, delete-orphan', lazy='dynamic')
     status_history = db.relationship('OrderStatusHistory', back_populates='order', cascade='all, delete-orphan', order_by='OrderStatusHistory.created_at.asc()')
+    invoice = db.relationship('ElectronicInvoice', back_populates='order', uselist=False, cascade='all, delete-orphan')
 
     @property
     def status_label(self) -> str:
@@ -90,9 +97,41 @@ class Order(db.Model):
         return OrderStatus.LABELS.get(self.status, self.status)
 
     @property
+    def status_code(self) -> str:
+        """Alias para status."""
+        return self.status
+
+    @property
     def can_cancel_by_customer(self) -> bool:
         """Regla de negocio: el cliente solo puede cancelar antes de entrar a preparación."""
         return self.status in [OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED]
+
+    @property
+    def latest_payment(self):
+        """Devuelve el último intento de pago registrado para este pedido."""
+        from app.models.payment import Payment
+        return self.payments.order_by(Payment.created_at.desc()).first()
+
+    @property
+    def payment(self):
+        """Alias de compatibilidad para el último pago registrado."""
+        return self.latest_payment
+
+    @property
+    def all_payments(self):
+        """Devuelve la lista de pagos ordenados de forma descendente por fecha."""
+        from app.models.payment import Payment
+        return self.payments.order_by(Payment.created_at.desc()).all()
+
+    @property
+    def order_items(self):
+        """Alias de compatibilidad para self.items."""
+        return self.items
+
+    @property
+    def customer(self):
+        """Alias de compatibilidad para self.user."""
+        return self.user
 
     def formatted_shipping_address(self) -> str:
         parts = [self.shipping_street_address]

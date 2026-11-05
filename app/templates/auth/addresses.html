@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Mis Direcciones — {{ store_settings.store_name }}{% endblock %}
 
@@ -26,7 +27,7 @@
                         {% endif %}
 
                         <strong style="display: block; font-size: 1rem; margin-bottom: 4px;">{{ addr.recipient_name }}</strong>
-                        <span style="display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 10px;">📞 {{ addr.phone }}</span>
+                        <span style="display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 10px;">{{ icon('phone', 14) }} {{ addr.phone }}</span>
                         
                         <p style="font-size: 0.9rem; margin: 0 0 6px;">{{ addr.street_address }} {% if addr.complement %}({{ addr.complement }}){% endif %}</p>
                         <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 14px;">{{ addr.neighborhood }}, {{ addr.city }}, {{ addr.department }}</p>

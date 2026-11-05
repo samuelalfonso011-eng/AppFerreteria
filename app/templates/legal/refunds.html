@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ t('refund_policy_title') }} — {{ store_settings.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container legal-page">
+    <article class="legal-card">
+        <span class="legal-tag">{{ t('refund_policy') }}</span>
+        <h1>{{ t('refund_policy_title') }}</h1>
+        <p class="legal-meta">Última actualización: noviembre de 2026 · Ley 1480 de 2011 y Decreto 587 de 2016</p>
+        <hr>
+
+        <div class="legal-body">
+            <h2>1. Derecho de retracto</h2>
+            <p>Conforme a la <strong>Ley 1480 de 2011</strong> (Estatuto del Consumidor), en las ventas realizadas a distancia el consumidor puede ejercer su derecho de retracto y devolver el producto dentro de los cinco (5) días hábiles siguientes a su entrega, sin necesidad de justificar la decisión. El producto debe devolverse sin uso, completo y en su empaque original, y los costos de transporte de la devolución corren por cuenta del consumidor.</p>
+
+            <h2>2. Excepciones al retracto</h2>
+            <p>No aplica el retracto, entre otros casos previstos en la ley, a bienes hechos sobre medidas del consumidor o claramente personalizados, y a productos que por su naturaleza no pueden ser devueltos o puedan deteriorarse con rapidez. Los materiales cortados a medida (por ejemplo tubería, cable o lámina cortados según su pedido) se consideran personalizados.</p>
+
+            <h2>3. Reversión del pago</h2>
+            <p>De acuerdo con el <strong>Decreto 587 de 2016</strong>, que reglamenta el retracto y la reversión del pago, cuando la compra se pague con tarjeta de crédito, débito u otro instrumento electrónico y haya fraude, operación no solicitada, producto no recibido, no conforme o defectuoso, el consumidor puede pedir la reversión dentro de los cinco (5) días hábiles siguientes a que tenga noticia de la operación. En este entorno de prueba los pagos son simulados y no generan movimientos bancarios.</p>
+
+            <h2>4. Garantía legal</h2>
+            <p>Todo producto goza de la garantía legal de calidad, idoneidad y seguridad. Si presenta un defecto, el cliente puede solicitar la reparación, el cambio o, cuando no sea posible, la devolución del dinero. Para tramitarla conserve el comprobante de pedido y escríbanos a <strong>{{ store_settings.email }}</strong>.</p>
+
+            <h2>5. Cómo solicitar una devolución</h2>
+            <ol>
+                <li>Escríbanos a <strong>{{ store_settings.email }}</strong> o desde el <a href="{{ url_for('public.contact') }}">formulario de contacto</a> indicando el número de pedido.</li>
+                <li>Le confirmaremos el procedimiento y la dirección de devolución.</li>
+                <li>Recibido y verificado el producto, restituimos el dinero por el mismo medio de pago, y el inventario se actualiza en el kárdex.</li>
+            </ol>
+
+            <h2>6. Autoridad competente</h2>
+            <p>Si no está conforme con la respuesta, puede acudir a la Superintendencia de Industria y Comercio, autoridad en protección al consumidor.</p>
+        </div>
+    </article>
+</div>
+{% endblock %}

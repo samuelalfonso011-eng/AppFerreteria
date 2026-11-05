@@ -36,13 +36,17 @@ venv.bak/
 
 # Environment variables & secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
 
 # Database local testing files
 *.sqlite
 *.sqlite3
 *.db
+instance/
 
 # Uploaded images (preserve structure, exclude user-uploaded images)
 app/static/uploads/products/*
@@ -60,3 +64,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Playwright MCP artifacts
+.playwright-mcp/

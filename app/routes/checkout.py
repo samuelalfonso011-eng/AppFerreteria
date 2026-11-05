@@ -1,5 +1,6 @@
 import uuid
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from app.services.inventory_service import InsufficientStockError
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.user import Address
@@ -7,6 +8,7 @@ from app.models.order import Order, OrderStatus
 from app.models.payment import PaymentMethod
 from app.models.setting import StoreSetting
 from app.forms.checkout_forms import CheckoutForm, PaymentSimulationForm
+from app.constants import VALLE_DE_ABURRA_MUNICIPALITIES
 from app.services.cart_service import CartService
 from app.services.order_service import OrderService
 from app.services.payment_service import payment_service
@@ -18,9 +20,21 @@ checkout_bp = Blueprint('checkout', __name__, url_prefix='/checkout')
 @login_required
 def index():
     """Paso 1 del Checkout: Datos de entrega y revisión de subtotales."""
+    OrderService.maybe_expire_stale_orders()  # libera stock de pedidos abandonados antes de validar
     cart_data = CartService.get_cart_data(current_user)
     if not cart_data['items']:
         flash("Tu carrito está vacío. Agrega productos antes de realizar el pedido.", "warning")
+        return redirect(url_for('cart.view'))
+
+    # Validar existencias antes de pedir datos de entrega o crear el pedido
+    unavailable = [it for it in cart_data['items'] if not it['is_available']]
+    if unavailable:
+        detalle = "; ".join(
+            f"{it['name']} (pediste {it['quantity']}, hay {it['stock']})" if it['stock'] > 0
+            else f"{it['name']} (agotado)"
+            for it in unavailable
+        )
+        flash(f"Ajusta tu carrito antes de continuar. Sin existencias suficientes: {detalle}.", "warning")
         return redirect(url_for('cart.view'))
 
     settings = StoreSetting.get_settings()
@@ -71,11 +85,16 @@ def index():
                 flash("La dirección seleccionada no es válida.", "danger")
                 return redirect(url_for('checkout.index'))
         else:
+            city_val = form.city.data.strip()
+            if city_val not in VALLE_DE_ABURRA_MUNICIPALITIES:
+                flash("Actualmente solo despachamos pedidos en los 10 municipios del Valle de Aburrá.", "danger")
+                return redirect(url_for('checkout.index'))
+
             shipping_data = {
                 'recipient_name': form.recipient_name.data.strip(),
                 'phone': form.phone.data.strip(),
-                'department': form.department.data.strip(),
-                'city': form.city.data.strip(),
+                'department': (form.department.data or 'Antioquia').strip(),
+                'city': city_val,
                 'neighborhood': form.neighborhood.data.strip(),
                 'street_address': form.street_address.data.strip(),
                 'complement': form.complement.data.strip() if form.complement.data else None,
@@ -92,18 +111,30 @@ def index():
                 db.session.add(new_saved)
                 db.session.commit()
 
-        # Crear orden transaccional con descuento de inventario
+        fiscal_data = {
+            'fiscal_doc_type': form.fiscal_doc_type.data or 'CC',
+            'fiscal_doc_number': form.fiscal_doc_number.data.strip() if form.fiscal_doc_number.data else '',
+            'fiscal_name': form.fiscal_name.data.strip() if form.fiscal_name.data else shipping_data['recipient_name'],
+            'fiscal_email': form.fiscal_email.data.strip().lower() if form.fiscal_email.data else current_user.email
+        }
+
+        # Crear orden transaccional con descuento de inventario e idempotencia
         try:
             order = OrderService.create_order(
                 user=current_user,
                 shipping_data=shipping_data,
                 idempotency_key=form.idempotency_key.data,
-                notes=form.notes.data.strip() if form.notes.data else None
+                notes=form.notes.data.strip() if form.notes.data else None,
+                fiscal_data=fiscal_data
             )
             flash("Pedido registrado con éxito. Por favor completa el pago de prueba.", "info")
             return redirect(url_for('checkout.payment_view', order_number=order.order_number))
-        except Exception as e:
-            flash(f"Error al procesar el pedido: {str(e)}", "danger")
+        except (ValueError, InsufficientStockError) as e:
+            flash(f"No se pudo procesar el pedido: {str(e)}", "danger")
+            return redirect(url_for('cart.view'))
+        except Exception:
+            current_app.logger.exception("Error inesperado al crear el pedido")
+            flash("Ocurrió un error inesperado al procesar tu pedido. Intenta de nuevo.", "danger")
             return redirect(url_for('cart.view'))
 
     return render_template(
@@ -159,8 +190,12 @@ def process_simulated_payment(order_number):
                 flash("El pago de prueba quedó en estado pendiente de verificación.", "warning")
                 return redirect(url_for('checkout.confirmation', order_number=order.order_number))
 
-        except Exception as e:
-            flash(f"Error en la simulación de pago: {str(e)}", "danger")
+        except ValueError as e:
+            flash(str(e), "danger")
+            return redirect(url_for('checkout.payment_view', order_number=order.order_number))
+        except Exception:
+            current_app.logger.exception("Error inesperado en el pago simulado")
+            flash("Ocurrió un error inesperado al procesar el pago. Intenta de nuevo.", "danger")
             return redirect(url_for('checkout.payment_view', order_number=order.order_number))
 
     return redirect(url_for('checkout.payment_view', order_number=order.order_number))
@@ -171,10 +206,11 @@ def process_simulated_payment(order_number):
 def confirmation(order_number):
     """Paso 3 del Checkout: Comprobante y resumen de orden confirmada."""
     order = Order.query.filter_by(order_number=order_number, user_id=current_user.id).first_or_404()
-    latest_payment = order.payments.order_by(order.payments.property.mapper.class_.created_at.desc()).first()
+    latest_payment = order.latest_payment
 
     return render_template(
         'checkout/confirmation.html',
         order=order,
         latest_payment=latest_payment
     )
+

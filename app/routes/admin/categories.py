@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from app.decorators import admin_required
 from app.extensions import db
-from app.models.category import Category, generate_slug
+from app.models.category import Category, generate_unique_slug
 from app.forms.product_forms import CategoryForm
 
 admin_categories_bp = Blueprint('admin_categories', __name__, url_prefix='/admin/categorias')
@@ -24,7 +24,7 @@ def create():
         name_clean = Category.normalize_name(form.name.data)
         category = Category(
             name=name_clean,
-            slug=generate_slug(name_clean),
+            slug=generate_unique_slug(name_clean, Category, max_len=120),
             description=form.description.data.strip() if form.description.data else None,
             is_active=form.is_active.data
         )
@@ -40,13 +40,13 @@ def create():
 @admin_required
 def edit(category_id):
     """Edita una categoría existente."""
-    category = Category.query.get_or_404(category_id)
+    category = db.get_or_404(Category, category_id)
     form = CategoryForm(original_name=category.name, obj=category)
 
     if form.validate_on_submit():
         name_clean = Category.normalize_name(form.name.data)
         category.name = name_clean
-        category.slug = generate_slug(name_clean)
+        category.slug = generate_unique_slug(name_clean, Category, max_len=120, exclude_id=category.id)
         category.description = form.description.data.strip() if form.description.data else None
         category.is_active = form.is_active.data
 
@@ -61,7 +61,7 @@ def edit(category_id):
 @admin_required
 def toggle_status(category_id):
     """Activa o desactiva una categoría."""
-    category = Category.query.get_or_404(category_id)
+    category = db.get_or_404(Category, category_id)
     category.is_active = not category.is_active
     db.session.commit()
     estado_str = "activada" if category.is_active else "desactivada"

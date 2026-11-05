@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Simulador de Pago de Prueba — Pedido #{{ order.order_number }}{% endblock %}
 
@@ -6,8 +7,8 @@
 <div class="container" style="max-width: 640px; margin: 30px auto;">
     <!-- BANNER DE ADVERTENCIA DE MODO DE PRUEBA -->
     <div style="background: #fffbeb; border: 2px dashed #f59e0b; border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; text-align: center;">
-        <span style="font-size: 2rem;">⚠️</span>
-        <h2 style="font-size: 1.25rem; font-weight: 800; color: #b45309; margin: 6px 0;">MÓDULO DE PAGO EN MODO DE PRUEBA</h2>
+        <span class="err-ico">{{ icon('alert', 36) }}</span>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--safety-text); margin: 6px 0;">MÓDULO DE PAGO EN MODO DE PRUEBA</h2>
         <p style="color: #92400e; font-size: 0.9rem; margin: 0; line-height: 1.5;">
             Esta es una <strong>simulación controlada de pago</strong>. No se realizarán cargos monetarios reales ni se solicitarán datos bancarios privados ni CVV.
         </p>
@@ -22,7 +23,7 @@
                 </div>
                 <div style="text-align: right;">
                     <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Monto a Pagar</span>
-                    <strong style="font-size: 1.4rem; color: var(--primary); display: block;">{{ order.total | currency }}</strong>
+                    <strong style="font-size: 1.4rem; color: var(--accent-text); display: block;">{{ order.total | currency }}</strong>
                 </div>
             </div>
         </div>
@@ -43,7 +44,7 @@
             </div>
 
             <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin: 24px 0; font-size: 0.82rem; color: var(--muted);">
-                ℹ️ <strong>Nota Técnica de Seguridad:</strong> El resultado de la simulación se procesa y audita en el servidor. Un pago aprobado en modo prueba no constituye una transacción financiera real.
+                {{ icon('info', 16) }} <strong>Nota Técnica de Seguridad:</strong> El resultado de la simulación se procesa y audita en el servidor. Un pago aprobado en modo prueba no constituye una transacción financiera real.
             </div>
 
             {{ form.submit(class="btn btn-primary btn-full", style="padding: 14px; font-size: 1rem;") }}

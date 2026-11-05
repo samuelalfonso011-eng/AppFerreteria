@@ -1,0 +1,334 @@
+{% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
+
+{% block title %}Generar Pedido — Panel Administrativo{% endblock %}
+{% block page_title %}Generar Nuevo Pedido (Venta Directa / Mostrador){% endblock %}
+
+{% block content %}
+<div style="max-width: 1050px; margin: 0 auto;">
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <a href="{{ url_for('admin_orders.index') }}" class="btn btn-outline btn-sm">&larr; Volver al listado de pedidos</a>
+        <span style="font-size: 0.85rem; color: var(--admin-muted, #9ca3af);">Panel de Ventas y Mostrador</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_orders.create') }}" id="adminOrderForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start;">
+            <!-- COLUMNA PRINCIPAL -->
+            <div>
+                <!-- SECCIÓN 1: CLIENTE Y FACTURACIÓN -->
+                <div class="admin-card" style="margin-bottom: 24px;">
+                    <h3 style="margin-top: 0; margin-bottom: 18px; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        {{ icon('user', 18) }} 1. Datos del Cliente y Factura Electrónica
+                    </h3>
+
+                    {% if customers %}
+                        <div class="admin-form-group" style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Asociar a Cliente Registrado (Opcional):</label>
+                            <select name="customer_user_id" id="customerSelect" class="admin-form-control">
+                                <option value="">-- Cliente de Mostrador / No registrado --</option>
+                                {% for c in customers %}
+                                    <option value="{{ c.id }}" data-name="{{ c.full_name }}" data-phone="{{ c.phone or '' }}" data-email="{{ c.email }}">{{ c.full_name }} ({{ c.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% endif %}
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Nombre del Cliente / Receptor *</label>
+                            <input type="text" name="recipient_name" id="recipientName" class="admin-form-control" placeholder="Ej: Juan Carlos Pérez" required>
+                        </div>
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Teléfono Celular *</label>
+                            <input type="text" name="phone" id="recipientPhone" class="admin-form-control" placeholder="Ej: 300 123 4567" required>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 16px; margin-top: 16px;">
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Tipo Doc.</label>
+                            <select name="fiscal_doc_type" class="admin-form-control">
+                                <option value="CC">CC</option>
+                                <option value="NIT">NIT</option>
+                                <option value="CE">CE</option>
+                                <option value="PP">Pasaporte</option>
+                            </select>
+                        </div>
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Número Doc. / NIT</label>
+                            <input type="text" name="fiscal_doc_number" class="admin-form-control" placeholder="Ej: 71234567 o 900.123.456-1">
+                        </div>
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Correo para Factura DIAN</label>
+                            <input type="email" name="fiscal_email" id="recipientEmail" class="admin-form-control" placeholder="cliente@correo.com">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: TIPO DE ENTREGA -->
+                <div class="admin-card" style="margin-bottom: 24px;">
+                    <h3 style="margin-top: 0; margin-bottom: 18px; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        {{ icon('truck', 18) }} 2. Modalidad de Entrega
+                    </h3>
+
+                    <div style="display: flex; gap: 24px; margin-bottom: 18px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;">
+                            <input type="radio" name="shipping_type" value="pickup" checked>
+                            <span>Retiro en Tienda / Mostrador ($0 Envío)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;">
+                            <input type="radio" name="shipping_type" value="delivery">
+                            <span>Despacho a Domicilio (Valle de Aburrá)</span>
+                        </label>
+                    </div>
+
+                    <div id="deliveryFields" style="display: none; padding-top: 14px; border-top: 1px dashed var(--admin-border, #374151);">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                            <div class="admin-form-group">
+                                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Municipio (Valle de Aburrá)</label>
+                                <select name="city" class="admin-form-control">
+                                    {% for m in municipalities %}
+                                        <option value="{{ m }}" {% if m == 'Medellín' %}selected{% endif %}>{{ m }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="admin-form-group">
+                                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Barrio o Sector</label>
+                                <input type="text" name="neighborhood" class="admin-form-control" placeholder="Ej: Belén, Laureles, Niquía...">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 14px;">
+                            <div class="admin-form-group">
+                                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Dirección Exacta</label>
+                                <input type="text" name="street_address" class="admin-form-control" placeholder="Ej: Calle 50 # 45-20">
+                            </div>
+                            <div class="admin-form-group">
+                                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Complemento</label>
+                                <input type="text" name="complement" class="admin-form-control" placeholder="Apto, Bodega, etc.">
+                            </div>
+                        </div>
+
+                        <div class="admin-form-group">
+                            <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Indicaciones para el Repartidor</label>
+                            <input type="text" name="delivery_instructions" class="admin-form-control" placeholder="Ej: Dejar con el vigilante">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: SELECCIÓN DE PRODUCTOS -->
+                <div class="admin-card">
+                    <h3 style="margin-top: 0; margin-bottom: 18px; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 8px;">{{ icon('package', 18) }} 3. Selección de Artículos</span>
+                        <input type="text" id="productFilterInput" placeholder="Filtrar por nombre o SKU..." style="font-size: 0.8rem; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--admin-border, #374151); background: var(--admin-panel, #1f2937); color: white;">
+                    </h3>
+
+                    <div style="overflow-x: auto;">
+                        <table class="admin-table" id="productsOrderTable">
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Producto</th>
+                                    <th style="text-align: right;">Precio Unitario</th>
+                                    <th style="text-align: center;">Stock Disponible</th>
+                                    <th style="text-align: center; width: 140px;">Cantidad</th>
+                                    <th style="text-align: right;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in products %}
+                                    <tr class="product-item-row" data-name="{{ p.name | lower }}" data-sku="{{ p.sku | lower }}">
+                                        <td><code style="font-weight: 700;">{{ p.sku }}</code></td>
+                                        <td>
+                                            <strong>{{ p.name }}</strong>
+                                            <span style="display: block; font-size: 0.75rem; color: var(--admin-muted, #9ca3af);">{{ p.category.name }}</span>
+                                        </td>
+                                        <td style="text-align: right; font-weight: 600;" data-price="{{ p.price }}">
+                                            {{ p.price | currency }}
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span class="badge {% if p.stock > 10 %}badge-success{% elif p.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
+                                                {{ p.stock }} unds
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <input type="number" 
+                                                   name="qty_{{ p.id }}" 
+                                                   id="qty_{{ p.id }}" 
+                                                   value="0" 
+                                                   min="0" 
+                                                   max="{{ p.stock }}" 
+                                                   class="admin-form-control item-qty-input" 
+                                                   style="width: 85px; text-align: center; display: inline-block; padding: 4px 6px;"
+                                                   data-price="{{ p.price }}"
+                                                   data-target-subtotal="subtotal_{{ p.id }}"
+                                                   {% if p.stock <= 0 %}disabled{% endif %}>
+                                        </td>
+                                        <td style="text-align: right; font-weight: 700; color: var(--accent-text);" id="subtotal_{{ p.id }}">
+                                            $ 0
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA LATERAL: RESUMEN Y ACCIONES -->
+            <div style="position: sticky; top: 90px;">
+                <div class="admin-card" style="border: 2px solid var(--brand-yellow);">
+                    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.1rem; font-weight: 800;">
+                        Resumen de Venta
+                    </h3>
+
+                    <!-- CONFIGURACIÓN DE ESTADO Y PAGO -->
+                    <div class="admin-form-group" style="margin-bottom: 14px;">
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px;">Estado del Pedido:</label>
+                        <select name="status" class="admin-form-control" style="font-size: 0.88rem;">
+                            {% for s in statuses %}
+                                <option value="{{ s }}" {% if s == 'CONFIRMED' %}selected{% endif %}>{{ status_labels[s] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="admin-form-group" style="margin-bottom: 14px;">
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px;">Método de Pago:</label>
+                        <select name="payment_method" class="admin-form-control" style="font-size: 0.88rem;">
+                            {% for m in payment_methods %}
+                                <option value="{{ m }}" {% if m == 'SIMULATED_CASH_ON_DELIVERY' %}selected{% endif %}>{{ payment_labels[m] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 18px; padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; border: 1px solid rgba(34, 197, 94, 0.3);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #10b981;">
+                            <input type="checkbox" name="is_paid" value="1" checked>
+                            <span>Marcar como PAGADO y generar Factura Electrónica DIAN</span>
+                        </label>
+                    </div>
+
+                    <div class="admin-form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px;">Notas Internas:</label>
+                        <textarea name="notes" class="admin-form-control" rows="2" placeholder="Ej: Venta presencial en mostrador"></textarea>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--admin-border, #374151); padding-top: 14px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 8px;">
+                            <span style="color: var(--admin-muted, #9ca3af);">Subtotal:</span>
+                            <strong id="displaySubtotal">$ 0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 8px;">
+                            <span style="color: var(--admin-muted, #9ca3af);">Costo de Envío:</span>
+                            <strong id="displayShipping">$ 0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: 800; border-top: 1px solid var(--admin-border, #374151); padding-top: 10px; color: var(--accent-text);">
+                            <span>Total a Cobrar:</span>
+                            <span id="displayTotal">$ 0</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" style="font-weight: 800; padding: 12px; font-size: 1rem;">
+                        {{ icon('bolt', 16) }} Generar Pedido
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+    var standardShippingCost = {{ settings.standard_shipping_cost | default(15000) }};
+    var freeThreshold = {{ settings.free_shipping_threshold | default(150000) }};
+
+    function formatCop(val) {
+        return '$ ' + Math.round(val).toLocaleString('es-CO');
+    }
+
+    function toggleShippingFields(val) {
+        var fields = document.getElementById('deliveryFields');
+        if (val === 'delivery') {
+            fields.style.display = 'block';
+        } else {
+            fields.style.display = 'none';
+        }
+        recalcTotals();
+    }
+
+    function autoFillCustomerData() {
+        var sel = document.getElementById('customerSelect');
+        var opt = sel.options[sel.selectedIndex];
+        if (opt && opt.value) {
+            document.getElementById('recipientName').value = opt.getAttribute('data-name') || '';
+            document.getElementById('recipientPhone').value = opt.getAttribute('data-phone') || '';
+            document.getElementById('recipientEmail').value = opt.getAttribute('data-email') || '';
+        }
+    }
+
+    function filterProductsList() {
+        var query = document.getElementById('productFilterInput').value.toLowerCase().trim();
+        var rows = document.querySelectorAll('.product-item-row');
+        rows.forEach(function(row) {
+            var name = row.getAttribute('data-name') || '';
+            var sku = row.getAttribute('data-sku') || '';
+            if (name.includes(query) || sku.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    function updateItemSubtotal(input) {
+        var price = parseFloat(input.getAttribute('data-price')) || 0;
+        var qty = parseInt(input.value) || 0;
+        var targetId = input.getAttribute('data-target-subtotal');
+        var sub = price * qty;
+        var targetEl = document.getElementById(targetId);
+        if (targetEl) {
+            targetEl.textContent = formatCop(sub);
+        }
+        recalcTotals();
+    }
+
+    function recalcTotals() {
+        var inputs = document.querySelectorAll('.item-qty-input');
+        var subtotal = 0;
+        inputs.forEach(function(input) {
+            var price = parseFloat(input.getAttribute('data-price')) || 0;
+            var qty = parseInt(input.value) || 0;
+            subtotal += price * qty;
+        });
+
+        var shippingType = document.querySelector('input[name="shipping_type"]:checked').value;
+        var shipping = 0;
+        if (shippingType === 'delivery') {
+            if (subtotal >= freeThreshold && freeThreshold > 0) {
+                shipping = 0;
+            } else {
+                shipping = standardShippingCost;
+            }
+        } else {
+            shipping = 0;
+        }
+
+        var total = subtotal + shipping;
+
+        document.getElementById('displaySubtotal').textContent = formatCop(subtotal);
+        document.getElementById('displayShipping').textContent = (shipping === 0 ? 'GRATIS ($ 0)' : formatCop(shipping));
+        document.getElementById('displayTotal').textContent = formatCop(total);
+    }
+
+    // Listeners (la CSP no permite manejadores inline)
+    document.getElementById('customerSelect') && document.getElementById('customerSelect').addEventListener('change', autoFillCustomerData);
+    document.querySelectorAll('input[name="shipping_type"]').forEach(function(r) {
+        r.addEventListener('change', function() { toggleShippingFields(r.value); });
+    });
+    document.getElementById('productFilterInput').addEventListener('keyup', filterProductsList);
+    document.querySelectorAll('.item-qty-input').forEach(function(i) {
+        i.addEventListener('input', function() { updateItemSubtotal(i); });
+    });
+</script>
+{% endblock %}

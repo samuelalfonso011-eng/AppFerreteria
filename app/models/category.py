@@ -10,6 +10,19 @@ def generate_slug(text: str) -> str:
     return re.sub(r'[-\s]+', '-', text)
 
 
+def generate_unique_slug(text: str, model, max_len: int = 200, exclude_id: int = None) -> str:
+    """Genera un slug único para `model` añadiendo sufijo numérico si ya existe."""
+    base = (generate_slug(text) or 'item')[:max_len - 8]
+    slug, n = base, 2
+    while True:
+        clash = model.query.filter_by(slug=slug).first()
+        if clash is None or (exclude_id is not None and clash.id == exclude_id):
+            break
+        slug = f"{base}-{n}"
+        n += 1
+    return slug
+
+
 class Category(db.Model):
     """Categorías de productos de la ferretería."""
     __tablename__ = 'categories'

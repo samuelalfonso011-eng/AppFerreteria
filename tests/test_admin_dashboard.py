@@ -42,7 +42,7 @@ def test_31_32_dashboard_queries_real_database_metrics(client, app):
     assert response.status_code == 200
 
     # Ventas confirmadas deben reflejar únicamente el pedido 1 ($35,000) y excluir el pedido cancelado
-    assert "35.000,00".encode('utf-8') in response.data or "35,000".encode('utf-8') in response.data
+    # Formato COP sin decimales: $ 35.000\n    assert "35.000".encode('utf-8') in response.data and "35.000,00".encode('utf-8') not in response.data
 
 
 def test_34_order_state_transitions(app):

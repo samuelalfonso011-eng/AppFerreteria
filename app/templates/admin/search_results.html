@@ -1,0 +1,193 @@
+{% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
+
+{% block title %}Resultados de Búsqueda — Panel Administrativo{% endblock %}
+{% block page_title %}Búsqueda Global Administrativa{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    {% if q %}
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 800;">
+                    Resultados para: <span style="color: var(--accent-text);">"{{ q }}"</span>
+                </h3>
+                <span style="font-size: 0.85rem; color: var(--admin-muted, #9ca3af);">
+                    Se encontraron {{ total_results }} coincidencia(s) en la base de datos.
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <span class="badge badge-info" style="font-size: 0.82rem; padding: 6px 12px;">{{ icon('cart', 14) }} Pedidos: {{ orders|length }}</span>
+                <span class="badge badge-success" style="font-size: 0.82rem; padding: 6px 12px;">{{ icon('package', 14) }} Productos: {{ products|length }}</span>
+                <span class="badge badge-warning" style="font-size: 0.82rem; padding: 6px 12px;">{{ icon('users', 14) }} Clientes: {{ customers|length }}</span>
+            </div>
+        </div>
+    {% else %}
+        <div class="admin-card" style="text-align: center; padding: 48px 24px;">
+            <div class="empty-state-icon">{{ icon('search-empty', 34) }}</div>
+            <h3 style="margin-top: 0; font-size: 1.25rem;">Búsqueda Global del Panel Administrativo</h3>
+            <p style="color: var(--admin-muted, #9ca3af); max-width: 500px; margin: 0 auto 20px;">
+                Ingresa un número de pedido (ORD-...), SKU, nombre de producto, cliente, correo o teléfono en la barra superior.
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+{% if q %}
+    {% if total_results == 0 %}
+        <div class="admin-card" style="text-align: center; padding: 48px 20px;">
+            <div class="empty-state-icon">{{ icon('search-empty', 34) }}</div>
+            <h4 style="margin: 0 0 8px; font-size: 1.15rem;">No se encontraron resultados para "{{ q }}"</h4>
+            <p style="color: var(--admin-muted, #9ca3af); font-size: 0.9rem; margin: 0 auto; max-width: 480px;">
+                Verifica que el término de búsqueda esté bien escrito o intenta buscar por una palabra clave más general (ej. SKU, apellido, municipio).
+            </p>
+        </div>
+    {% else %}
+
+        <!-- 1. PEDIDOS ENCONTRADOS -->
+        {% if orders %}
+            <div class="admin-card" style="margin-bottom: 24px;">
+                <h4 style="margin: 0 0 16px; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    {{ icon('cart', 18) }} Pedidos Encontrados ({{ orders|length }})
+                </h4>
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Fecha</th>
+                                <th>Destinatario / Cliente</th>
+                                <th>Teléfono</th>
+                                <th>Ciudad / Destino</th>
+                                <th style="text-align: center;">Estado</th>
+                                <th style="text-align: right;">Total</th>
+                                <th style="text-align: right;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" style="font-weight: 700; color: var(--accent-text);">
+                                            #{{ o.order_number }}
+                                        </a>
+                                    </td>
+                                    <td style="font-size: 0.85rem; color: var(--admin-muted, #9ca3af);">{{ o.created_at | date_format("%d/%m/%Y %H:%M") }}</td>
+                                    <td>
+                                        <strong>{{ o.shipping_recipient_name }}</strong>
+                                        <span style="font-size: 0.75rem; color: var(--admin-muted, #9ca3af); display: block;">{{ o.user.email }}</span>
+                                    </td>
+                                    <td style="font-size: 0.85rem;">{{ o.shipping_phone }}</td>
+                                    <td style="font-size: 0.85rem;">{{ o.shipping_city }}</td>
+                                    <td style="text-align: center;">
+                                        <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
+                                            {{ o.status_label }}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right; font-weight: 800;">{{ o.total | currency }}</td>
+                                    <td style="text-align: right;">
+                                        <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" class="btn btn-outline btn-sm">
+                                            Gestionar
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 2. PRODUCTOS ENCONTRADOS -->
+        {% if products %}
+            <div class="admin-card" style="margin-bottom: 24px;">
+                <h4 style="margin: 0 0 16px; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    {{ icon('package', 18) }} Productos Encontrados ({{ products|length }})
+                </h4>
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th style="text-align: right;">Precio</th>
+                                <th style="text-align: center;">Stock</th>
+                                <th style="text-align: center;">Estado</th>
+                                <th style="text-align: right;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in products %}
+                                <tr>
+                                    <td><code style="font-weight: 700;">{{ p.sku }}</code></td>
+                                    <td>
+                                        <strong>{{ p.name }}</strong>
+                                    </td>
+                                    <td>{{ p.category.name }}</td>
+                                    <td style="text-align: right; font-weight: 700;">{{ p.price | currency }}</td>
+                                    <td style="text-align: center;">
+                                        <span class="badge {% if p.stock > 10 %}badge-success{% elif p.stock > 0 %}badge-warning{% else %}badge-danger{% endif %}">
+                                            {{ p.stock }}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if p.is_active %}
+                                            <span class="badge badge-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Inactivo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <a href="{{ url_for('admin_products.edit', product_id=p.id) }}" class="btn btn-outline btn-sm">
+                                            Editar
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- 3. CLIENTES ENCONTRADOS -->
+        {% if customers %}
+            <div class="admin-card">
+                <h4 style="margin: 0 0 16px; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    {{ icon('users', 18) }} Clientes Encontrados ({{ customers|length }})
+                </h4>
+                <div style="overflow-x: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre Completo</th>
+                                <th>Correo Electrónico</th>
+                                <th>Teléfono</th>
+                                <th>Fecha Registro</th>
+                                <th style="text-align: right;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in customers %}
+                                <tr>
+                                    <td><strong>{{ c.full_name }}</strong></td>
+                                    <td>{{ c.email }}</td>
+                                    <td>{{ c.phone or 'No registrado' }}</td>
+                                    <td style="font-size: 0.85rem; color: var(--admin-muted, #9ca3af);">{{ c.created_at | date_format("%d/%m/%Y") }}</td>
+                                    <td style="text-align: right;">
+                                        <a href="{{ url_for('admin_customers.detail', customer_id=c.id) }}" class="btn btn-outline btn-sm">
+                                            Ver Perfil
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+    {% endif %}
+{% endif %}
+{% endblock %}

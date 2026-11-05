@@ -3,30 +3,35 @@
 {% block title %}Términos y Condiciones — {{ store_settings.store_name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 900px; margin: 40px auto;">
-    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 48px; box-shadow: var(--shadow-sm);">
-        <span style="background: var(--brand-yellow); color: #111111; padding: 4px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">Condiciones Comerciales</span>
-        <h1 style="font-size: 2.2rem; font-weight: 800; margin: 16px 0 24px; color: var(--text-main);">Términos y Condiciones de Uso</h1>
-        <p style="color: var(--muted); font-size: 0.95rem;">Última actualización: Octubre de 2026</p>
+<div class="container legal-page">
+    <article class="legal-card">
+        <span class="legal-tag">Condiciones comerciales</span>
+        <h1>Términos y Condiciones de Uso</h1>
+        <p class="legal-meta">Última actualización: noviembre de 2026</p>
+        <hr>
 
-        <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+        <div class="legal-body">
+            <h2>1. Ámbito de aplicación</h2>
+            <p>El acceso y la compra de productos a través de este portal se rigen por estos Términos y Condiciones y por la <strong>Ley 1480 de 2011</strong> (Estatuto del Consumidor). Al realizar un pedido en <strong>{{ store_settings.store_name }}</strong>, el cliente los acepta expresamente.</p>
 
-        <div style="line-height: 1.8; color: var(--text-main); font-size: 0.96rem;">
-            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">1. Ámbito de Aplicación</h2>
-            <p>El acceso y compra de productos a través de este portal web se rige por los presentes Términos y Condiciones. Al realizar un pedido en <strong>{{ store_settings.store_name }}</strong>, el cliente acepta expresamente las cláusulas aquí estipuladas.</p>
+            <h2>2. Disponibilidad de stock y precios</h2>
+            <p>Los precios están expresados en pesos colombianos (COP) e incluyen los tributos aplicables. Valen los precios calculados y confirmados en el servidor al momento de la orden. El inventario se valida en tiempo real; si un artículo se agota de forma imprevista, se notificará al cliente y no se procesará el cobro.</p>
 
-            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">2. Disponibilidad de Stock y Precios</h2>
-            <p>Los precios publicados en la tienda virtual están expresados en moneda legal (COP) e incluyen los tributos aplicables. Los precios válidos son aquellos calculados y confirmados en el servidor al momento de la orden. El inventario es auditado en tiempo real; en caso de agotamiento imprevisto, el sistema notificará inmediatamente al cliente y no procesará el cargo.</p>
+            <h2>3. Entorno de pago de prueba (Sandbox)</h2>
+            <p>Esta versión opera en <strong>modo de prueba (Sandbox)</strong>. Las transacciones procesadas con el simulador de pago son simuladas: no generan débitos bancarios reales ni solicitan datos reales de tarjetas.</p>
 
-            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">3. Entorno de Pago de Prueba</h2>
-            <p>Esta versión de la plataforma opera en **Modo de Prueba**. Las transacciones procesadas a través del simulador de pago no representan débitos bancarios reales ni solicitan códigos de seguridad reales de tarjetas financieras.</p>
+            <h2>4. Despachos y entregas</h2>
+            <p>Entregamos en la dirección indicada por el cliente dentro del Valle de Aburrá y municipios habilitados. Las compras superiores a <strong>{{ store_settings.free_shipping_threshold | currency }}</strong> tienen envío sin costo adicional. Los materiales de gran longitud o peso, como tuberías, láminas y cables en rollo, pueden requerir vehículo especial y coordinación previa.</p>
 
-            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">4. Despachos y Entregas a Domicilio</h2>
-            <p>Las entregas se efectuarán en la dirección suministrada por el cliente al momento de comprar. Las compras superiores a <strong>{{ store_settings.free_shipping_threshold | currency }}</strong> aplican para beneficio de envío sin costo adicional.</p>
+            <h2>5. Cancelaciones</h2>
+            <p>El cliente puede cancelar su pedido desde su perfil mientras no haya pasado a preparación o despacho. Toda cancelación aprobada restituye automáticamente las existencias al kárdex de inventario.</p>
 
-            <h2 style="font-size: 1.3rem; font-weight: 700; margin-top: 28px; color: var(--brand-yellow-hover, #d97706);">5. Cancelaciones y Devoluciones</h2>
-            <p>El cliente podrá cancelar su pedido desde su perfil de usuario siempre que el estado se encuentre antes de preparación o despacho. Toda cancelación aprobada restituye automáticamente las existencias de los artículos al kárdex de inventario.</p>
+            <h2>6. Retracto, garantía y reembolsos</h2>
+            <p>En compras a distancia el consumidor puede ejercer el derecho de <strong>Retracto</strong> dentro de los cinco (5) días hábiles siguientes a la entrega, con las excepciones previstas en la ley. La garantía legal y el procedimiento de devolución se detallan en la <a href="{{ url_for('public.refunds_policy') }}">Política de Reembolsos</a>.</p>
+
+            <h2>7. Ley aplicable y jurisdicción</h2>
+            <p>Estos términos se rigen por las leyes de la República de Colombia. Cualquier controversia se someterá a los jueces competentes del Valle de Aburrá, sin perjuicio de las acciones que el consumidor pueda adelantar ante la Superintendencia de Industria y Comercio.</p>
         </div>
-    </div>
+    </article>
 </div>
 {% endblock %}

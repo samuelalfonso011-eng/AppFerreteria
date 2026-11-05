@@ -6,6 +6,14 @@ from app.models.setting import StoreSetting
 cart_bp = Blueprint('cart', __name__, url_prefix='/carrito')
 
 
+def _payload():
+    """Devuelve (is_json, datos) tolerando cuerpos JSON vacíos o malformados."""
+    if request.is_json:
+        data = request.get_json(silent=True)
+        return True, data if isinstance(data, dict) else {}
+    return False, request.form
+
+
 @cart_bp.route('/')
 def view():
     """Vista detallada del carrito con subtotales y costos calculados en servidor."""
@@ -26,8 +34,7 @@ def view():
 @cart_bp.route('/agregar', methods=['POST'])
 def add():
     """Agrega un producto al carrito comprobando existencias en servidor."""
-    is_json = request.is_json
-    data = request.get_json() if is_json else request.form
+    is_json, data = _payload()
 
     try:
         product_id = int(data.get('product_id'))
@@ -59,8 +66,7 @@ def add():
 @cart_bp.route('/actualizar', methods=['POST'])
 def update():
     """Actualiza la cantidad de un ítem en el carrito."""
-    is_json = request.is_json
-    data = request.get_json() if is_json else request.form
+    is_json, data = _payload()
 
     try:
         product_id = int(data.get('product_id'))
@@ -92,8 +98,7 @@ def update():
 @cart_bp.route('/eliminar', methods=['POST'])
 def remove():
     """Elimina un artículo del carrito."""
-    is_json = request.is_json
-    data = request.get_json() if is_json else request.form
+    is_json, data = _payload()
 
     try:
         product_id = int(data.get('product_id'))

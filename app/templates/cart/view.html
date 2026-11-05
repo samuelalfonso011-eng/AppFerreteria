@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Carrito de Compras — {{ store_settings.store_name }}{% endblock %}
 
@@ -25,7 +26,7 @@
                             <tr style="border-bottom: 1px solid var(--border);">
                                 <td style="padding: 16px;">
                                     <div style="display: flex; gap: 14px; align-items: center;">
-                                        <div style="width: 50px; height: 50px; background: #f3f4f6; border-radius: 8px; display: grid; place-items: center; font-size: 1.5rem;">📦</div>
+                                        <div class="cart-thumb-ico">{{ icon('package', 24) }}</div>
                                         <div>
                                             <strong style="display: block; font-size: 0.95rem;">{{ item.name }}</strong>
                                             <span style="font-size: 0.75rem; color: var(--muted);">SKU: {{ item.sku }}</span>
@@ -52,7 +53,7 @@
                                     <form action="{{ url_for('cart.remove') }}" method="POST">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="product_id" value="{{ item.product_id }}">
-                                        <button type="submit" style="background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem;" title="Eliminar artículo">🗑️</button>
+                                        <button type="submit" style="background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem;" title="Eliminar artículo" aria-label="Eliminar artículo">{{ icon('trash', 18) }}</button>
                                     </form>
                                 </td>
                             </tr>
@@ -77,7 +78,7 @@
                 {% if store_settings.free_shipping_threshold %}
                     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 0.85rem;">
                         {% if cart.subtotal >= store_settings.free_shipping_threshold %}
-                            <strong style="color: #166534; display: block;">🎉 ¡Felicidades! Calificas para Envío Gratuito.</strong>
+                            <strong style="color: #166534; display: block;">{{ icon('check', 16) }} ¡Felicidades! Calificas para Envío Gratuito.</strong>
                         {% else %}
                             {% set remaining = store_settings.free_shipping_threshold - cart.subtotal %}
                             <span style="color: #166534;">Agrega <strong>{{ remaining | currency }}</strong> más para obtener <strong>Envío Gratis</strong>.</span>
@@ -113,7 +114,7 @@
         </div>
     {% else %}
         <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 60px 20px; text-align: center;">
-            <div style="font-size: 4rem; margin-bottom: 16px;">🛒</div>
+            <div class="empty-state-icon">{{ icon('cart', 34) }}</div>
             <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Tu carrito de compras está vacío</h2>
             <p style="color: var(--muted); margin-bottom: 24px;">No tienes productos seleccionados en este momento.</p>
             <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">Explorar Catálogo de Ferretería</a>

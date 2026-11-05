@@ -35,7 +35,7 @@
                     {{ form.remember() }}
                     <span>{{ form.remember.label.text }}</span>
                 </label>
-                <a href="{{ url_for('auth.forgot_password') }}" style="color: var(--brand-yellow-hover, #d97706); font-weight: 600;">¿Olvidaste tu contraseña?</a>
+                <a href="{{ url_for('auth.forgot_password') }}" class="link-accent">¿Olvidaste tu contraseña?</a>
             </div>
 
             {{ form.submit(class="btn btn-primary btn-full", style="padding: 12px; font-size: 1rem;") }}

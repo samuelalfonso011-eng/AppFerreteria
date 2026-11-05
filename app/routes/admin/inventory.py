@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import current_user
 from app.decorators import admin_required
+from app.extensions import db
 from app.models.inventory import InventoryMovement, MovementType
 from app.models.product import Product
 from app.forms.admin_forms import StockAdjustmentForm
@@ -60,7 +61,7 @@ def alerts():
 @admin_required
 def adjust(product_id):
     """Ajuste manual de existencias con justificación y registro en kárdex."""
-    product = Product.query.get_or_404(product_id)
+    product = db.get_or_404(Product, product_id)
     form = StockAdjustmentForm(target_stock=product.stock)
 
     if form.validate_on_submit():

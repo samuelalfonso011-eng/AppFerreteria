@@ -110,7 +110,7 @@ def test_password_reset_flow(client, app):
     assert '¡Hola de nuevo'.encode('utf-8') in res_login.data
 
     # 6. Comprobar que la contraseña antigua ya no funciona
-    client.get('/logout')
+    client.post('/logout')
     res_old_login = client.post('/login', data={'email': 'cliente@correo.com', 'password': 'ClientePass123*'}, follow_redirects=True)
     assert 'contraseña incorrectos'.encode('utf-8') in res_old_login.data
 

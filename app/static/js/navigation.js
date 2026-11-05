@@ -72,6 +72,7 @@
         }
 
         startProgress();
+        mainContent.classList.add('is-loading');
 
         // Transición de salida suave (150ms)
         mainContent.style.transition = 'opacity 150ms ease, transform 150ms ease';
@@ -108,7 +109,7 @@
 
             // Actualizar contenido principal
             mainContent.innerHTML = newMain.innerHTML;
-            mainContent.className = newMain.className;
+            mainContent.className = newMain.className; // también retira is-loading
 
             // Actualizar badge del carrito si cambió
             const newCartBadge = newDoc.querySelector('.cart-badge');

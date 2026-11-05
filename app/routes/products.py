@@ -15,7 +15,7 @@ def catalog():
     per_page = 12
 
     # Parámetros de búsqueda y filtros
-    query = request.args.get('q', '').strip()
+    query = (request.args.get('q') or request.args.get('search') or '').strip()
     category_slug = request.args.get('categoria', '').strip()
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)

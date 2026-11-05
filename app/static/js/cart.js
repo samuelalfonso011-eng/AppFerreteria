@@ -18,8 +18,8 @@ function initCartAsync() {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
             btn.disabled = true;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'Agregando...';
+            btn.classList.add('is-loading');
+            btn.setAttribute('aria-busy', 'true');
 
             try {
                 const response = await fetch('/carrito/agregar', {
@@ -43,6 +43,9 @@ function initCartAsync() {
                     const badge = document.querySelector('.cart-badge');
                     if (badge) {
                         badge.textContent = data.cart.total_items;
+                        badge.classList.remove('bump');
+                        void badge.offsetWidth; // reinicia la animación
+                        badge.classList.add('bump');
                     }
                 } else {
                     if (typeof showToast === 'function') {
@@ -55,7 +58,8 @@ function initCartAsync() {
                 }
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = originalText;
+                btn.classList.remove('is-loading');
+                btn.removeAttribute('aria-busy');
             }
         });
     });

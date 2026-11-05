@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% from '_icons.html' import icon %}
+
+{% block meta_title %}Factura Electrónica {{ invoice.invoice_number }} | Ferretería El Constructor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .invoice-wrapper {
+        max-width: 900px;
+        margin: 2rem auto;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+    .invoice-actions-bar {
+        background: var(--bg-surface);
+        padding: 1rem 2rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .invoice-content {
+        padding: 2.5rem;
+    }
+    .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 1.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+    .invoice-brand h1 {
+        font-size: 1.6rem;
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+        color: var(--text-primary);
+    }
+    .invoice-brand p {
+        margin: 0.15rem 0;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+    }
+    .invoice-badge-box {
+        text-align: right;
+        background: var(--bg-surface);
+        border: 2px solid #F59E0B;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+    }
+    .invoice-badge-box .badge-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        display: block;
+    }
+    .invoice-badge-box .invoice-number {
+        font-size: 1.6rem;
+        font-weight: 900;
+        color: var(--text-primary);
+        letter-spacing: 0.5px;
+    }
+    .invoice-grid-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .invoice-box {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+    .invoice-box h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #F59E0B;
+        margin-bottom: 0.75rem;
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: 0.4rem;
+    }
+    .invoice-box p {
+        margin: 0.3rem 0;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+    }
+    .invoice-box strong {
+        color: var(--text-primary);
+    }
+    .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.5rem;
+    }
+    .invoice-table th {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        padding: 0.85rem 1rem;
+        border-bottom: 2px solid var(--border-color);
+        text-align: left;
+    }
+    .invoice-table td {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+    }
+    .invoice-table tr:hover {
+        background: rgba(245, 158, 11, 0.04);
+    }
+    .invoice-totals-wrapper {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 2rem;
+    }
+    .invoice-totals-table {
+        width: 380px;
+        border-collapse: collapse;
+    }
+    .invoice-totals-table td {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.92rem;
+    }
+    .invoice-totals-table tr.total-row {
+        border-top: 2px solid #F59E0B;
+        border-bottom: 2px solid #F59E0B;
+        font-weight: 800;
+        font-size: 1.2rem;
+        color: var(--text-primary);
+    }
+    .invoice-dian-section {
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
+        border-radius: 8px;
+        padding: 1.25rem;
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .invoice-qr-container {
+        flex-shrink: 0;
+        padding: 0.5rem;
+        background: #ffffff;
+        border-radius: 6px;
+        display: inline-flex;
+    }
+    .invoice-cufe-box {
+        flex: 1;
+        min-width: 280px;
+    }
+    .invoice-cufe-box h4 {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .cufe-code {
+        font-family: monospace;
+        font-size: 0.8rem;
+        word-break: break-all;
+        background: var(--bg-card);
+        padding: 0.6rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+    .invoice-legal-note {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .invoice-grid-details {
+            grid-template-columns: 1fr;
+        }
+        .invoice-badge-box {
+            text-align: left;
+            width: 100%;
+        }
+        .invoice-totals-table {
+            width: 100%;
+        }
+        .invoice-content {
+            padding: 1.25rem;
+        }
+    }
+
+    /* Estilos optimizados para impresión en papel estándar */
+    @media print {
+        header, footer, .navbar, .top-bar, .invoice-actions-bar, #backToTopBtn, .toast-container {
+            display: none !important;
+        }
+        body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .invoice-wrapper {
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            background: #ffffff !important;
+        }
+        .invoice-box, .invoice-badge-box, .invoice-dian-section {
+            background: #ffffff !important;
+            border: 1px solid #cccccc !important;
+            color: #000000 !important;
+        }
+        .invoice-brand h1, .invoice-brand p, .invoice-box p, .invoice-box strong, .invoice-table td, .invoice-table th {
+            color: #000000 !important;
+        }
+        .cufe-code {
+            background: #f8f8f8 !important;
+            color: #111111 !important;
+            border: 1px solid #dddddd !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="invoice-wrapper">
+        <!-- Barra de acciones (Oculta al imprimir) -->
+        <div class="invoice-actions-bar no-print">
+            <div>
+                <a href="{{ url_for('orders.detail', order_number=order.order_number) }}" class="btn btn-sm btn-outline-secondary">
+                    &larr; Volver al Pedido #{{ order.order_number }}
+                </a>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-warning fw-bold text-dark" data-print>
+                    {{ icon('printer', 16) }} Imprimir / Guardar como PDF
+                </button>
+            </div>
+        </div>
+
+        <div class="invoice-content">
+            <!-- Encabezado de Factura -->
+            <div class="invoice-header">
+                <div class="invoice-brand">
+                    <h1>{{ invoice.issuer_name }}</h1>
+                    <p><strong>NIT:</strong> {{ invoice.issuer_nit }} | Responsable de IVA</p>
+                    <p><strong>Dirección:</strong> {{ invoice.issuer_address }}</p>
+                    <p><strong>Teléfono:</strong> {{ invoice.issuer_phone }} | <strong>Email:</strong> facturacion@ferreteriaelconstructor.com</p>
+                    <p class="text-muted small mt-1">{{ invoice.dian_resolution }}</p>
+                </div>
+                <div class="invoice-badge-box">
+                    <span class="badge-title">Factura Electrónica de Venta</span>
+                    <div class="invoice-number">{{ invoice.invoice_number }}</div>
+                    <small class="text-muted d-block mt-1">Pedido Ref: {{ order.order_number }}</small>
+                </div>
+            </div>
+
+            <!-- Datos del Cliente y de la Transacción -->
+            <div class="invoice-grid-details">
+                <div class="invoice-box">
+                    <h3>Datos del Adquirente</h3>
+                    <p><strong>Nombre / Razón Social:</strong> {{ invoice.customer_name }}</p>
+                    <p><strong>Documento:</strong> {{ invoice.customer_doc_type }} {{ invoice.customer_doc_number }}</p>
+                    <p><strong>Correo Electrónico:</strong> {{ invoice.customer_email }}</p>
+                    <p><strong>Dirección de Entrega:</strong> {{ order.shipping_street_address }}, {{ order.shipping_city }} ({{ order.shipping_neighborhood }})</p>
+                    <p><strong>Teléfono de Contacto:</strong> {{ order.shipping_phone }}</p>
+                </div>
+                <div class="invoice-box">
+                    <h3>Detalles de la Transacción</h3>
+                    <p><strong>Fecha y Hora de Emisión:</strong> {{ invoice.issued_at | bogota_time }}</p>
+                    <p><strong>Forma de Pago:</strong> Contado (100% Simulado)</p>
+                    <p><strong>Medio de Pago:</strong> 
+                        {% if order.latest_payment %}
+                            {{ order.latest_payment.method_label }}
+                        {% else %}
+                            Simulación en línea
+                        {% endif %}
+                    </p>
+                    <p><strong>Estado del Pedido:</strong> <span class="badge bg-success text-white">{{ order.status_label }}</span></p>
+                    <p><strong>Moneda:</strong> COP (Pesos Colombianos - $)</p>
+                </div>
+            </div>
+
+            <!-- Tabla de Ítems / Productos -->
+            <div class="table-responsive">
+                <table class="invoice-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 15%;">SKU</th>
+                            <th style="width: 45%;">Descripción del Producto</th>
+                            <th style="width: 10%; text-align: center;">Cant.</th>
+                            <th style="width: 12%; text-align: right;">Vr. Unitario</th>
+                            <th style="width: 13%; text-align: right;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order.items %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><code>{{ item.product_sku }}</code></td>
+                            <td><strong>{{ item.product_name }}</strong></td>
+                            <td style="text-align: center;">{{ item.quantity }}</td>
+                            <td style="text-align: right;">{{ item.unit_price | currency }}</td>
+                            <td style="text-align: right; font-weight: 600;">{{ item.subtotal | currency }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumen y Desglose Tributario (IVA 19%) -->
+            <div class="invoice-totals-wrapper">
+                <table class="invoice-totals-table">
+                    <tr>
+                        <td class="text-muted">Subtotal Base Gravable (19%):</td>
+                        <td style="text-align: right; font-weight: 600;">{{ invoice.base_amount | currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Impuesto a las Ventas (IVA 19%):</td>
+                        <td style="text-align: right; font-weight: 600; color: #2563eb;">{{ invoice.tax_amount | currency }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Flete / Transporte (Valle de Aburrá):</td>
+                        <td style="text-align: right; font-weight: 600;">
+                            {% if invoice.shipping_cost == 0 %}
+                                <span class="text-success">GRATIS</span>
+                            {% else %}
+                                {{ invoice.shipping_cost | currency }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>TOTAL A PAGAR:</td>
+                        <td style="text-align: right; color: var(--text-primary);">{{ invoice.total | currency }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Sección DIAN: CUFE y Código QR -->
+            <div class="invoice-dian-section">
+                <div class="invoice-qr-container">
+                    {{ invoice.qr_svg | safe }}
+                </div>
+                <div class="invoice-cufe-box">
+                    <h4>Código Único de Factura Electrónica (CUFE)</h4>
+                    <span class="cufe-code">{{ invoice.cufe }}</span>
+                    <p class="invoice-legal-note">
+                        Esta representación gráfica de la Factura Electrónica de Venta cumple con los requerimientos técnicos y legales expedidos por la Unidad Administrativa Especial Dirección de Impuestos y Aduanas Nacionales (DIAN) de Colombia conforme a la Resolución No. 000042 de 2020 y el Decreto 358 de 2020.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

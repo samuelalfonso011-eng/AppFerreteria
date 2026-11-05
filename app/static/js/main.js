@@ -172,8 +172,8 @@ function initScrollReveal() {
     });
 }
 
-// Sistema de Notificaciones Toast Flotantes
-function showToast(message, type = 'info', duration = 4000) {
+// Sistema de Notificaciones Toast Flotantes (v1.2.0)
+function showToast(message, type = 'info', duration = 2800) {
     let container = document.getElementById('toastContainer');
     if (!container) {
         container = document.createElement('div');
@@ -182,28 +182,47 @@ function showToast(message, type = 'info', duration = 4000) {
         document.body.appendChild(container);
     }
 
+    // Evitar apilar más de 2 notificaciones simultáneas
+    while (container.children.length >= 2) {
+        container.removeChild(container.firstElementChild);
+    }
+
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
 
+    // Iconos SVG de trazo uniforme (sin emojis). Contenido estático y de confianza.
+    const svg = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
     const icons = {
-        success: '✅',
-        danger: '❌',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️'
+        success: svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+        danger: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+        error: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+        warning: svg('<path d="M12 8v5M12 17h.01"/>'),
+        info: svg('<path d="M12 11v5M12 8h.01"/>')
     };
 
-    toast.innerHTML = `
-        <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-        <span class="toast-text">${message}</span>
-        <button type="button" class="toast-close" aria-label="Cerrar">&times;</button>
-    `;
+    toast.setAttribute('role', type === 'danger' || type === 'error' ? 'alert' : 'status');
 
+    const iconEl = document.createElement('span');
+    iconEl.className = 'toast-icon';
+    iconEl.innerHTML = icons[type] || icons.info;
+
+    // El mensaje se inserta como TEXTO (nunca como HTML) para evitar XSS
+    const textEl = document.createElement('span');
+    textEl.className = 'toast-text';
+    textEl.textContent = message;
+
+    const closeEl = document.createElement('button');
+    closeEl.type = 'button';
+    closeEl.className = 'toast-close';
+    closeEl.setAttribute('aria-label', 'Cerrar');
+    closeEl.textContent = '×';
+
+    toast.append(iconEl, textEl, closeEl);
     const closeBtn = toast.querySelector('.toast-close');
     closeBtn.addEventListener('click', () => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(50px)';
-        setTimeout(() => toast.remove(), 300);
+        setTimeout(() => toast.remove(), 250);
     });
 
     container.appendChild(toast);
@@ -212,10 +231,95 @@ function showToast(message, type = 'info', duration = 4000) {
         if (toast.parentElement) {
             toast.style.opacity = '0';
             toast.style.transform = 'translateX(50px)';
-            setTimeout(() => toast.remove(), 300);
+            setTimeout(() => toast.remove(), 250);
         }
     }, duration);
 }
+
+// ==============================================================================
+// OPTIMIZACIÓN DE LLAMADAS API Y DEDUPLICACIÓN (v1.3.0)
+// ==============================================================================
+const inFlightRequests = new Map();
+
+/**
+ * Wrapper de peticiones fetch con deduplicación automática de peticiones GET en vuelo.
+ * Si una petición GET a la misma URL ya está pendiente, reutiliza la misma Promesa.
+ */
+window.apiFetch = function(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+
+    // Solo deduplicamos peticiones GET idempotentes
+    if (method === 'GET') {
+        const cacheKey = url;
+        if (inFlightRequests.has(cacheKey)) {
+            return inFlightRequests.get(cacheKey);
+        }
+
+        const promise = fetch(url, options)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .finally(() => {
+                inFlightRequests.delete(cacheKey);
+            });
+
+        inFlightRequests.set(cacheKey, promise);
+        return promise;
+    }
+
+    // Para POST, PUT, DELETE se ejecuta normalmente con retorno JSON
+    return fetch(url, options).then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    });
+};
+
+/**
+ * Función de debounce con soporte de AbortController para búsquedas y filtros en tiempo real
+ */
+window.debounce = function(fn, delay = 300) {
+    let timer = null;
+    let abortController = null;
+
+    return function(...args) {
+        if (timer) clearTimeout(timer);
+        if (abortController) abortController.abort();
+
+        abortController = new AbortController();
+        const signal = abortController.signal;
+
+        return new Promise((resolve, reject) => {
+            timer = setTimeout(async () => {
+                try {
+                    const result = await fn(...args, { signal });
+                    resolve(result);
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        reject(err);
+                    }
+                }
+            }, delay);
+        });
+    };
+};
+
+// Prevención de doble clic en botones de compra y formularios críticos
+document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (form && (form.classList.contains('prevent-double-submit') || form.id === 'checkoutForm')) {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn && !submitBtn.disabled) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+        }
+    }
+});
 
 // Exportar para recarga SPA
 window.initPageEnhancements = function() {

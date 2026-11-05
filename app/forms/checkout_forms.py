@@ -2,47 +2,56 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, BooleanField, HiddenField, SubmitField
 from wtforms.validators import DataRequired, Length, Optional
 from app.models.payment import PaymentMethod
+from app.constants import MUNICIPALITY_CHOICES, DEFAULT_DEPARTMENT
 
 
 class CheckoutForm(FlaskForm):
     # Selección de dirección guardada (0 para nueva dirección)
     saved_address_id = SelectField('Direcciones guardadas', coerce=int, default=0)
 
-    # Campos para dirección de entrega
+    # Campos para dirección de entrega (Exclusivo Valle de Aburrá)
     recipient_name = StringField('Nombre de quien recibe', validators=[
         DataRequired(message="El nombre de quien recibe es obligatorio."),
         Length(max=150)
     ])
     phone = StringField('Teléfono de contacto', validators=[
-        DataRequired(message="El teléfono es obligatorio."),
+        DataRequired(message="El teléfono celular es obligatorio."),
         Length(max=30)
     ])
-    department = StringField('Departamento o Región', validators=[
-        DataRequired(message="El departamento es obligatorio."),
+    department = HiddenField('Departamento o Región', default=DEFAULT_DEPARTMENT)
+    city = SelectField('Municipio (Valle de Aburrá)', choices=MUNICIPALITY_CHOICES, default='Medellín', validators=[
+        DataRequired(message="Selecciona un municipio del Valle de Aburrá.")
+    ])
+    neighborhood = StringField('Barrio o Sector', validators=[
+        DataRequired(message="El barrio o sector es obligatorio."),
         Length(max=100)
     ])
-    city = StringField('Ciudad o Municipio', validators=[
-        DataRequired(message="La ciudad es obligatoria."),
-        Length(max=100)
-    ])
-    neighborhood = StringField('Barrio', validators=[
-        DataRequired(message="El barrio es obligatorio."),
-        Length(max=100)
-    ])
-    street_address = StringField('Dirección exacta', validators=[
-        DataRequired(message="La dirección exacta es obligatoria."),
+    street_address = StringField('Dirección exacta de entrega', validators=[
+        DataRequired(message="La dirección exacta de entrega es obligatoria."),
         Length(max=255)
     ])
-    complement = StringField('Complemento (Apto, Interior, Manzana)', validators=[
+    complement = StringField('Interior / Apto / Bodega / Obra', validators=[
         Optional(),
         Length(max=100)
     ])
-    delivery_instructions = TextAreaField('Instrucciones para el domiciliario', validators=[
+    delivery_instructions = TextAreaField('Indicaciones de entrega para el conductor', validators=[
         Optional()
     ])
 
     save_to_address_book = BooleanField('Guardar esta dirección en mi libreta de direcciones', default=True)
     notes = TextAreaField('Notas sobre el pedido', validators=[Optional()])
+
+    # Datos para Facturación Electrónica DIAN
+    fiscal_doc_type = SelectField('Tipo de Documento Fiscal', choices=[
+        ('CC', 'Cédula de Ciudadanía (CC)'),
+        ('NIT', 'Número de Identificación Tributaria (NIT)'),
+        ('CE', 'Cédula de Extranjería (CE)'),
+        ('PP', 'Pasaporte')
+    ], default='CC')
+    fiscal_doc_number = StringField('Número de Documento / NIT', validators=[Optional(), Length(max=50)])
+    fiscal_name = StringField('Razón Social o Nombre Completo para Factura', validators=[Optional(), Length(max=150)])
+    fiscal_email = StringField('Correo para Envío de Factura Electrónica', validators=[Optional(), Length(max=150)])
+
     idempotency_key = HiddenField('Clave de Idempotencia')
     submit = SubmitField('Continuar al pago')
 

@@ -17,6 +17,13 @@ def register_cli_commands(app):
         db.create_all()
         click.echo(click.style("Tablas de la base de datos creadas/verificadas correctamente.", fg="green"))
 
+    @app.cli.command("expire-orders")
+    def expire_orders():
+        """Vence los pedidos pendientes sin pago y repone su stock (apto para cron)."""
+        from app.services.order_service import OrderService
+        n = OrderService.expire_stale_pending_orders()
+        click.echo(f"Pedidos vencidos: {n}")
+
     @app.cli.command("init-roles")
     def init_roles():
         """Crea los roles base del sistema ('admin' y 'customer')."""

@@ -55,7 +55,7 @@ def test_4_login_and_logout(client):
     assert "¡Hola de nuevo, Juan Perez!".encode('utf-8') in response.data
 
     # Logout
-    logout_res = client.get('/logout', follow_redirects=True)
+    logout_res = client.post('/logout', follow_redirects=True)
     assert logout_res.status_code == 200
     assert "Has cerrado sesión correctamente".encode('utf-8') in logout_res.data
 

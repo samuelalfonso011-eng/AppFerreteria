@@ -1,4 +1,5 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Gestión de Categorías{% endblock %}
 {% block page_title %}Categorías de la Ferretería{% endblock %}
@@ -38,7 +39,7 @@
                         </td>
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 8px;">
-                                <a href="{{ url_for('admin_categories.edit', category_id=c.id) }}" class="btn btn-outline btn-sm" title="Editar">✏️</a>
+                                <a href="{{ url_for('admin_categories.edit', category_id=c.id) }}" class="btn btn-outline btn-sm" title="Editar" aria-label="Editar">{{ icon('pencil', 16) }}</a>
                                 <form action="{{ url_for('admin_categories.toggle_status', category_id=c.id) }}" method="POST" style="display: inline;">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-outline btn-sm" title="{% if c.is_active %}Desactivar{% else %}Activar{% endif %}">

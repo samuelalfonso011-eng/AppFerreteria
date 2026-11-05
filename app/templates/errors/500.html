@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Error Inesperado — Error 500{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 600px; margin: 60px auto; text-align: center;">
     <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 50px 30px;">
-        <span style="font-size: 4rem; display: block; margin-bottom: 12px;">⚙️</span>
+        <span class="err-ico">{{ icon('alert', 56) }}</span>
         <h1 style="font-size: 2.2rem; font-weight: 800; margin: 0 0 10px;">Error Interno del Servidor</h1>
         <p style="color: var(--muted); font-size: 1rem; margin-bottom: 24px;">
             Ocurrió una eventualidad al procesar la solicitud. Las transacciones pendientes han sido revertidas de forma segura.

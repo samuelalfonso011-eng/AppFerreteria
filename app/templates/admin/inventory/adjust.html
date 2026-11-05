@@ -1,4 +1,5 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Ajuste de Inventario — {{ product.name }}{% endblock %}
 {% block page_title %}Ajuste Manual de Existencias{% endblock %}
@@ -36,7 +37,7 @@
             </div>
 
             <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 24px; font-size: 0.82rem; color: var(--muted);">
-                ℹ️ Todo ajuste manual queda auditado permanentemente en el Kárdex con la firma de tu usuario administrador y la fecha exacta.
+                {{ icon('info', 16) }} Todo ajuste manual queda auditado permanentemente en el Kárdex con la firma de tu usuario administrador y la fecha exacta.
             </div>
 
             <div style="display: flex; gap: 12px;">

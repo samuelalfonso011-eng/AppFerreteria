@@ -1,11 +1,12 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Auditoría de Pagos de Prueba{% endblock %}
 {% block page_title %}Auditoría de Pagos en Modo de Prueba{% endblock %}
 
 {% block content %}
 <div style="background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 0.88rem; color: #92400e;">
-    ℹ️ <strong>Registro de Simulación:</strong> Las transacciones mostradas a continuación corresponden a pruebas operativas del módulo simulado. No representan ingresos monetarios reales en cuentas bancarias.
+    {{ icon('info', 16) }} <strong>Registro de Simulación:</strong> Las transacciones mostradas a continuación corresponden a pruebas operativas del módulo simulado. No representan ingresos monetarios reales en cuentas bancarias.
 </div>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
@@ -43,7 +44,7 @@
                     <tr>
                         <td><code>{{ p.transaction_reference }}</code></td>
                         <td>
-                            <a href="{{ url_for('admin_orders.detail', order_id=p.order_id) }}" style="color: var(--primary); font-weight: 700;">
+                            <a href="{{ url_for('admin_orders.detail', order_id=p.order_id) }}" style="color: var(--accent-text); font-weight: 700;">
                                 #{{ p.order.order_number }}
                             </a>
                         </td>

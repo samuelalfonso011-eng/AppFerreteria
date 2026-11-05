@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
@@ -7,9 +8,22 @@ from app.forms.auth_forms import (
     LoginForm, RegisterForm, ProfileForm, AddressForm,
     ForgotPasswordForm, ResetPasswordForm
 )
+from app.constants import VALLE_DE_ABURRA_MUNICIPALITIES
 from app.services.cart_service import CartService
+from app.utils.anti_spam import (
+    is_honeypot_triggered, check_rate_limit, is_rate_limited,
+    register_hit, clear_hits, render_rate_limit_error
+)
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def is_safe_next_url(target) -> bool:
+    """Acepta solo rutas relativas internas (evita //host, /\\host y esquemas externos)."""
+    if not target or not target.startswith('/') or target.startswith('//') or '\\' in target:
+        return False
+    parsed = urlparse(target)
+    return not parsed.scheme and not parsed.netloc
 
 
 @auth_bp.route('/registro', methods=['GET', 'POST'])
@@ -17,6 +31,13 @@ def register():
     """Registro público abierto exclusivo para rol de clientes."""
     if current_user.is_authenticated:
         return redirect(url_for('public.home'))
+
+    if request.method == 'POST' and is_honeypot_triggered(request.form, 'website_url'):
+        flash("¡Bienvenido! Tu cuenta ha sido creada exitosamente.", "success")
+        return redirect(url_for('public.home'))
+
+    if request.method == 'POST' and not check_rate_limit('register', limit=5, window_seconds=600):
+        return render_rate_limit_error("Demasiados registros desde tu red. Espera unos minutos e inténtalo de nuevo.")
 
     form = RegisterForm()
     if form.validate_on_submit():
@@ -58,8 +79,18 @@ def login():
         return redirect(url_for('public.home'))
 
     form = LoginForm()
+    if request.method == 'POST' and is_honeypot_triggered(request.form, 'website_url'):
+        flash("Credenciales incorrectas o acceso bloqueado por actividad inusual.", "danger")
+        return render_template('auth/login.html', form=form)
+
+    # Límite por IP (todos los intentos) y por cuenta (solo fallos, para no permitir bloquear a terceros con aciertos)
+    if request.method == 'POST' and not check_rate_limit('login_ip', limit=20, window_seconds=300):
+        return render_rate_limit_error("Demasiados intentos de inicio de sesión. Espera unos minutos e inténtalo de nuevo.")
+
     if form.validate_on_submit():
         email_clean = form.email.data.strip().lower()
+        if is_rate_limited('login_fail', limit=5, window_seconds=900, identity=email_clean):
+            return render_rate_limit_error("Demasiados intentos fallidos para esta cuenta. Espera 15 minutos o recupera tu contraseña.")
         user = User.query.filter_by(email=email_clean).first()
 
         if user and user.check_password(form.password.data):
@@ -67,6 +98,7 @@ def login():
                 flash("Tu cuenta ha sido desactivada. Por favor contacta al administrador.", "danger")
                 return render_template('auth/login.html', form=form)
 
+            clear_hits('login_fail', identity=email_clean)
             login_user(user, remember=form.remember.data)
 
             # Sincronizar carrito de visitante con la base de datos
@@ -76,19 +108,20 @@ def login():
 
             # Redirección segura evitando ataques de Open Redirect
             next_page = request.args.get('next')
-            if next_page and next_page.startswith('/'):
+            if is_safe_next_url(next_page):
                 return redirect(next_page)
 
             if user.is_admin:
                 return redirect(url_for('admin_dashboard.index'))
             return redirect(url_for('public.home'))
 
+        register_hit('login_fail', identity=email_clean)
         flash("Correo electrónico o contraseña incorrectos.", "danger")
 
     return render_template('auth/login.html', form=form)
 
 
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     """Cierre de sesión seguro en el servidor."""
@@ -118,6 +151,11 @@ def addresses():
     """Gestión de la libreta de direcciones de entrega del cliente."""
     form = AddressForm()
     if form.validate_on_submit():
+        city_val = form.city.data.strip()
+        if city_val not in VALLE_DE_ABURRA_MUNICIPALITIES:
+            flash("Actualmente solo despachamos pedidos en los 10 municipios del Valle de Aburrá.", "danger")
+            return redirect(url_for('auth.addresses'))
+
         # Si se marca como default, desmarcar las anteriores
         if form.is_default.data:
             Address.query.filter_by(user_id=current_user.id).update({'is_default': False})
@@ -126,8 +164,8 @@ def addresses():
             user_id=current_user.id,
             recipient_name=form.recipient_name.data.strip(),
             phone=form.phone.data.strip(),
-            department=form.department.data.strip(),
-            city=form.city.data.strip(),
+            department=(form.department.data or 'Antioquia').strip(),
+            city=city_val,
             neighborhood=form.neighborhood.data.strip(),
             street_address=form.street_address.data.strip(),
             complement=form.complement.data.strip() if form.complement.data else None,
@@ -177,14 +215,20 @@ def get_reset_serializer():
 def generate_reset_token(user_id: int) -> str:
     """Genera un token firmado con sal específica para restablecimiento de contraseña."""
     s = get_reset_serializer()
-    return s.dumps(user_id, salt='password-reset-salt')
+    user = db.session.get(User, user_id)
+    # Fragmento del hash actual: el token deja de servir en cuanto cambia la contraseña (un solo uso)
+    fingerprint = user.password_hash[-12:] if user else ''
+    return s.dumps([user_id, fingerprint], salt='password-reset-salt')
 
 
 def verify_reset_token(token: str, max_age: int = 1800) -> int:
-    """Verifica la validez y expiración del token (30 minutos = 1800s). Retorna user_id o None."""
+    """Verifica firma, expiración (30 min) y que no se haya usado ya. Retorna user_id o None."""
     s = get_reset_serializer()
     try:
-        user_id = s.loads(token, salt='password-reset-salt', max_age=max_age)
+        user_id, fingerprint = s.loads(token, salt='password-reset-salt', max_age=max_age)
+        user = db.session.get(User, user_id)
+        if not user or user.password_hash[-12:] != fingerprint:
+            return None
         return user_id
     except Exception:
         return None
@@ -200,27 +244,28 @@ def forgot_password():
     form = ForgotPasswordForm()
     dev_reset_url = None
 
+    if request.method == 'POST' and not check_rate_limit('forgot_password', limit=5, window_seconds=600):
+        return render_rate_limit_error("Demasiadas solicitudes de recuperación. Espera unos minutos e inténtalo de nuevo.")
+
     if form.validate_on_submit():
         email_clean = form.email.data.strip().lower()
         user = User.query.filter_by(email=email_clean).first()
 
+        # Mensaje idéntico exista o no la cuenta (evita enumeración de correos)
+        flash("Hemos enviado las instrucciones para restablecer tu contraseña. Revisa tu bandeja de entrada.", "info")
+
         if user:
             token = generate_reset_token(user.id)
             reset_url = url_for('auth.reset_password', token=token, _external=True)
-            dev_reset_url = reset_url
-            current_app.logger.info(f"[RECUPERACIÓN CONTRASEÑA] Token generado para {email_clean}: {reset_url}")
-            print(f"\n=======================================================")
-            print(f" [ENLACE DE RECUPERACIÓN DE CONTRASEÑA]")
-            print(f" Para: {email_clean}")
-            print(f" Enlace: {reset_url}")
-            print(f" Válido por: 30 minutos")
-            print(f"=======================================================\n")
-            flash("Hemos enviado las instrucciones para restablecer tu contraseña. Revisa tu bandeja de entrada.", "info")
-            return render_template('auth/forgot_password.html', form=form, dev_reset_url=dev_reset_url)
-        else:
-            # Mensaje preventivo idéntico para evitar enumeración de correos
-            flash("Si el correo electrónico está registrado, recibirás un enlace de recuperación.", "info")
-            return redirect(url_for('auth.login'))
+            # El enlace SOLO se expone en desarrollo/pruebas (aún no hay envío de correo).
+            # Nunca se muestra en pantalla ni se escribe en logs en producción.
+            if current_app.debug or current_app.testing:
+                dev_reset_url = reset_url
+                current_app.logger.info(f"[RECUPERACIÓN CONTRASEÑA][DEV] {email_clean}: {reset_url}")
+                return render_template('auth/forgot_password.html', form=form, dev_reset_url=dev_reset_url)
+            current_app.logger.info(f"[RECUPERACIÓN CONTRASEÑA] Solicitud para usuario id={user.id}")
+
+        return redirect(url_for('auth.login'))
 
     return render_template('auth/forgot_password.html', form=form, dev_reset_url=dev_reset_url)
 

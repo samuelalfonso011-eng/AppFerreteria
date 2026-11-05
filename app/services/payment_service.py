@@ -23,7 +23,30 @@ class SimulatedPaymentProvider(BasePaymentProvider):
     de pago aprobado, rechazado y pendiente.
     """
 
-    def process_payment(self, order: Order, payment_method: str, simulated_action: str = 'approve') -> Payment:
+    def process_payment(self, order: Order, payment_method: str, simulated_action: str = 'approve', idempotency_key: str = None) -> Payment:
+        from flask import current_app
+        if not current_app.config.get('PAYMENTS_SIMULATION_ENABLED', False):
+            raise ValueError("Los pagos de prueba están deshabilitados en este entorno.")
+
+        # Bloqueo de fila para serializar pagos concurrentes sobre el mismo pedido
+        locked = Order.query.filter_by(id=order.id).with_for_update().first()
+        if locked is not None:
+            order = locked
+
+        # Prevención estricta de doble pago: si ya existe pago aprobado, retornar de inmediato
+        existing_approved = order.payments.filter_by(status=PaymentStatus.APPROVED).first()
+        if existing_approved:
+            return existing_approved
+
+        # Prevención por llave de idempotencia
+        if idempotency_key:
+            for p in order.payments:
+                if p.gateway_response.get("idempotency_key") == idempotency_key:
+                    return p
+
+        if order.status != OrderStatus.PENDING_CONFIRMATION:
+            raise ValueError("Este pedido ya no admite pagos (cancelado o ya procesado).")
+
         if payment_method not in PaymentMethod.ALL_METHODS:
             raise ValueError(f"Método de pago no válido: {payment_method}")
 
@@ -56,11 +79,12 @@ class SimulatedPaymentProvider(BasePaymentProvider):
             "mode": "SIMULATION",
             "message": response_msg,
             "processed_at": datetime.now(timezone.utc).isoformat(),
-            "simulation_code": "00" if status == PaymentStatus.APPROVED else "05"
+            "simulation_code": "00" if status == PaymentStatus.APPROVED else "05",
+            "idempotency_key": idempotency_key
         }
         db.session.add(payment)
 
-        # Si el pago es aprobado, actualizar el pedido a CONFIRMED
+        # Si el pago es aprobado, actualizar el pedido a CONFIRMED y generar Factura Electrónica
         if status == PaymentStatus.APPROVED:
             prev_status = order.status
             order.status = OrderStatus.CONFIRMED
@@ -73,10 +97,34 @@ class SimulatedPaymentProvider(BasePaymentProvider):
                 comment=f"Pago de prueba aprobado con ref: {ref}"
             )
             db.session.add(history)
+            db.session.commit()
 
-        db.session.commit()
+            # Generar automáticamente la Factura Electrónica DIAN
+            from app.services.invoice_service import InvoiceService
+            try:
+                InvoiceService.get_or_create_invoice_for_order(order)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Fallo al generar la factura del pedido %s", order.order_number)
+        else:
+            db.session.commit()
+
         return payment
 
 
 # Instancia por defecto para la primera fase
 payment_service = SimulatedPaymentProvider()
+
+
+class PaymentService:
+    """Fachada estática para servicios de procesamiento de pagos."""
+
+    @staticmethod
+    def process_payment(order: Order, payment_method: str, simulated_action: str = 'approve', idempotency_key: str = None) -> Payment:
+        return payment_service.process_payment(
+            order=order,
+            payment_method=payment_method,
+            simulated_action=simulated_action,
+            idempotency_key=idempotency_key
+        )
+

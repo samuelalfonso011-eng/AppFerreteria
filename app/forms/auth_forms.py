@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, SelectField, HiddenField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from app.models.user import User
 
@@ -60,30 +60,37 @@ class AddressForm(FlaskForm):
         DataRequired(message="El nombre del destinatario es obligatorio."),
         Length(max=150)
     ])
-    phone = StringField('Teléfono de contacto', validators=[
+    phone = StringField('Teléfono celular de contacto', validators=[
         DataRequired(message="El teléfono es obligatorio."),
         Length(max=30)
     ])
-    department = StringField('Departamento o Región', validators=[
-        DataRequired(message="El departamento es obligatorio."),
-        Length(max=100)
+    department = HiddenField('Departamento o Región', default='Antioquia')
+    city = SelectField('Municipio (Valle de Aburrá)', choices=[
+        ('Medellín', 'Medellín'),
+        ('Bello', 'Bello'),
+        ('Itagüí', 'Itagüí'),
+        ('Envigado', 'Envigado'),
+        ('Sabaneta', 'Sabaneta'),
+        ('Copacabana', 'Copacabana'),
+        ('La Estrella', 'La Estrella'),
+        ('Girardota', 'Girardota'),
+        ('Caldas', 'Caldas'),
+        ('Barbosa', 'Barbosa')
+    ], default='Medellín', validators=[
+        DataRequired(message="Selecciona un municipio del Valle de Aburrá.")
     ])
-    city = StringField('Ciudad o Municipio', validators=[
-        DataRequired(message="La ciudad es obligatoria."),
-        Length(max=100)
-    ])
-    neighborhood = StringField('Barrio', validators=[
+    neighborhood = StringField('Barrio o Sector', validators=[
         DataRequired(message="El barrio es obligatorio."),
         Length(max=100)
     ])
-    street_address = StringField('Dirección exacta', validators=[
+    street_address = StringField('Dirección exacta de entrega', validators=[
         DataRequired(message="La dirección es obligatoria."),
         Length(max=255)
     ])
-    complement = StringField('Complemento (Apto, Torre, Oficina)', validators=[
+    complement = StringField('Interior / Apto / Bodega / Obra', validators=[
         Length(max=100)
     ])
-    delivery_instructions = TextAreaField('Indicaciones adicionales de entrega')
+    delivery_instructions = TextAreaField('Indicaciones de entrega para el conductor')
     is_default = BooleanField('Establecer como dirección principal')
     submit = SubmitField('Guardar dirección')
 

@@ -28,13 +28,23 @@ def detail(order_number):
     """Consulta detallada de un pedido personal con precios históricos y trazabilidad."""
     # Control de acceso estricto: el cliente solo puede consultar sus propios pedidos
     order = Order.query.filter_by(order_number=order_number, user_id=current_user.id).first_or_404()
-    latest_payment = order.payments.order_by(order.payments.property.mapper.class_.created_at.desc()).first()
+    latest_payment = order.latest_payment
 
     return render_template(
         'orders/order_detail.html',
         order=order,
         latest_payment=latest_payment
     )
+
+
+@orders_bp.route('/<order_number>/factura')
+@login_required
+def invoice(order_number):
+    """Representación gráfica de factura electrónica para el cliente."""
+    order = Order.query.filter_by(order_number=order_number, user_id=current_user.id).first_or_404()
+    from app.services.invoice_service import InvoiceService
+    inv = InvoiceService.get_or_create_invoice_for_order(order)
+    return render_template('orders/invoice.html', order=order, invoice=inv)
 
 
 @orders_bp.route('/<order_number>/cancelar', methods=['POST'])
@@ -55,3 +65,29 @@ def cancel(order_number):
         flash(str(e), "danger")
 
     return redirect(url_for('orders.detail', order_number=order_number))
+
+
+# Blueprint complementario para compatibilidad con la ruta /orders/<id>/invoice
+orders_invoice_bp = Blueprint('orders_invoice', __name__, url_prefix='/orders')
+
+
+@orders_invoice_bp.route('/<order_identifier>/invoice')
+@login_required
+def view_invoice(order_identifier):
+    """Ruta estándar /orders/<id>/invoice para cliente y administrador."""
+    if str(order_identifier).isdigit():
+        order = Order.query.filter_by(id=int(order_identifier)).first()
+    else:
+        order = Order.query.filter_by(order_number=str(order_identifier)).first()
+
+    if not order:
+        from flask import abort
+        abort(404)
+
+    if not (current_user.is_admin or order.user_id == current_user.id):
+        from flask import abort
+        abort(403)
+
+    from app.services.invoice_service import InvoiceService
+    inv = InvoiceService.get_or_create_invoice_for_order(order)
+    return render_template('orders/invoice.html', order=order, invoice=inv)

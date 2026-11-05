@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, TextAreaField, DecimalField, IntegerField, BooleanField, SelectField, SubmitField
-from wtforms.validators import DataRequired, NumberRange, Length, ValidationError
+from wtforms.validators import DataRequired, InputRequired, Optional, NumberRange, Length, ValidationError
 from app.models.product import Product
 from app.models.category import Category
 
@@ -23,15 +23,15 @@ class ProductForm(FlaskForm):
     ])
     technical_specs = TextAreaField('Características técnicas')
     price = DecimalField('Precio unitario ($)', places=2, validators=[
-        DataRequired(message="El precio es obligatorio."),
+        InputRequired(message="El precio es obligatorio."),
         NumberRange(min=0, message="El precio no puede ser negativo.")
     ])
     stock = IntegerField('Cantidad en existencias', validators=[
-        DataRequired(message="El stock inicial es obligatorio."),
+        InputRequired(message="El stock inicial es obligatorio."),
         NumberRange(min=0, message="El stock no puede ser negativo.")
     ])
     min_stock_alert = IntegerField('Alerta de stock mínimo', default=5, validators=[
-        DataRequired(message="Define el umbral mínimo de inventario."),
+        InputRequired(message="Define el umbral mínimo de inventario."),
         NumberRange(min=0, message="El umbral mínimo no puede ser negativo.")
     ])
     image = FileField('Imagen del producto', validators=[
@@ -43,6 +43,9 @@ class ProductForm(FlaskForm):
     def __init__(self, original_sku=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.original_sku = original_sku
+        if original_sku is not None:
+            # En edición el stock no se modifica aquí (se usa el ajuste de inventario con kárdex)
+            self.stock.validators = [Optional()]
         self.category_id.choices = [
             (c.id, c.name) for c in Category.query.filter_by(is_active=True).order_by(Category.name).all()
         ]

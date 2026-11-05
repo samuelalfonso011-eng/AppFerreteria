@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Comprobante de Pedido #{{ order.order_number }} — {{ store_settings.store_name }}{% endblock %}
 
@@ -6,7 +7,7 @@
 <div class="container" style="max-width: 800px; margin: 30px auto;">
     <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-sm);">
         <div style="text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 24px; margin-bottom: 24px;">
-            <div style="width: 60px; height: 60px; background: #dcfce7; color: #16a34a; border-radius: 999px; display: grid; place-items: center; font-size: 2rem; margin: 0 auto 16px;">✓</div>
+            <div class="confirm-ico">{{ icon('check', 30) }}</div>
             <h1 style="font-size: 1.8rem; font-weight: 800; margin: 0 0 6px;">¡Pedido Registrado con Éxito!</h1>
             <p style="color: var(--muted); margin: 0;">Número de Seguimiento: <strong style="color: var(--secondary); font-size: 1.1rem;">#{{ order.order_number }}</strong></p>
         </div>
@@ -35,7 +36,7 @@
         <div style="margin-bottom: 28px;">
             <h3 style="font-size: 1.05rem; font-weight: 700; margin-top: 0; margin-bottom: 10px;">Dirección de Entrega Registrada</h3>
             <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-size: 0.9rem;">
-                <p style="margin: 0 0 4px;"><strong>Destinatario:</strong> {{ order.shipping_recipient_name }} (📞 {{ order.shipping_phone }})</p>
+                <p style="margin: 0 0 4px;"><strong>Destinatario:</strong> {{ order.shipping_recipient_name }} ({{ icon('phone', 14) }} {{ order.shipping_phone }})</p>
                 <p style="margin: 0 0 4px;"><strong>Dirección:</strong> {{ order.formatted_shipping_address() }}</p>
                 {% if order.shipping_instructions %}
                     <p style="margin: 0; color: var(--muted);"><strong>Indicaciones:</strong> {{ order.shipping_instructions }}</p>
@@ -83,11 +84,14 @@
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 800; color: var(--secondary);">
                 <span>Total Confirmado:</span>
-                <span style="color: var(--primary);">{{ order.total | currency }}</span>
+                <span style="color: var(--accent-text);">{{ order.total | currency }}</span>
             </div>
         </div>
 
-        <div style="display: flex; gap: 14px; justify-content: center;">
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+            <a href="{{ url_for('orders.invoice', order_number=order.order_number) }}" class="btn btn-warning fw-bold text-dark">
+                {{ icon('file', 16) }} Ver Factura Electrónica
+            </a>
             <a href="{{ url_for('orders.my_orders') }}" class="btn btn-primary">Ir a Mis Pedidos</a>
             <a href="{{ url_for('products.catalog') }}" class="btn btn-outline">Volver a la Tienda</a>
         </div>

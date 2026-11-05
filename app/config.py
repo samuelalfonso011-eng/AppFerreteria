@@ -40,6 +40,8 @@ class Config:
         SQLALCHEMY_ENGINE_OPTIONS = {
             "pool_pre_ping": True,
             "pool_recycle": 300,
+            "pool_timeout": 15,
+            "connect_args": {"options": "-c statement_timeout=10000"}
         }
     
     # Almacenamiento local de imágenes
@@ -53,6 +55,12 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     WTF_CSRF_TIME_LIMIT = 3600
     
+    # Pagos simulados: solo habilitados por defecto fuera de producción
+    PAYMENTS_SIMULATION_ENABLED = os.getenv("PAYMENTS_SIMULATION_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    # Minutos que un pedido sin pagar mantiene el stock reservado antes de vencer
+    ORDER_PENDING_EXPIRY_MINUTES = int(os.getenv("ORDER_PENDING_EXPIRY_MINUTES", 60))
+
     # Caché y optimización de estáticos (12 horas por defecto)
     SEND_FILE_MAX_AGE_DEFAULT = int(os.getenv("SEND_FILE_MAX_AGE_DEFAULT", 43200))
 
@@ -78,6 +86,10 @@ class ProductionConfig(Config):
     TESTING = False
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
+    # En producción los pagos simulados deben activarse de forma explícita
+    PAYMENTS_SIMULATION_ENABLED = os.getenv("PAYMENTS_SIMULATION_ENABLED", "false").lower() in ("true", "1", "yes")
+    # Sin SECRET_KEY real no se debe arrancar en producción
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
 
 config_by_name = {

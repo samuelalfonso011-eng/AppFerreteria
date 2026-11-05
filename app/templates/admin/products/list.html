@@ -1,4 +1,5 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Gestión de Productos{% endblock %}
 {% block page_title %}Catálogo de Productos{% endblock %}
@@ -51,7 +52,7 @@
                         <td>
                             <strong>{{ p.name }}</strong>
                             {% if p.image_path %}
-                                <span style="font-size: 0.72rem; color: var(--muted); display: block;">📷 Foto cargada</span>
+                                <span style="font-size: 0.72rem; color: var(--muted); display: block;">{{ icon('check', 12) }} Foto cargada</span>
                             {% endif %}
                         </td>
                         <td>{{ p.category.name }}</td>
@@ -74,7 +75,7 @@
                         </td>
                         <td style="text-align: right;">
                             <div style="display: inline-flex; gap: 8px;">
-                                <a href="{{ url_for('admin_products.edit', product_id=p.id) }}" class="btn btn-outline btn-sm" title="Editar">✏️</a>
+                                <a href="{{ url_for('admin_products.edit', product_id=p.id) }}" class="btn btn-outline btn-sm" title="Editar" aria-label="Editar">{{ icon('pencil', 16) }}</a>
                                 
                                 <form action="{{ url_for('admin_products.toggle_status', product_id=p.id) }}" method="POST" style="display: inline;">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -83,9 +84,9 @@
                                     </button>
                                 </form>
 
-                                <form action="{{ url_for('admin_products.delete', product_id=p.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('¿Deseas eliminar este producto? (Si tiene historial de pedidos, el sistema preservará los datos y sugerirá desactivarlo).');">
+                                <form action="{{ url_for('admin_products.delete', product_id=p.id) }}" method="POST" style="display: inline;" data-confirm="¿Deseas eliminar este producto? (Si tiene historial de pedidos, el sistema preservará los datos y sugerirá desactivarlo).">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar">🗑️</button>
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar" aria-label="Eliminar">{{ icon('trash', 16) }}</button>
                                 </form>
                             </div>
                         </td>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Mis Pedidos — {{ store_settings.store_name }}{% endblock %}
 
@@ -67,7 +68,7 @@
 
     {% else %}
         <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 50px; text-align: center;">
-            <div style="font-size: 3.5rem; margin-bottom: 12px;">📦</div>
+            <div class="empty-state-icon">{{ icon('package', 34) }}</div>
             <h2 style="font-size: 1.4rem; margin-bottom: 6px;">Aún no has realizado ningún pedido</h2>
             <p style="color: var(--muted); margin-bottom: 20px;">Explora nuestros productos y solicita tu primer pedido de materiales.</p>
             <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">Ir al Catálogo</a>

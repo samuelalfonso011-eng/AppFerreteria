@@ -1,4 +1,5 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Kárdex de Inventario{% endblock %}
 {% block page_title %}Kárdex y Auditoría de Movimientos de Inventario{% endblock %}
@@ -26,7 +27,7 @@
     </form>
 
     <div style="display: flex; gap: 10px;">
-        <a href="{{ url_for('admin_inventory.alerts') }}" class="btn btn-outline btn-sm">⚠️ Ver Alertas de Stock</a>
+        <a href="{{ url_for('admin_inventory.alerts') }}" class="btn btn-outline btn-sm">{{ icon('alert', 16) }} Ver Alertas de Stock</a>
     </div>
 </div>
 

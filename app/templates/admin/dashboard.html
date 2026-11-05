@@ -1,4 +1,5 @@
 {% extends 'admin/base_admin.html' %}
+{% from '_icons.html' import icon %}
 
 {% block title %}Dashboard Administrativo{% endblock %}
 {% block page_title %}Dashboard Comercial y Operativo{% endblock %}
@@ -8,7 +9,7 @@
 <div class="kpi-grid">
     <div class="kpi-card">
         <div class="kpi-title">Ventas Confirmadas (Mes)</div>
-        <div class="kpi-value" style="color: var(--primary);">{{ sales_month | currency }}</div>
+        <div class="kpi-value text-accent">{{ sales_month | currency }}</div>
         <div class="kpi-sub">Hoy: {{ sales_today | currency }} | Semana: {{ sales_week | currency }}</div>
     </div>
 
@@ -22,18 +23,18 @@
         <div class="kpi-title">Pedidos Totales</div>
         <div class="kpi-value">{{ total_orders }}</div>
         <div class="kpi-sub">
-            <span style="color: #b45309; font-weight: 600;">{{ pending_orders }} pendientes</span> |
-            <span style="color: #15803d; font-weight: 600;">{{ delivered_orders }} entregados</span>
+            <span class="dash-warn">{{ pending_orders }} pendientes</span> |
+            <span class="dash-ok">{{ delivered_orders }} entregados</span>
         </div>
     </div>
 
     <div class="kpi-card">
         <div class="kpi-title">Alertas de Inventario</div>
-        <div class="kpi-value" style="color: {% if out_of_stock_products > 0 %}var(--danger){% else %}var(--success){% endif %};">
+        <div class="kpi-value {% if out_of_stock_products > 0 %}dash-alert{% else %}dash-ok{% endif %}">
             {{ out_of_stock_products }}
         </div>
         <div class="kpi-sub">
-            Agotados | <span style="color: #d97706; font-weight: 600;">{{ low_stock_products }} con stock bajo</span>
+            Agotados | <span class="dash-warn">{{ low_stock_products }} con stock bajo</span>
         </div>
     </div>
 
@@ -44,51 +45,75 @@
     </div>
 </div>
 
-<!-- ACCIONES RÁPIDAS -->
-<div style="display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap;">
-    <a href="{{ url_for('admin_products.create') }}" class="btn btn-primary btn-sm">+ Registrar Nuevo Producto</a>
-    <a href="{{ url_for('admin_inventory.alerts') }}" class="btn btn-outline btn-sm">⚠️ Revisar Alertas de Stock</a>
-    <a href="{{ url_for('admin_orders.index', estado='PENDING_CONFIRMATION') }}" class="btn btn-outline btn-sm">📋 Ver Pedidos Pendientes</a>
-    <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">📑 Kárdex de Inventario</a>
+<!-- RECURSOS Y PRESUPUESTO -->
+<div class="admin-card dash-budget">
+    <div class="dash-budget-head">
+        <h3>Presupuesto operativo del mes</h3>
+        <span class="badge {% if resource_stats.budget_alert == 'danger' %}badge-danger{% elif resource_stats.budget_alert == 'warning' %}badge-warning{% else %}badge-success{% endif %}">{{ resource_stats.budget_usage_percent }}%</span>
+    </div>
+    <progress class="dash-meter" max="100" value="{{ [resource_stats.budget_usage_percent, 100] | min }}">{{ resource_stats.budget_usage_percent }}%</progress>
+    <div class="kpi-sub">{{ resource_stats.monthly_sales | currency }} de {{ resource_stats.monthly_budget | currency }} · Imágenes almacenadas: {{ resource_stats.uploads_mb }} MB</div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px;">
+<!-- ACCIONES RÁPIDAS -->
+<div class="dash-actions">
+    <a href="{{ url_for('admin_products.create') }}" class="btn btn-primary btn-sm">+ Registrar Nuevo Producto</a>
+    <a href="{{ url_for('admin_inventory.alerts') }}" class="btn btn-outline btn-sm">{{ icon('alert', 16) }} Revisar Alertas de Stock</a>
+    <a href="{{ url_for('admin_orders.index', estado='PENDING_CONFIRMATION') }}" class="btn btn-outline btn-sm">{{ icon('clipboard', 16) }} Ver Pedidos Pendientes</a>
+    <a href="{{ url_for('admin_inventory.index') }}" class="btn btn-outline btn-sm">{{ icon('package', 16) }} Kárdex de Inventario</a>
+</div>
+
+<!-- GRÁFICOS (datos de /admin/api/metrics) -->
+<div class="dash-charts">
+    <div class="admin-card dash-chart-wide">
+        <h3>Ventas confirmadas · últimos 7 días</h3>
+        <div class="dash-chart-box"><canvas id="salesTrendChart" role="img" aria-label="Ventas confirmadas por día durante los últimos 7 días"></canvas></div>
+    </div>
+    <div class="admin-card">
+        <h3>Productos más vendidos</h3>
+        <div class="dash-chart-box"><canvas id="topProductsChart" role="img" aria-label="Unidades vendidas de los cinco productos principales"></canvas></div>
+    </div>
+    <div class="admin-card">
+        <h3>Pedidos por estado</h3>
+        <div class="dash-chart-box"><canvas id="orderStatusChart" role="img" aria-label="Distribución de pedidos por estado"></canvas></div>
+    </div>
+</div>
+
+<div class="dash-tables">
     <!-- TOP PRODUCTOS MÁS VENDIDOS -->
     <div class="admin-card">
-        <h3 style="margin-top: 0; font-size: 1.1rem; font-weight: 700; margin-bottom: 18px;">Top Productos Más Vendidos</h3>
+        <h3>Top Productos Más Vendidos</h3>
         {% if top_selling %}
             <div class="table-responsive">
                 <table class="admin-table">
                     <thead>
                         <tr>
                             <th>Producto</th>
-                            <th style="text-align: center;">Unidades</th>
-                            <th style="text-align: right;">Ingresos</th>
+                            <th class="num-center">Unidades</th>
+                            <th class="num-right">Ingresos</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for p in top_selling %}
                             <tr>
                                 <td><strong>{{ p.product_name }}</strong></td>
-                                <td style="text-align: center;"><span class="badge badge-info">{{ p.total_units }}</span></td>
-                                <td style="text-align: right; font-weight: 700;">{{ p.total_revenue | currency }}</td>
+                                <td class="num-center"><span class="badge badge-info">{{ p.total_units }}</span></td>
+                                <td class="num-right"><strong>{{ p.total_revenue | currency }}</strong></td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         {% else %}
-            <div style="padding: 24px; text-align: center; color: var(--admin-muted); font-size: 0.9rem;">
-                Aún no hay ventas registradas para generar el ranking de productos.
-            </div>
+            <div class="dash-empty">Aún no hay ventas registradas para generar el ranking de productos.</div>
         {% endif %}
     </div>
 
     <!-- ÚLTIMOS PEDIDOS RECIBIDOS -->
     <div class="admin-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Últimos Pedidos</h3>
-            <a href="{{ url_for('admin_orders.index') }}" style="font-size: 0.85rem; color: var(--brand-yellow-hover, #d97706); font-weight: 700;">Ver todos &rarr;</a>
+        <div class="dash-budget-head">
+            <h3>Últimos Pedidos</h3>
+            <a href="{{ url_for('admin_orders.index') }}" class="home-link">Ver todos &rarr;</a>
         </div>
         {% if recent_orders %}
             <div class="table-responsive">
@@ -98,34 +123,31 @@
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Estado</th>
-                            <th style="text-align: right;">Total</th>
+                            <th class="num-right">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for o in recent_orders %}
                             <tr>
-                                <td>
-                                    <a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" style="font-weight: 700; color: var(--brand-yellow-hover, #d97706);">
-                                        #{{ o.order_number }}
-                                    </a>
-                                </td>
+                                <td><a href="{{ url_for('admin_orders.detail', order_id=o.id) }}" class="home-link">#{{ o.order_number }}</a></td>
                                 <td>{{ o.shipping_recipient_name }}</td>
                                 <td>
-                                    <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">
-                                        {{ o.status_label }}
-                                    </span>
+                                    <span class="badge {% if o.status == 'DELIVERED' %}badge-success{% elif o.status == 'CANCELLED' %}badge-danger{% elif o.status in ['CONFIRMED', 'SHIPPED', 'PREPARING'] %}badge-info{% else %}badge-warning{% endif %}">{{ o.status_label }}</span>
                                 </td>
-                                <td style="text-align: right; font-weight: 700;">{{ o.total | currency }}</td>
+                                <td class="num-right"><strong>{{ o.total | currency }}</strong></td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         {% else %}
-            <div style="padding: 24px; text-align: center; color: var(--admin-muted); font-size: 0.9rem;">
-                No se han registrado pedidos en la tienda aún.
-            </div>
+            <div class="dash-empty">No se han registrado pedidos en la tienda aún.</div>
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/admin-charts.js') }}" data-metrics-url="{{ url_for('admin_dashboard.api_metrics') }}"></script>
 {% endblock %}

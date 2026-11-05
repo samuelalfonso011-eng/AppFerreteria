@@ -13,6 +13,7 @@ class CartService:
     """
 
     SESSION_KEY = 'guest_cart'
+    MAX_CART_LINES = 100  # evita que la cookie de sesión del invitado crezca sin límite
 
     @classmethod
     def _get_or_create_user_cart(cls, user_id: int) -> Cart:
@@ -34,7 +35,8 @@ class CartService:
         subtotal = Decimal('0.00')
 
         if user and user.is_authenticated:
-            cart = Cart.query.filter_by(user_id=user.id).first()
+            from sqlalchemy.orm import joinedload
+            cart = Cart.query.options(joinedload(Cart.items).joinedload(CartItem.product)).filter_by(user_id=user.id).first()
             if cart:
                 for ci in cart.items:
                     product = ci.product
@@ -54,29 +56,41 @@ class CartService:
                             'is_available': product.stock >= ci.quantity
                         })
         else:
-            # Carrito de invitado en sesión
+            # Carrito de invitado en sesión: consulta en bloque O(N) evitando consultas en bucle
             guest_cart = session.get(cls.SESSION_KEY, {})
-            for product_id_str, qty in guest_cart.items():
+            valid_pids = []
+            for pid_str in guest_cart.keys():
                 try:
-                    product_id = int(product_id_str)
-                    product = db.session.get(Product, product_id)
-                    if product and product.is_active:
-                        item_subtotal = Decimal(str(product.price)) * qty
-                        subtotal += item_subtotal
-                        total_items += qty
-                        items.append({
-                            'product_id': product.id,
-                            'name': product.name,
-                            'sku': product.sku,
-                            'price': Decimal(str(product.price)),
-                            'quantity': qty,
-                            'subtotal': item_subtotal,
-                            'stock': product.stock,
-                            'image': product.display_image,
-                            'is_available': product.stock >= qty
-                        })
+                    valid_pids.append(int(pid_str))
                 except (ValueError, TypeError):
                     continue
+
+            if valid_pids:
+                products_list = Product.query.filter(Product.id.in_(valid_pids)).all()
+                products_map = {p.id: p for p in products_list}
+            else:
+                products_map = {}
+
+            for product_id in valid_pids:
+                qty = guest_cart.get(str(product_id), guest_cart.get(product_id, 0))
+                if not qty or qty <= 0:
+                    continue
+                product = products_map.get(product_id)
+                if product and product.is_active:
+                    item_subtotal = Decimal(str(product.price)) * qty
+                    subtotal += item_subtotal
+                    total_items += qty
+                    items.append({
+                        'product_id': product.id,
+                        'name': product.name,
+                        'sku': product.sku,
+                        'price': Decimal(str(product.price)),
+                        'quantity': qty,
+                        'subtotal': item_subtotal,
+                        'stock': product.stock,
+                        'image': product.display_image,
+                        'is_available': product.stock >= qty
+                    })
 
         return {
             'items': items,
@@ -115,6 +129,8 @@ class CartService:
         else:
             guest_cart = session.get(cls.SESSION_KEY, {})
             pid_str = str(product_id)
+            if pid_str not in guest_cart and len(guest_cart) >= cls.MAX_CART_LINES:
+                raise ValueError(f"El carrito admite hasta {cls.MAX_CART_LINES} productos distintos.")
             current_qty = guest_cart.get(pid_str, 0)
             new_qty = current_qty + quantity
 
@@ -143,16 +159,18 @@ class CartService:
         if user and user.is_authenticated:
             cart = cls._get_or_create_user_cart(user.id)
             cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product.id).first()
-            if cart_item:
-                cart_item.quantity = quantity
-                db.session.commit()
+            if not cart_item:
+                raise ValueError("Ese producto no está en tu carrito.")
+            cart_item.quantity = quantity
+            db.session.commit()
         else:
             guest_cart = session.get(cls.SESSION_KEY, {})
             pid_str = str(product_id)
-            if pid_str in guest_cart:
-                guest_cart[pid_str] = quantity
-                session[cls.SESSION_KEY] = guest_cart
-                session.modified = True
+            if pid_str not in guest_cart:
+                raise ValueError("Ese producto no está en tu carrito.")
+            guest_cart[pid_str] = quantity
+            session[cls.SESSION_KEY] = guest_cart
+            session.modified = True
 
         return cls.get_cart_data(user)
 
@@ -198,7 +216,7 @@ class CartService:
         for pid_str, guest_qty in guest_cart.items():
             try:
                 product_id = int(pid_str)
-                product = Product.query.get(product_id)
+                product = db.session.get(Product, product_id)
                 if not product or not product.is_active:
                     continue
 

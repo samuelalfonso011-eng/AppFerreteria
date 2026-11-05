@@ -15,6 +15,8 @@ class StoreSetting(db.Model):
     business_hours = db.Column(db.String(255), default='Lunes a Viernes: 7:00 AM - 6:00 PM | Sábados: 7:00 AM - 2:00 PM', nullable=False)
     default_shipping_cost = db.Column(db.Numeric(12, 2), default=Decimal('10000.00'), nullable=False)
     free_shipping_threshold = db.Column(db.Numeric(12, 2), default=Decimal('200000.00'), nullable=True)
+    monthly_budget_limit = db.Column(db.Numeric(12, 2), default=Decimal('5000000.00'), nullable=True)
+    high_value_order_threshold = db.Column(db.Numeric(12, 2), default=Decimal('2000000.00'), nullable=True)
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     @classmethod

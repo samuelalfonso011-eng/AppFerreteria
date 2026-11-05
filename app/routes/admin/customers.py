@@ -39,7 +39,7 @@ def index():
 @admin_required
 def detail(user_id):
     """Consulta de información de un cliente e historial de sus pedidos."""
-    customer = User.query.get_or_404(user_id)
+    customer = db.get_or_404(User, user_id)
     orders = customer.orders.order_by(Order.created_at.desc()).all()
 
     total_spent = sum((o.total for o in orders if o.status not in ['CANCELLED', 'PENDING_CONFIRMATION']), 0)
@@ -56,7 +56,7 @@ def detail(user_id):
 @admin_required
 def toggle_status(user_id):
     """Desactiva o reactiva el acceso de un cliente al sistema."""
-    customer = User.query.get_or_404(user_id)
+    customer = db.get_or_404(User, user_id)
     customer.is_active = not customer.is_active
     db.session.commit()
     estado_str = "reactivada" if customer.is_active else "desactivada"
