@@ -1,4 +1,5 @@
 import os
+import secrets
 from dotenv import load_dotenv
 
 # Cargar variables del archivo .env si existe
@@ -26,7 +27,7 @@ def normalize_db_url(url: str | None) -> str:
 
 class Config:
     """Configuración base de la aplicación."""
-    SECRET_KEY = os.getenv("SECRET_KEY", "ferreteria-dev-secret-key-must-change-in-production-2026")
+    SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Base de datos
@@ -53,6 +54,9 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    TRUSTED_PROXY_HOPS = int(os.getenv('TRUSTED_PROXY_HOPS', '0'))
+    TRUSTED_HOSTS = [h.strip() for h in os.getenv('TRUSTED_HOSTS', '').split(',') if h.strip()] or None
     WTF_CSRF_TIME_LIMIT = 3600
     
     # Pagos simulados: solo habilitados por defecto fuera de producción

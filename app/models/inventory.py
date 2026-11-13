@@ -34,6 +34,8 @@ class InventoryMovement(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
     __table_args__ = (
+        db.Index('ix_inventory_product_created', 'product_id', 'created_at'),
+
         db.CheckConstraint('quantity > 0', name='check_positive_movement_quantity'),
         db.CheckConstraint('previous_stock >= 0', name='check_non_negative_prev_stock'),
         db.CheckConstraint('new_stock >= 0', name='check_non_negative_new_stock'),

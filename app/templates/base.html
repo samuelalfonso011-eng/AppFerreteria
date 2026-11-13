@@ -25,10 +25,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
     
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <script nonce="{{ csp_nonce }}">
@@ -175,6 +171,8 @@
             </div>
             <div class="footer-column">
                 <h3>{{ t('legal_privacy') }}</h3>
+                <a href="{{ url_for('public.data_policy') }}">Tratamiento de Datos (Habeas Data)</a>
+                <button type="button" id="cookiePreferences" class="footer-preferences">Preferencias de cookies</button>
                 <a href="{{ url_for('public.privacy_policy') }}">{{ t('privacy_policy') }}</a>
                 <a href="{{ url_for('public.terms_conditions') }}">{{ t('terms_conditions') }}</a>
                 <a href="{{ url_for('public.cookies_policy') }}">{{ t('cookies_policy') }}</a>
@@ -193,22 +191,23 @@
         </div>
     </footer>
 
-    <!-- BANNER FLOTANTE DE CONSENTIMIENTO DE COOKIES -->
-    <div id="cookieConsentBanner" class="cookie-banner" style="display: none;">
-        <div class="cookie-banner-content">
-            <div class="cookie-banner-text">
-                <span class="cookie-icon">{{ icon('info', 28) }}</span>
-                <div>
-                    <strong style="color: #ffffff; font-size: 0.95rem;">Valoramos tu privacidad y seguridad</strong>
-                    <p style="margin: 3px 0 0; font-size: 0.85rem; color: #a0aec0;">Utilizamos cookies esenciales para gestionar tu sesión, conservar tu carrito de compras y garantizar compras seguras. Consulta nuestra <a href="{{ url_for('public.cookies_policy') }}" style="color: var(--brand-yellow); text-decoration: underline;">Política de Cookies</a>.</p>
-                </div>
-            </div>
-            <div class="cookie-banner-actions">
-                <button type="button" class="btn btn-outline btn-sm" id="cookieAcceptEssential" style="color: white; border-color: #4b5563; background: #1f2937;">Solo Esenciales</button>
-                <button type="button" class="btn btn-primary btn-sm" id="cookieAcceptAll">Aceptar Todas</button>
-            </div>
+    <section id="cookieConsentBanner" class="cookie-banner" hidden tabindex="-1" aria-labelledby="cookieConsentTitle">
+        <h2 id="cookieConsentTitle">Tus preferencias de privacidad</h2>
+        <p>Las cookies necesarias permiten iniciar sesión y gestionar el carrito.
+            Analítica y marketing son opcionales; actualmente no usamos servicios de rastreo.
+            <a href="{{ url_for('public.cookies_policy') }}">Política de Cookies</a>.</p>
+        <div class="cookie-categories">
+            <label class="consent-choice"><input type="checkbox" checked disabled> Estrictamente necesarias (siempre activas)</label>
+            <label class="consent-choice"><input type="checkbox" id="cookieAnalytics"> Analíticas: medición de uso</label>
+            <label class="consent-choice"><input type="checkbox" id="cookieMarketing"> Marketing: publicidad personalizada</label>
         </div>
-    </div>
+        <div class="cookie-banner-actions">
+            <button type="button" class="btn btn-outline" id="cookieAcceptEssential">Solo necesarias</button>
+            <button type="button" class="btn btn-outline" id="cookieSavePreferences">Guardar selección</button>
+            <button type="button" class="btn btn-outline" id="cookieAcceptAll">Aceptar todas</button>
+        </div>
+    </section>
+    <p id="consentStatus" class="sr-only" role="status"></p>
 
     <!-- BOTÓN FLOTANTE RÁPIDO DE WHATSAPP -->
     <a href="https://wa.me/57{{ store_settings.phone | replace(' ', '') }}?text=Hola,%20deseo%20asesor%C3%ADa%20sobre%20materiales%20de%20ferreter%C3%ADa" target="_blank" rel="noopener noreferrer" class="whatsapp-float-btn" title="Asesoría rápida por WhatsApp" aria-label="Contacto directo por WhatsApp">
@@ -221,6 +220,7 @@
     </button>
 
     <script src="{{ url_for('static', filename='js/csp-handlers.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/consent.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/cart.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/navigation.js') }}" defer></script>

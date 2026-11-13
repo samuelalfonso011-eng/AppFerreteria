@@ -8,7 +8,7 @@
 <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <a href="{{ url_for('admin_orders.index') }}" class="btn btn-outline btn-sm">&larr; Volver al listado de pedidos</a>
     <a href="{{ url_for('orders_invoice.view_invoice', order_identifier=order.id) }}" class="btn btn-warning btn-sm fw-bold text-dark" target="_blank">
-        {{ icon('file', 16) }} Ver Factura Electrónica (DIAN)
+        {{ icon('file', 16) }} Ver comprobante de prueba
     </a>
 </div>
 
@@ -88,7 +88,7 @@
                                 <span style="font-size: 0.78rem; color: var(--muted);">| Por: {{ h.changed_by.full_name }}</span>
                             {% endif %}
                             {% if h.comment %}
-                                <p style="font-size: 0.85rem; color: #475569; margin: 4px 0 0;">{{ h.comment }}</p>
+                                <p style="font-size: 0.85rem; color: var(--muted); margin: 4px 0 0;">{{ h.comment }}</p>
                             {% endif %}
                         </div>
                     </div>
@@ -113,14 +113,15 @@
 
             <form action="{{ url_for('admin_orders.change_status', order_id=order.id) }}" method="POST">
                 {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
                 <div class="admin-form-group">
-                    <label>{{ form.new_status.label.text }}</label>
+                    <label for="{{ form.new_status.id }}">{{ form.new_status.label.text }}</label>
                     {{ form.new_status(class="admin-form-control") }}
                 </div>
 
                 <div class="admin-form-group">
-                    <label>{{ form.comment.label.text }}</label>
+                    <label for="{{ form.comment.id }}">{{ form.comment.label.text }}</label>
                     {{ form.comment(class="admin-form-control", rows="2", placeholder="Motivo u observación del cambio...") }}
                 </div>
 

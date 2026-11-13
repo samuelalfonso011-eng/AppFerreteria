@@ -1,3 +1,4 @@
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import current_user
 from sqlalchemy import or_
@@ -23,7 +24,7 @@ def index():
     cat_id = request.args.get('categoria', type=int)
     status_filter = request.args.get('estado', '').strip()
 
-    query = Product.query
+    query = Product.query.options(joinedload(Product.category))
 
     if search:
         query = query.filter(or_(

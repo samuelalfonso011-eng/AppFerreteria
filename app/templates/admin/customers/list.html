@@ -34,7 +34,7 @@
                         <td><strong>{{ c.full_name }}</strong></td>
                         <td>{{ c.email }}</td>
                         <td>{{ c.phone or 'No registrado' }}</td>
-                        <td style="text-align: center;"><span class="badge badge-info">{{ c.orders.count() }}</span></td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ order_counts.get(c.id, 0) }}</span></td>
                         <td style="text-align: center;">
                             {% if c.is_active %}
                                 <span class="badge badge-success">Activo</span>

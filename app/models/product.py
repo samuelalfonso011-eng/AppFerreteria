@@ -23,6 +23,8 @@ class Product(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
+        db.Index('ix_products_active_created', 'is_active', 'created_at'),
+
         db.CheckConstraint('price >= 0', name='check_positive_price'),
         db.CheckConstraint('stock >= 0', name='check_non_negative_stock'),
         db.CheckConstraint('min_stock_alert >= 0', name='check_non_negative_min_stock'),

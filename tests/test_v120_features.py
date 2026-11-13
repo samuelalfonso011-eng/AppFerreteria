@@ -37,6 +37,7 @@ def test_address_book_valle_de_aburra_success(client, app):
         'street_address': 'Calle 25 Sur # 42-10',
         'complement': 'Apto 402',
         'delivery_instructions': 'Tocar timbre 402',
+        'accept_privacy': 'y',
         'is_default': 'y'
     }, follow_redirects=True)
 

@@ -19,7 +19,7 @@
     </div>
 
     <!-- TARJETA PRINCIPAL DEL PEDIDO -->
-    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; margin-bottom: 30px;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; margin-bottom: 30px;">
         <!-- INFORMACIÓN DE ENTREGA -->
         <div style="margin-bottom: 28px; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
             <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 12px;">Datos de Entrega (Snapshot Histórico)</h3>
@@ -72,7 +72,7 @@
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 800; color: var(--secondary);">
                 <span>Total:</span>
-                <span style="color: var(--primary);">{{ order.total | currency }}</span>
+                <span style="color: var(--accent-text);">{{ order.total | currency }}</span>
             </div>
         </div>
 
@@ -100,7 +100,7 @@
     </div>
 
     <!-- TRAZABILIDAD E HISTORIAL DE ESTADOS -->
-    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 30px;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 30px;">
         <h3 style="font-size: 1.1rem; font-weight: 700; margin-top: 0; margin-bottom: 16px;">Trazabilidad del Pedido</h3>
         <div style="display: flex; flex-direction: column; gap: 14px;">
             {% for h in order.status_history %}
@@ -110,7 +110,7 @@
                         <strong style="font-size: 0.92rem;">{{ labels.get(h.new_status, h.new_status) if labels else h.new_status }}</strong>
                         <span style="font-size: 0.78rem; color: var(--muted); margin-left: 8px;">{{ h.created_at | date_format }}</span>
                         {% if h.comment %}
-                            <p style="font-size: 0.85rem; color: #4b5563; margin: 4px 0 0;">{{ h.comment }}</p>
+                            <p style="font-size: 0.85rem; color: var(--muted); margin: 4px 0 0;">{{ h.comment }}</p>
                         {% endif %}
                     </div>
                 </div>
@@ -125,7 +125,7 @@
             <p style="font-size: 0.88rem; color: #742a2a; margin-bottom: 16px;">
                 Como el pedido aún no ha entrado en preparación o despacho, puedes solicitar su cancelación. Las unidades reservadas serán repuestas automáticamente al inventario.
             </p>
-            <form action="{{ url_for('orders.cancel', order_number=order.order_number) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas cancelar este pedido?');">
+            <form action="{{ url_for('orders.cancel', order_number=order.order_number) }}" method="POST" data-confirm="¿Seguro que deseas cancelar este pedido?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div style="display: flex; gap: 12px;">
                     <input type="text" name="reason" placeholder="Motivo de la cancelación (opcional)" class="admin-form-control" style="max-width: 400px;">

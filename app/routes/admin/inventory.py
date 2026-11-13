@@ -1,3 +1,4 @@
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import current_user
 from app.decorators import admin_required
@@ -18,7 +19,7 @@ def index():
     prod_id = request.args.get('producto_id', type=int)
     m_type = request.args.get('tipo', '').strip()
 
-    query = InventoryMovement.query
+    query = InventoryMovement.query.options(joinedload(InventoryMovement.product), joinedload(InventoryMovement.user))
 
     if prod_id:
         query = query.filter_by(product_id=prod_id)

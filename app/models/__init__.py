@@ -1,3 +1,4 @@
+from app.models.consent import PrivacyConsent
 from app.models.user import Role, User, Address
 from app.models.category import Category
 from app.models.product import Product
@@ -10,6 +11,7 @@ from app.models.setting import StoreSetting
 from app.models.contact import ContactMessage
 
 __all__ = [
+    'PrivacyConsent',
     'Role',
     'User',
     'Address',

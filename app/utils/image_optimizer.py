@@ -24,8 +24,8 @@ def optimize_image(image: Image.Image, max_dim: int = MAX_DIMENSION) -> Image.Im
     # 1. Normalizar orientación EXIF (evita fotos volteadas en móviles)
     try:
         image = ImageOps.exif_transpose(image)
-    except Exception:
-        pass
+    except (OSError, SyntaxError, ValueError):
+        logger.warning("Metadatos EXIF inválidos; se conserva la orientación original")
 
     # 2. Redimensionar proporcionalmente con filtro Lanczos de alta fidelidad
     width, height = image.size

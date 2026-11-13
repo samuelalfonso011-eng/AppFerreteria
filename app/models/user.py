@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
@@ -37,6 +38,14 @@ class User(UserMixin, db.Model):
     addresses = db.relationship('Address', back_populates='user', cascade='all, delete-orphan', lazy='dynamic')
     orders = db.relationship('Order', back_populates='user', lazy='dynamic')
     cart = db.relationship('Cart', back_populates='user', uselist=False, cascade='all, delete-orphan')
+
+    @property
+    def session_fingerprint(self) -> str:
+        """Revoca también cookies de recordar sesión al cambiar la contraseña."""
+        return hashlib.sha256(self.password_hash.encode()).hexdigest()
+
+    def get_id(self) -> str:
+        return f"{self.id}:{self.session_fingerprint}"
 
     def set_password(self, password: str):
         """Genera hash seguro para la contraseña."""

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
+import logging
 from app.extensions import db
 
 
@@ -54,6 +55,8 @@ class Payment(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
+        db.Index('ix_payments_order_status', 'order_id', 'status'),
+
         db.CheckConstraint('amount >= 0', name='check_payment_amount_positive'),
         db.CheckConstraint(
             f"status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')",
@@ -75,9 +78,12 @@ class Payment(db.Model):
     def gateway_response(self) -> dict:
         if self.gateway_response_raw:
             try:
-                return json.loads(self.gateway_response_raw)
-            except Exception:
-                return {}
+                value = json.loads(self.gateway_response_raw)
+                if isinstance(value, dict):
+                    return value
+                logging.getLogger(__name__).warning("Respuesta de pago %s con tipo inesperado", self.id)
+            except (json.JSONDecodeError, TypeError):
+                logging.getLogger(__name__).warning("Respuesta de pago %s con JSON inválido", self.id)
         return {}
 
     @gateway_response.setter

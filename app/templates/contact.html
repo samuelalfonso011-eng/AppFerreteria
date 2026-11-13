@@ -11,7 +11,7 @@
         <p style="color: var(--muted); font-size: 1.05rem; max-width: 650px; margin: 0 auto;">¿Tienes dudas sobre un producto, requieres cotización para obra o deseas consultar el estado de tu pedido? Nuestro equipo técnico te asesorará de inmediato.</p>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; align-items: start;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 32px; align-items: start;">
         <!-- INFORMACIÓN DE CANALES -->
         <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm);">
             <h2 style="font-size: 1.25rem; font-weight: 800; margin-top: 0; margin-bottom: 22px; color: var(--text-main);">Canales Directos de Atención</h2>
@@ -60,9 +60,12 @@
 
             <form action="{{ url_for('public.contact') }}" method="POST">
                 {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
+                <input type="hidden" name="form_token" value="{{ form_token }}">
+                <div hidden aria-hidden="true"><label for="website_url">Sitio web</label><input id="website_url" name="website_url" tabindex="-1" autocomplete="off"></div>
 
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.full_name.label.text }} *</label>
+                    <label for="{{ form.full_name.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.full_name.label.text }} *</label>
                     {{ form.full_name(class="admin-form-control", placeholder="Tu nombre y apellido") }}
                     {% for err in form.full_name.errors %}
                         <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
@@ -71,39 +74,34 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                     <div>
-                        <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.email.label.text }} *</label>
+                        <label for="{{ form.email.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.email.label.text }} *</label>
                         {{ form.email(class="admin-form-control", placeholder="correo@ejemplo.com") }}
                         {% for err in form.email.errors %}
                             <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
                         {% endfor %}
                     </div>
                     <div>
-                        <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.phone.label.text }}</label>
+                        <label for="{{ form.phone.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.phone.label.text }}</label>
                         {{ form.phone(class="admin-form-control", placeholder="Ej. 300 000 0000") }}
                     </div>
                 </div>
 
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.subject.label.text }} *</label>
+                    <label for="{{ form.subject.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.subject.label.text }} *</label>
                     {{ form.subject(class="admin-form-control") }}
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.message.label.text }} *</label>
+                    <label for="{{ form.message.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.message.label.text }} *</label>
                     {{ form.message(class="admin-form-control", rows="5", placeholder="Describe en detalle tu solicitud o los productos que requieres cotizar...") }}
                     {% for err in form.message.errors %}
                         <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
                     {% endfor %}
                 </div>
 
-                <div style="margin-bottom: 24px; font-size: 0.85rem; color: var(--text-main);">
-                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="accept_privacy" required checked style="margin-top: 3px; accent-color: var(--brand-yellow);">
-                        <span>Acepto que mis datos sean tratados de acuerdo con la <a href="{{ url_for('public.privacy_policy') }}" target="_blank" class="link-accent link-u">Política de Privacidad</a> de la ferretería.</span>
-                    </label>
-                </div>
-
-                {{ form.submit(class="btn btn-primary btn-full", style="padding: 12px; font-size: 1rem;") }}
+                {% set consent_purpose = 'atender mi mensaje' %}
+            {% include '_privacy_consent.html' %}
+            {{ form.submit(class="btn btn-primary btn-full", style="padding: 12px; font-size: 1rem;") }}
             </form>
         </div>
     </div>

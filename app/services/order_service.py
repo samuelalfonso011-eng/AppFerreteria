@@ -1,3 +1,4 @@
+from sqlalchemy.orm import lazyload
 from datetime import datetime, timezone
 from decimal import Decimal
 import uuid
@@ -24,7 +25,8 @@ class OrderService:
         shipping_data: dict,
         idempotency_key: str = None,
         notes: str = None,
-        fiscal_data: dict = None
+        fiscal_data: dict = None,
+        privacy_authorized: bool = False
     ) -> Order:
         """
         Crea un pedido transaccional atómico:
@@ -37,6 +39,8 @@ class OrderService:
         if idempotency_key:
             existing_order = Order.query.filter_by(idempotency_key=idempotency_key).first()
             if existing_order:
+                if existing_order.user_id != user.id:
+                    raise ValueError("Clave de pedido inválida para este usuario.")
                 return existing_order
 
         # 2. Obtener datos vigentes del carrito
@@ -110,14 +114,17 @@ class OrderService:
             db.session.add(history)
 
             # Vaciar carrito tras la confirmación exitosa
-            CartService.clear_cart(user)
+            if privacy_authorized:
+                from app.models.consent import record_consent
+                record_consent('checkout', user_id=user.id, order_id=order.id)
+            CartService.clear_cart(user, commit=False)
 
             db.session.commit()
             return order
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise
 
     @classmethod
     def change_order_status(cls, order_id: int, new_status: str, changed_by_user_id: int, comment: str = None) -> Order:
@@ -125,7 +132,7 @@ class OrderService:
         Actualiza el estado de un pedido validando las transiciones autorizadas de la máquina de estados.
         Si se cancela, repone las existencias en el inventario.
         """
-        order = Order.query.filter_by(id=order_id).with_for_update().first()
+        order = Order.query.options(lazyload(Order.items)).filter_by(id=order_id).populate_existing().with_for_update(of=Order).first()
         if not order:
             raise ValueError("Pedido no encontrado.")
 
@@ -188,7 +195,12 @@ class OrderService:
         expired = 0
         for order_id in stale_ids:
             try:
-                order = db.session.get(Order, order_id)
+                order = Order.query.options(lazyload(Order.items)).filter_by(id=order_id)\
+                    .populate_existing().with_for_update(of=Order).first()
+                if not order or order.status != OrderStatus.PENDING_CONFIRMATION or order.payments.filter(
+                    Payment.status.in_([PaymentStatus.PENDING, PaymentStatus.APPROVED])).first():
+                    db.session.rollback()
+                    continue
                 cls.change_order_status(
                     order_id=order_id,
                     new_status=OrderStatus.CANCELLED,
@@ -217,7 +229,7 @@ class OrderService:
     @classmethod
     def cancel_by_customer(cls, order_id: int, customer_user_id: int, reason: str = None) -> Order:
         """Permite al cliente cancelar su propio pedido si aún está en estado previo a preparación."""
-        order = Order.query.filter_by(id=order_id, user_id=customer_user_id).first()
+        order = Order.query.options(lazyload(Order.items)).filter_by(id=order_id, user_id=customer_user_id).populate_existing().with_for_update(of=Order).first()
         if not order:
             raise ValueError("Pedido no encontrado.")
 
@@ -379,12 +391,13 @@ class OrderService:
                 try:
                     InvoiceService.get_or_create_invoice_for_order(order)
                 except Exception:
+                    db.session.rollback()
                     import logging
                     logging.getLogger(__name__).exception("Fallo al generar la factura del pedido %s", order.order_number)
 
             return order
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise
 

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Tratamiento de Datos — {{ store_settings.store_name }}{% endblock %}
+{% block content %}
+<div class="container legal-page"><article class="legal-card">
+    <h1>Política de Tratamiento de Datos Personales (Habeas Data)</h1>
+    <p class="legal-meta">Versión 2026-11-13 · Ley 1581 de 2012</p>
+    <div class="legal-body">
+        <h2>Responsable y alcance</h2>
+        <p>{{ store_settings.store_name }}, {{ store_settings.address }}, {{ store_settings.email }}, {{ store_settings.phone }}.
+        Esta política cubre el registro, perfil, direcciones, mensajes y pedidos de la tienda. La <a href="{{ url_for('public.privacy_policy') }}">Política de Privacidad</a> explica las categorías y finalidades.</p>
+        <h2>Autorización y prueba</h2>
+        <p>Solicitamos una elección expresa antes de guardar los datos. Conservamos la fecha, la versión del aviso, la finalidad y una referencia a la solicitud o cuenta. Las autorizaciones no incluyen publicidad ni venta de datos. No solicitamos datos sensibles ni datos de menores.</p>
+        <h2>Cómo ejercer tus derechos</h2>
+        <p>Envía a {{ store_settings.email }} tu nombre, el medio para responder y una descripción de la petición. Podemos solicitar información proporcional para verificar tu identidad; nunca tu contraseña. Puedes pedir acceso, corrección, actualización, prueba de autorización, información sobre el uso, supresión o revocación. La supresión y la revocación están sujetas a las obligaciones legales o contractuales de conservación.</p>
+        <p>Las consultas se atienden en diez (10) días hábiles, con hasta cinco (5) adicionales informados y justificados. Los reclamos se resuelven en quince (15) días hábiles, prorrogables hasta ocho (8) adicionales con aviso motivado. Si faltan datos, te indicaremos qué completar. Puedes acudir a la Superintendencia de Industria y Comercio después de agotar el trámite ante el responsable.</p>
+        <h2>Uso limitado y conservación</h2>
+        <p>El acceso administrativo se limita a las operaciones de atención, pedidos y seguridad. No enviamos publicidad por aceptar este aviso. Las solicitudes de supresión se revisan para separar datos que puedan eliminarse de aquellos exigidos por obligaciones legales. El responsable debe informar cualquier cambio sustancial de finalidades y obtener nueva autorización cuando corresponda.</p>
+    </div>
+</article></div>
+{% endblock %}

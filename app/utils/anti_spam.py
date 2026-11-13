@@ -13,7 +13,7 @@ _rate_limits = defaultdict(list)
 
 
 def get_serializer():
-    secret = current_app.config.get('SECRET_KEY', 'anti-spam-secret-key-2026')
+    secret = current_app.config['SECRET_KEY']
     return URLSafeTimedSerializer(secret, salt='ferreteria-anti-spam')
 
 
@@ -30,7 +30,7 @@ def is_honeypot_triggered(form_data: dict, field_name: str = "website_url") -> b
     """
     val = form_data.get(field_name, '')
     if val and str(val).strip():
-        logger.warning(f"[ANTI-SPAM] Honeypot activado por bot desde IP: {request.remote_addr}. Valor: {val}")
+        logger.warning("[ANTI-SPAM] Honeypot activado")
         return True
     return False
 

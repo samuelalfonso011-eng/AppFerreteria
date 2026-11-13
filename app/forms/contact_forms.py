@@ -1,9 +1,10 @@
+from app.forms.privacy import PrivacyForm
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, Email, Length
 
 
-class ContactForm(FlaskForm):
+class ContactForm(PrivacyForm):
     """Formulario de contacto para clientes y visitantes."""
     full_name = StringField('Nombre completo', validators=[
         DataRequired(message="Por favor introduce tu nombre completo."),
@@ -11,7 +12,7 @@ class ContactForm(FlaskForm):
     ])
     email = StringField('Correo electrónico', validators=[
         DataRequired(message="El correo electrónico es obligatorio."),
-        Email(check_deliverability=False, message="Introduce una dirección de correo válida.")
+        Email(check_deliverability=False, message="Introduce una dirección de correo válida."), Length(max=255)
     ])
     phone = StringField('Teléfono de contacto', validators=[
         Length(max=30, message="El teléfono no puede exceder 30 caracteres.")
@@ -29,5 +30,4 @@ class ContactForm(FlaskForm):
         DataRequired(message="El mensaje no puede estar vacío."),
         Length(min=10, max=2500, message="El mensaje debe contener entre 10 y 2500 caracteres.")
     ])
-    accept_privacy = BooleanField('Acepto la Política de Privacidad')
     submit = SubmitField('Enviar Mensaje')

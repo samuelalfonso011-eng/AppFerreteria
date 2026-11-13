@@ -29,7 +29,7 @@
                         <td><strong>{{ c.name }}</strong></td>
                         <td><code>{{ c.slug }}</code></td>
                         <td style="color: var(--muted); font-size: 0.85rem;">{{ c.description or 'Sin descripción' }}</td>
-                        <td style="text-align: center;"><span class="badge badge-info">{{ c.products.count() }}</span></td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ product_counts.get(c.id, 0) }}</span></td>
                         <td style="text-align: center;">
                             {% if c.is_active %}
                                 <span class="badge badge-success">Activa</span>

@@ -115,7 +115,9 @@ body.admin-body {
   align-items: center; justify-content: center;
 }
 
-.admin-content { padding: 24px 32px 48px; width: 100%; }
+.admin-content { padding: 24px 32px 48px; width: 100%; min-width: 0; max-width: 100%; }
+/* Las tablas anchas se desplazan dentro de su tarjeta y no ensanchan la página */
+.admin-card { overflow-x: auto; max-width: 100%; }
 
 /* Tema claro / oscuro (sobre fondo del panel) */
 .theme-toggle-btn {
@@ -127,7 +129,7 @@ body.admin-body {
 .theme-toggle-btn:hover { background: var(--admin-table-hover); border-color: #D97706; }
 
 /* ----- KPIs ----- */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 16px; margin-bottom: 24px; }
 
 .kpi-card {
   background: var(--admin-card-bg);
@@ -209,7 +211,7 @@ body.admin-body {
 .admin-form-control:focus { border-color: #D97706; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35); }
 textarea.admin-form-control { min-height: 96px; }
 
-.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 18px; }
 
 /* Acción rápida en tabla (stock / precio sin abrir el formulario completo) */
 .quick-edit { display: inline-flex; gap: 6px; align-items: center; }
@@ -236,6 +238,17 @@ textarea.admin-form-control { min-height: 96px; }
   .kpi-grid { grid-template-columns: 1fr; }
 }
 
+/* ----- REJILLAS Y FORMULARIOS EN LÍNEA: nunca ensanchan la página ----- */
+.admin-content [style*="grid-template-columns"] > * { min-width: 0; }
+.admin-content form[style*="display: flex"],
+.admin-content div[style*="display: flex; gap"] { flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .admin-content [style*="grid-template-columns: 1fr 340px"],
+  .admin-content [style*="grid-template-columns: 120px 1fr 1fr"],
+  .admin-content [style*="grid-template-columns: 2fr 1fr"] { grid-template-columns: minmax(0, 1fr) !important; }
+  .admin-content [style*="position: sticky"] { position: static !important; }
+}
+
 /* ----- DASHBOARD ----- */
 .dash-ok { color: var(--success); font-weight: 600; }
 .dash-warn { color: var(--safety-text); font-weight: 600; }
@@ -247,11 +260,17 @@ textarea.admin-form-control { min-height: 96px; }
 .dash-budget h3, .dash-charts h3, .dash-tables h3 { margin: 0 0 14px; font-size: 1.1rem; font-weight: 700; }
 .dash-budget-head h3 { margin: 0; }
 .dash-meter { width: 100%; height: 10px; margin-bottom: 10px; accent-color: var(--amber); }
-.dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px; margin-bottom: 28px; }
+.dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 28px; margin-bottom: 28px; }
 .dash-chart-wide { grid-column: 1 / -1; }
 .dash-chart-box { position: relative; height: 280px; }
 .dash-chart-box[data-error]::after { content: attr(data-error); position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 0.9rem; }
-.dash-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 28px; }
+.dash-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 28px; }
 .dash-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 0.9rem; }
 .num-center { text-align: center; }
 .num-right { text-align: right; }
+
+.admin-topbar > div { min-width: 0; }
+.admin-topbar h2 { overflow-wrap: anywhere; }
+.admin-topbar input[type="search"] { min-height: 44px; }
+.admin-topbar button[type="submit"] { min-height: 44px; min-width: 44px; justify-content: center; }
+@media (max-width: 480px) { .admin-topbar > div:first-child { max-width: calc(100% - 68px); } }

@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from app.decorators import admin_required
 from app.extensions import db
+from sqlalchemy import func
 from app.models.category import Category, generate_unique_slug
+from app.models.product import Product
 from app.forms.product_forms import CategoryForm
 
 admin_categories_bp = Blueprint('admin_categories', __name__, url_prefix='/admin/categorias')
@@ -12,7 +14,17 @@ admin_categories_bp = Blueprint('admin_categories', __name__, url_prefix='/admin
 def index():
     """Listado de categorías para administración."""
     categories = Category.query.order_by(Category.name.asc()).all()
-    return render_template('admin/categories/list.html', categories=categories)
+    # Admin ve el total (activos e inactivos) en una sola consulta agrupada
+    product_counts = dict(
+        db.session.query(Product.category_id, func.count(Product.id))
+        .group_by(Product.category_id)
+        .all()
+    )
+    return render_template(
+        'admin/categories/list.html',
+        categories=categories,
+        product_counts=product_counts
+    )
 
 
 @admin_categories_bp.route('/crear', methods=['GET', 'POST'])

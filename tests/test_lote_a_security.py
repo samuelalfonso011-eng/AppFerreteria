@@ -393,3 +393,12 @@ def test_category_slug_collision_does_not_crash(app, client):
     assert client.post(f'/admin/categorias/{cid}/editar', data={'name': 'Pintura', 'is_active': 'y'}).status_code == 302
     with app.app_context():
         assert db.session.get(Category, cid).slug == 'pintura'
+
+def test_no_template_contains_inline_event_handlers():
+    """Regresión CSP: ninguna plantilla (incluidas las que requieren sesión) usa atributos on*="..."."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent / 'app' / 'templates'
+    pattern = re.compile(r'\son(click|change|submit|error|load|mouseover|mouseout|keyup|input)=')
+    offenders = [str(p.relative_to(root)) for p in root.rglob('*.html')
+                 if pattern.search(p.read_text(encoding='utf-8'))]
+    assert not offenders, f'Handlers inline (bloqueados por la CSP): {offenders}'

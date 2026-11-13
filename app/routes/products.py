@@ -1,4 +1,5 @@
 from decimal import Decimal
+import math
 from flask import Blueprint, render_template, request, abort
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
@@ -19,6 +20,8 @@ def catalog():
     category_slug = request.args.get('categoria', '').strip()
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
+    min_price = min_price if min_price is not None and math.isfinite(min_price) else None
+    max_price = max_price if max_price is not None and math.isfinite(max_price) else None
     availability = request.args.get('disponibilidad', '').strip()
     sort_by = request.args.get('orden', 'nuevos').strip()
 

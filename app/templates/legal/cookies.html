@@ -1,103 +1,26 @@
 {% extends 'base.html' %}
-
 {% block title %}Política de Cookies — {{ store_settings.store_name }}{% endblock %}
-
 {% block content %}
-<div class="container" style="max-width: 880px; margin: 40px auto; padding: 0 16px;">
-    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 44px 40px; box-shadow: var(--shadow-sm);">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
-            <span style="background: var(--brand-yellow); color: var(--text-on-yellow); padding: 5px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;">
-                Transparencia Digital
-            </span>
-            <span style="background: rgba(34, 197, 94, 0.15); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.3); padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-                Lineamientos SIC Colombia
-            </span>
-        </div>
-
-        <h1 style="font-size: 2.1rem; font-weight: 900; margin: 12px 0 14px; color: var(--text-main); line-height: 1.25;">
-            Política de Cookies y Tecnologías de Almacenamiento Local
-        </h1>
-        <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 24px;">
-            Conoce cómo utilizamos cookies técnicas, tokens de seguridad y almacenamiento de preferencias para mejorar tu experiencia de compra en el Valle de Aburrá. Última actualización: Octubre de 2026.
-        </p>
-
-        <div style="line-height: 1.8; color: var(--text-main); font-size: 0.96rem;">
-            <h2 style="font-size: 1.3rem; font-weight: 800; margin-top: 32px; color: var(--text-main); border-bottom: 2px solid var(--brand-yellow); padding-bottom: 6px;">
-                1. ¿Qué son las Cookies y Tecnologías de Almacenamiento?
-            </h2>
-            <p>
-                Una cookie es un pequeño archivo de texto que un sitio web solicita a su navegador que guarde en su dispositivo (computador, tableta o teléfono móvil) mientras navega. Las tecnologías de almacenamiento local (como <code>localStorage</code>) permiten registrar selecciones de interfaz directamente en su equipo para agilizar la navegación entre páginas.
-            </p>
-            <p>
-                En <strong>{{ store_settings.store_name }}</strong> utilizamos cookies conforme a las pautas de transparencia de la <strong>Superintendencia de Industria y Comercio (SIC)</strong>, garantizando que ninguna cookie de nuestro sistema recolecta contraseñas en texto claro ni información bancaria no autorizada.
-            </p>
-
-            <h2 style="font-size: 1.3rem; font-weight: 800; margin-top: 32px; color: var(--text-main); border-bottom: 2px solid var(--brand-yellow); padding-bottom: 6px;">
-                2. Inventario de Cookies y Almacenamiento Utilizados
-            </h2>
-            <p>A continuación detallamos las cookies y parámetros de almacenamiento local utilizados en nuestra tienda virtual:</p>
-
-            <div style="overflow-x: auto; margin: 20px 0;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--background); border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
-                    <thead>
-                        <tr style="background: rgba(245, 158, 11, 0.15); border-bottom: 1px solid var(--border); text-align: left;">
-                            <th style="padding: 12px 16px; color: var(--text-main);">Clave / Cookie</th>
-                            <th style="padding: 12px 16px; color: var(--text-main);">Categoría</th>
-                            <th style="padding: 12px 16px; color: var(--text-main);">Finalidad Técnica</th>
-                            <th style="padding: 12px 16px; color: var(--text-main);">Duración</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 12px 16px;"><code>session</code></td>
-                            <td style="padding: 12px 16px;"><span class="badge badge-info">Estrictamente Necesaria</span></td>
-                            <td style="padding: 12px 16px;">Conserva la sesión del usuario autenticado y los artículos del carrito de compras transaccional.</td>
-                            <td style="padding: 12px 16px; color: var(--muted);">Sesión del navegador</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 12px 16px;"><code>csrf_token</code></td>
-                            <td style="padding: 12px 16px;"><span class="badge badge-success">Seguridad Bancaria / Web</span></td>
-                            <td style="padding: 12px 16px;">Protege los formularios contra ataques de falsificación de petición en sitios cruzados (OWASP Top 10).</td>
-                            <td style="padding: 12px 16px; color: var(--muted);">Por formulario / Sesión</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 12px 16px;"><code>theme</code></td>
-                            <td style="padding: 12px 16px;"><span class="badge badge-secondary">Preferencia de Usuario</span></td>
-                            <td style="padding: 12px 16px;">Guarda si el usuario prefiere visualizar la web en Modo Claro o Modo Oscuro.</td>
-                            <td style="padding: 12px 16px; color: var(--muted);">Persistente en navegador</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 12px 16px;"><code>lang</code></td>
-                            <td style="padding: 12px 16px;"><span class="badge badge-secondary">Preferencia de Idioma</span></td>
-                            <td style="padding: 12px 16px;">Conserva la selección de idioma (Español 'es' o Inglés 'en') en la interfaz.</td>
-                            <td style="padding: 12px 16px; color: var(--muted);">Sesión y cookie (30 días)</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 12px 16px;"><code>cookie_consent</code></td>
-                            <td style="padding: 12px 16px;"><span class="badge badge-secondary">Consentimiento Legal</span></td>
-                            <td style="padding: 12px 16px;">Registra que el usuario ha visto y gestionado el banner flotante de consentimiento de cookies.</td>
-                            <td style="padding: 12px 16px; color: var(--muted);">1 año</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <h2 style="font-size: 1.3rem; font-weight: 800; margin-top: 32px; color: var(--text-main); border-bottom: 2px solid var(--brand-yellow); padding-bottom: 6px;">
-                3. Administración y Bloqueo de Cookies
-            </h2>
-            <p>
-                El usuario puede en cualquier momento bloquear o eliminar las cookies instaladas en su equipo mediante las opciones de configuración de su navegador web:
-            </p>
-            <ul>
-                <li><strong>Google Chrome:</strong> Configuración &rarr; Privacidad y seguridad &rarr; Cookies y otros datos de sitios.</li>
-                <li><strong>Mozilla Firefox:</strong> Ajustes &rarr; Privacidad & Seguridad &rarr; Cookies y datos del sitio.</li>
-                <li><strong>Microsoft Edge:</strong> Configuración &rarr; Permisos de sitios &rarr; Cookies y datos guardados.</li>
-                <li><strong>Apple Safari:</strong> Preferencias &rarr; Privacidad &rarr; Bloquear todas las cookies.</li>
-            </ul>
-            <p style="font-size: 0.88rem; color: var(--muted);">
-                Tenga en cuenta que deshabilitar cookies esenciales como <code>session</code> o <code>csrf_token</code> impedirá agregar productos al carrito o confirmar compras en la plataforma.
-            </p>
-        </div>
+<div class="container legal-page"><article class="legal-card">
+    <h1>Política de Cookies y Almacenamiento Local</h1>
+    <p class="legal-meta">Versión 2026-11-13</p>
+    <div class="legal-body">
+        <p>Usamos almacenamiento propio para las funciones solicitadas. Actualmente no instalamos analítica ni publicidad de terceros.</p>
+        <div class="table-responsive"><table>
+            <thead><tr><th>Elemento</th><th>Finalidad</th><th>Duración</th></tr></thead>
+            <tbody>
+                <tr><td>session</td><td>Inicio de sesión, carrito, idioma (lang) y token de seguridad (csrf_token). Cookie necesaria firmada; no contiene la contraseña.</td><td>Sesión del navegador.</td></tr>
+                <tr><td>remember_token</td><td>Recordar el acceso, solo cuando marcas «Recordar sesión».</td><td>Hasta 365 días; se elimina al cerrar sesión y deja de ser válido al cambiar la contraseña.</td></tr>
+                <tr><td>theme</td><td>Preferencia de tema en localStorage.</td><td>Hasta que borres los datos del sitio.</td></tr>
+                <tr><td>cookie_consent</td><td>Preferencias necesarias, analíticas y de marketing, versión y fecha, en localStorage.</td><td>Se vuelve a solicitar tras 365 días o al cambiar la versión.</td></tr>
+            </tbody>
+        </table></div>
+        <h2>Elección y cambios</h2>
+        <p>Las categorías opcionales empiezan desactivadas. Puedes rechazar ambas, elegirlas por separado o aceptarlas. Usa «Preferencias de cookies» en el pie de cualquier página para cambiar o retirar tu elección con la misma facilidad. La elección no autoriza correos promocionales.</p>
+        <p>Si bloqueas el almacenamiento, la elección solo se aplica a la página actual. Desactivar las cookies necesarias puede impedir el inicio de sesión, el carrito o el envío seguro de formularios.</p>
+        <h2>Servicios externos</h2>
+        <p>Los enlaces a WhatsApp y redes sociales solo contactan a esos servicios cuando los abres; allí rigen sus propias políticas. No se cargan fuentes remotas ni píxeles de seguimiento en la tienda.</p>
+        <p>Contacto: {{ store_settings.email }}. Consulta también la <a href="{{ url_for('public.privacy_policy') }}">Política de Privacidad</a>.</p>
     </div>
-</div>
+</article></div>
 {% endblock %}

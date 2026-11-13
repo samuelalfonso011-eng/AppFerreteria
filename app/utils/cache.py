@@ -3,6 +3,9 @@ import threading
 import logging
 from functools import wraps
 from sqlalchemy import event
+from sqlalchemy.orm import Session
+from flask import current_app, has_app_context
+from werkzeug.local import LocalProxy
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +73,13 @@ class SimpleCache:
             }
 
 
-# Instancia singleton de caché
-cache = SimpleCache(default_ttl=300)
+def _app_cache():
+    if not has_app_context():
+        raise RuntimeError("El caché requiere contexto de aplicación")
+    return current_app.extensions.setdefault('audit_cache', SimpleCache())
+
+
+cache = LocalProxy(_app_cache)
 
 
 def cached(key_prefix: str, ttl: int = 300):
@@ -97,48 +105,37 @@ def cached(key_prefix: str, ttl: int = 300):
     return decorator
 
 
+def _collect_invalidations(session, flush_context, instances):
+    from app.models import Product, Category, Order, OrderItem, Payment, InventoryMovement, StoreSetting, User
+    prefixes = session.info.setdefault('cache_invalidations', set())
+    for obj in session.new | session.dirty | session.deleted:
+        if isinstance(obj, Product):
+            prefixes.update(('products:', 'catalog:', 'admin:dashboard:'))
+        elif isinstance(obj, Category):
+            prefixes.update(('categories:', 'catalog:', 'products:'))
+        elif isinstance(obj, (Order, OrderItem, Payment, InventoryMovement)):
+            prefixes.update(('orders:', 'admin:dashboard:', 'products:'))
+        elif isinstance(obj, StoreSetting):
+            prefixes.update(('store:settings', 'admin:dashboard:'))
+        elif isinstance(obj, User):
+            prefixes.add('admin:dashboard:')
+
+
+def _invalidate_after_commit(session):
+    for prefix in session.info.pop('cache_invalidations', ()):
+        cache.invalidate_prefix(prefix)
+
+
+def _discard_after_rollback(session):
+    session.info.pop('cache_invalidations', None)
+
+
 def register_cache_invalidation_listeners():
-    """
-    Registra listeners automáticos de SQLAlchemy para invalidar el caché
-    inmediatamente ante cualquier INSERT, UPDATE o DELETE en la base de datos.
-    """
-    try:
-        from app.models.product import Product
-        from app.models.category import Category
-        from app.models.order import Order, OrderItem
-        from app.models.payment import Payment
-        from app.models.inventory import InventoryMovement
-        from app.models.setting import StoreSetting
-
-        def on_product_change(mapper, connection, target):
-            cache.invalidate_prefix("products:")
-            cache.invalidate_prefix("catalog:")
-            cache.invalidate_prefix("admin:dashboard:")
-
-        def on_category_change(mapper, connection, target):
-            cache.invalidate_prefix("categories:")
-            cache.invalidate_prefix("catalog:")
-            cache.invalidate_prefix("products:")
-
-        def on_order_change(mapper, connection, target):
-            cache.invalidate_prefix("orders:")
-            cache.invalidate_prefix("admin:dashboard:")
-            cache.invalidate_prefix("products:")
-
-        def on_setting_change(mapper, connection, target):
-            cache.invalidate_prefix("store:settings")
-            cache.invalidate_prefix("admin:dashboard:")
-
-        # Vincular eventos para Product
-        for evt in ('after_insert', 'after_update', 'after_delete'):
-            event.listen(Product, evt, on_product_change)
-            event.listen(Category, evt, on_category_change)
-            event.listen(Order, evt, on_order_change)
-            event.listen(OrderItem, evt, on_order_change)
-            event.listen(Payment, evt, on_order_change)
-            event.listen(InventoryMovement, evt, on_order_change)
-            event.listen(StoreSetting, evt, on_setting_change)
-
-        logger.info("[CACHE] Listeners de invalidación automática registrados en modelos SQLAlchemy.")
-    except Exception as e:
-        logger.warning(f"[CACHE] No se pudieron registrar todos los listeners de caché: {e}")
+    """Registro idempotente; invalidación después del commit, nunca durante el flush."""
+    for name, handler in (
+        ('before_flush', _collect_invalidations),
+        ('after_commit', _invalidate_after_commit),
+        ('after_rollback', _discard_after_rollback),
+    ):
+        if not event.contains(Session, name, handler):
+            event.listen(Session, name, handler)

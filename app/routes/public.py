@@ -1,4 +1,6 @@
+from app.models.consent import record_consent
 from flask import Blueprint, render_template, request, flash, redirect, url_for, session
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models.category import Category
@@ -25,7 +27,18 @@ def home():
     
     # Categorías activas
     categories = Category.query.filter_by(is_active=True).all()
-    
+
+    # Conteo de productos activos por categoría en una sola consulta agrupada
+    category_ids = [c.id for c in categories]
+    product_counts = {}
+    if category_ids:
+        product_counts = dict(
+            db.session.query(Product.category_id, func.count(Product.id))
+            .filter(Product.is_active.is_(True), Product.category_id.in_(category_ids))
+            .group_by(Product.category_id)
+            .all()
+        )
+
     # Productos destacados (activos y con inventario) con joinedload
     featured_products = Product.query.options(joinedload(Product.category)).filter_by(is_active=True).filter(Product.stock > 0).limit(8).all()
     
@@ -36,6 +49,7 @@ def home():
         'home.html',
         settings=settings,
         categories=categories,
+        product_counts=product_counts,
         featured_products=featured_products,
         recent_products=recent_products
     )
@@ -84,6 +98,8 @@ def contact():
                 message=form.message.data.strip()
             )
             db.session.add(contact_msg)
+            db.session.flush()
+            record_consent('contact', contact_message_id=contact_msg.id)
             db.session.commit()
             flash("¡Gracias por contactarnos! Tu mensaje ha sido recibido exitosamente. Nos comunicaremos contigo en breve.", "success")
             return redirect(url_for('public.contact'))
@@ -107,6 +123,11 @@ def privacy_policy():
     """Política de tratamiento de datos personales y privacidad."""
     settings = StoreSetting.get_settings()
     return render_template('legal/privacy.html', settings=settings)
+
+
+@public_bp.route('/tratamiento-de-datos')
+def data_policy():
+    return render_template('legal/data_policy.html')
 
 
 @public_bp.route('/terminos-y-condiciones')

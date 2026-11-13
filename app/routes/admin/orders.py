@@ -1,3 +1,4 @@
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import current_user
 from sqlalchemy import or_
@@ -19,7 +20,7 @@ def index():
     search = request.args.get('q', '').strip()
     status_filter = request.args.get('estado', '').strip()
 
-    query = Order.query.join(User)
+    query = Order.query.options(joinedload(Order.user)).join(User)
 
     if search:
         query = query.filter(or_(

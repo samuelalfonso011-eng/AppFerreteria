@@ -18,7 +18,7 @@
             <p>Los precios están expresados en pesos colombianos (COP) e incluyen los tributos aplicables. Valen los precios calculados y confirmados en el servidor al momento de la orden. El inventario se valida en tiempo real; si un artículo se agota de forma imprevista, se notificará al cliente y no se procesará el cobro.</p>
 
             <h2>3. Entorno de pago de prueba (Sandbox)</h2>
-            <p>Esta versión opera en <strong>modo de prueba (Sandbox)</strong>. Las transacciones procesadas con el simulador de pago son simuladas: no generan débitos bancarios reales ni solicitan datos reales de tarjetas.</p>
+            <p>Esta versión opera en <strong>modo de prueba (Sandbox)</strong>. Las transacciones procesadas con el simulador de pago son simuladas: no generan débitos bancarios reales ni solicitan datos reales de tarjetas. Los comprobantes generados son de prueba, no están validados por la DIAN y no tienen validez fiscal.</p>
 
             <h2>4. Despachos y entregas</h2>
             <p>Entregamos en la dirección indicada por el cliente dentro del Valle de Aburrá y municipios habilitados. Las compras superiores a <strong>{{ store_settings.free_shipping_threshold | currency }}</strong> tienen envío sin costo adicional. Los materiales de gran longitud o peso, como tuberías, láminas y cables en rollo, pueden requerir vehículo especial y coordinación previa.</p>
@@ -30,7 +30,7 @@
             <p>En compras a distancia el consumidor puede ejercer el derecho de <strong>Retracto</strong> dentro de los cinco (5) días hábiles siguientes a la entrega, con las excepciones previstas en la ley. La garantía legal y el procedimiento de devolución se detallan en la <a href="{{ url_for('public.refunds_policy') }}">Política de Reembolsos</a>.</p>
 
             <h2>7. Ley aplicable y jurisdicción</h2>
-            <p>Estos términos se rigen por las leyes de la República de Colombia. Cualquier controversia se someterá a los jueces competentes del Valle de Aburrá, sin perjuicio de las acciones que el consumidor pueda adelantar ante la Superintendencia de Industria y Comercio.</p>
+            <p>Estos términos se rigen por las leyes de la República de Colombia. El consumidor conserva las vías y competencias previstas en la ley, incluidas las acciones ante la Superintendencia de Industria y Comercio.</p>
         </div>
     </article>
 </div>

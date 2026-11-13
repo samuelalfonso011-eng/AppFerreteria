@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container" style="max-width: 480px; margin: 40px auto;">
-    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-sm);">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-sm);">
         <div style="text-align: center; margin-bottom: 28px;">
             <div class="brand-mark" style="margin: 0 auto 14px; width: 50px; height: 50px; font-size: 1.5rem;">F</div>
             <h1 style="font-size: 1.6rem; font-weight: 800; margin: 0 0 6px;">Iniciar Sesión</h1>
@@ -13,9 +13,10 @@
 
         <form action="{{ url_for('auth.login', next=request.args.get('next', '')) }}" method="POST">
             {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
             <div style="margin-bottom: 18px;">
-                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.email.label.text }}</label>
+                <label for="{{ form.email.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.email.label.text }}</label>
                 {{ form.email(class="admin-form-control", placeholder="ejemplo@correo.com", autofocus=true) }}
                 {% for err in form.email.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
@@ -23,7 +24,7 @@
             </div>
 
             <div style="margin-bottom: 18px;">
-                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.password.label.text }}</label>
+                <label for="{{ form.password.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">{{ form.password.label.text }}</label>
                 {{ form.password(class="admin-form-control", placeholder="••••••••") }}
                 {% for err in form.password.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
@@ -43,7 +44,7 @@
 
         <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.88rem; color: var(--muted);">
             ¿No tienes una cuenta aún?
-            <a href="{{ url_for('auth.register') }}" style="color: var(--primary); font-weight: 700;">Regístrate aquí</a>
+            <a href="{{ url_for('auth.register') }}" style="color: var(--accent-text); font-weight: 700;">Regístrate aquí</a>
         </div>
     </div>
 </div>

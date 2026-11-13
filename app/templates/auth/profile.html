@@ -16,6 +16,7 @@
     <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm);">
         <form action="{{ url_for('auth.profile') }}" method="POST">
             {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
             <div style="margin-bottom: 20px;">
                 <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; color: var(--text-main);">{{ t('email_readonly') if t else 'Correo Electrónico (No editable)' }}</label>
@@ -24,7 +25,7 @@
             </div>
 
             <div style="margin-bottom: 20px;">
-                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; color: var(--text-main);">{{ form.full_name.label.text }} *</label>
+                <label for="{{ form.full_name.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; color: var(--text-main);">{{ form.full_name.label.text }} *</label>
                 {{ form.full_name(class="admin-form-control") }}
                 {% for err in form.full_name.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
@@ -32,13 +33,15 @@
             </div>
 
             <div style="margin-bottom: 24px;">
-                <label style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; color: var(--text-main);">{{ form.phone.label.text }}</label>
+                <label for="{{ form.phone.id }}" style="display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; color: var(--text-main);">{{ form.phone.label.text }}</label>
                 {{ form.phone(class="admin-form-control", placeholder="300 123 4567") }}
                 {% for err in form.phone.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem; display: block; margin-top: 4px;">{{ err }}</span>
                 {% endfor %}
             </div>
 
+            {% set consent_purpose = 'actualizar mi perfil' %}
+            {% include '_privacy_consent.html' %}
             {{ form.submit(class="btn btn-primary", style="padding: 10px 24px; font-weight: 700;") }}
         </form>
     </div>

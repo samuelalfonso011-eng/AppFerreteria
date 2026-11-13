@@ -1,4 +1,5 @@
 import click
+import secrets
 from decimal import Decimal
 from app.extensions import db
 from app.models.user import Role, User
@@ -17,12 +18,42 @@ def register_cli_commands(app):
         db.create_all()
         click.echo(click.style("Tablas de la base de datos creadas/verificadas correctamente.", fg="green"))
 
+    @app.cli.command("init-privacy-schema")
+    def init_privacy_schema():
+        """Crea solo la tabla aditiva de autorizaciones en instalaciones existentes."""
+        from app.models.consent import PrivacyConsent
+        PrivacyConsent.__table__.create(db.engine, checkfirst=True)
+        click.echo("Tabla de autorizaciones verificada.")
+
+    @app.cli.command("apply-audit-indexes")
+    def apply_audit_indexes():
+        """Añade los índices compuestos de auditoría a una BD existente, sin borrar datos."""
+        names = {"ix_orders_user_created", "ix_orders_status_created",
+                 "ix_payments_order_status", "ix_inventory_product_created",
+                 "ix_products_active_created"}
+        with db.engine.begin() as connection:
+            for table in db.metadata.sorted_tables:
+                for index in table.indexes:
+                    if index.name in names:
+                        index.create(connection, checkfirst=True)
+        click.echo("Índices de auditoría verificados.")
+
     @app.cli.command("expire-orders")
     def expire_orders():
         """Vence los pedidos pendientes sin pago y repone su stock (apto para cron)."""
         from app.services.order_service import OrderService
         n = OrderService.expire_stale_pending_orders()
         click.echo(f"Pedidos vencidos: {n}")
+
+    @app.cli.command("disable-legacy-demo-account")
+    def disable_legacy_demo_account():
+        """Revoca la antigua cuenta técnica demo; conserva su historial de inventario."""
+        user = User.query.filter_by(email="sistema@ferreteria.local").first()
+        if user:
+            user.is_active = False
+            user.set_password(secrets.token_urlsafe(48))
+            db.session.commit()
+        click.echo("Cuenta técnica demo deshabilitada o inexistente.")
 
     @app.cli.command("init-roles")
     def init_roles():
@@ -76,6 +107,8 @@ def register_cli_commands(app):
     @app.cli.command("seed-demo-data")
     def seed_demo_data():
         """Inicializa categorías y productos de ejemplo de ferretería para desarrollo local."""
+        if not (app.debug or app.testing):
+            raise click.ClickException("Los datos demo solo se permiten en desarrollo o pruebas")
         db.create_all()
         # 1. Asegurar roles
         admin_role = Role.query.filter_by(name='admin').first()
@@ -189,9 +222,9 @@ def register_cli_commands(app):
                 email="sistema@ferreteria.local",
                 full_name="Sistema Automático",
                 role_id=admin_role.id,
-                is_active=True
+                is_active=False
             )
-            admin_user.set_password("system_seed_password_protected_2026")
+            admin_user.set_password(secrets.token_urlsafe(48))
             db.session.add(admin_user)
             db.session.flush()
 

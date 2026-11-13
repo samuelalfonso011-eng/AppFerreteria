@@ -1,3 +1,4 @@
+from sqlalchemy.orm import lazyload
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -29,7 +30,7 @@ class SimulatedPaymentProvider(BasePaymentProvider):
             raise ValueError("Los pagos de prueba están deshabilitados en este entorno.")
 
         # Bloqueo de fila para serializar pagos concurrentes sobre el mismo pedido
-        locked = Order.query.filter_by(id=order.id).with_for_update().first()
+        locked = Order.query.options(lazyload(Order.items)).filter_by(id=order.id).populate_existing().with_for_update(of=Order).first()
         if locked is not None:
             order = locked
 
@@ -104,6 +105,7 @@ class SimulatedPaymentProvider(BasePaymentProvider):
             try:
                 InvoiceService.get_or_create_invoice_for_order(order)
             except Exception:
+                db.session.rollback()
                 import logging
                 logging.getLogger(__name__).exception("Fallo al generar la factura del pedido %s", order.order_number)
         else:

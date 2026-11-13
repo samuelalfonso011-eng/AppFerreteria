@@ -1,7 +1,8 @@
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from flask import Blueprint, render_template, request, redirect, url_for
-from sqlalchemy import func
+from sqlalchemy import func, case
+from sqlalchemy.orm import joinedload
 from app.decorators import admin_required
 from app.extensions import db
 from app.models.order import Order, OrderItem, OrderStatus
@@ -99,7 +100,7 @@ def index():
      .limit(5).all()
 
     # 6. Últimos 5 pedidos recibidos
-    recent_orders = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+    recent_orders = Order.query.options(joinedload(Order.user)).order_by(Order.created_at.desc()).limit(5).all()
 
     # 7. Monitoreo de recursos y presupuesto operativo (v1.3.0)
     from app.models.setting import StoreSetting
@@ -160,21 +161,21 @@ def api_metrics():
     ]
 
     # 1. Ventas por día (últimos 7 días)
-    sales_trend = []
-    for i in range(6, -1, -1):
-        day_date = (now_col - timedelta(days=i)).date()
-        day_start = datetime.combine(day_date, datetime.min.time(), tzinfo=now_col.tzinfo).astimezone(timezone.utc)
-        day_end = datetime.combine(day_date, datetime.max.time(), tzinfo=now_col.tzinfo).astimezone(timezone.utc)
-
-        day_total = db.session.query(func.coalesce(func.sum(Order.total), Decimal('0.00')))\
-            .filter(Order.status.in_(confirmed_statuses))\
-            .filter(Order.created_at >= day_start, Order.created_at <= day_end).scalar() or Decimal('0.00')
-
-        sales_trend.append({
-            "date": day_date.strftime("%d/%m"),
-            "full_date": str(day_date),
-            "total": float(day_total)
-        })
+    days = [(now_col - timedelta(days=i)).date() for i in range(6, -1, -1)]
+    boundaries = [datetime.combine(day, datetime.min.time(), tzinfo=now_col.tzinfo)
+                  .astimezone(timezone.utc) for day in days]
+    # Siete agregados en una consulta; intervalos semiabiertos en hora de Colombia.
+    totals = db.session.query(*[
+        func.coalesce(func.sum(case(
+            ((Order.created_at >= start) & (Order.created_at < start + timedelta(days=1)), Order.total),
+            else_=0)), 0)
+        for start in boundaries
+    ]).filter(Order.status.in_(confirmed_statuses), Order.created_at >= boundaries[0],
+              Order.created_at < boundaries[-1] + timedelta(days=1)).one()
+    sales_trend = [
+        {"date": day.strftime("%d/%m"), "full_date": str(day), "total": float(total)}
+        for day, total in zip(days, totals)
+    ]
 
     # 2. Top 5 productos más vendidos
     top_selling = db.session.query(
@@ -196,13 +197,8 @@ def api_metrics():
     ]
 
     # 3. Distribución de pedidos por estado
-    status_counts = {
-        "Pendiente": Order.query.filter_by(status=OrderStatus.PENDING_CONFIRMATION).count(),
-        "En preparación": Order.query.filter_by(status=OrderStatus.PREPARING).count(),
-        "Enviado": Order.query.filter_by(status=OrderStatus.SHIPPED).count(),
-        "Entregado": Order.query.filter_by(status=OrderStatus.DELIVERED).count(),
-        "Cancelado": Order.query.filter_by(status=OrderStatus.CANCELLED).count(),
-    }
+    counts = dict(db.session.query(Order.status, func.count(Order.id)).group_by(Order.status).all())
+    status_counts = {label: counts.get(status, 0) for status, label in OrderStatus.LABELS.items()}
 
     # 4. Monitoreo de recursos y presupuesto operativo
     from app.models.setting import StoreSetting
@@ -280,7 +276,7 @@ def search():
         return redirect(url_for('admin_products.edit', product_id=exact_product.id))
 
     # Búsqueda en Pedidos
-    orders = Order.query.join(User).filter(or_(
+    orders = Order.query.options(joinedload(Order.user)).join(User).filter(or_(
         Order.order_number.ilike(f"%{q}%"),
         Order.shipping_recipient_name.ilike(f"%{q}%"),
         Order.shipping_phone.ilike(f"%{q}%"),
@@ -290,7 +286,7 @@ def search():
     )).order_by(Order.created_at.desc()).limit(20).all()
 
     # Búsqueda en Productos
-    products = Product.query.join(Category).filter(or_(
+    products = Product.query.options(joinedload(Product.category)).join(Category).filter(or_(
         Product.name.ilike(f"%{q}%"),
         Product.sku.ilike(f"%{q}%"),
         Product.description.ilike(f"%{q}%"),

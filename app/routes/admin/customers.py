@@ -27,10 +27,22 @@ def index():
 
     pagination = query.order_by(User.created_at.desc()).paginate(page=page, per_page=15, error_out=False)
 
+    # Conteo de pedidos solo para los clientes de esta página, en una consulta agrupada
+    user_ids = [u.id for u in pagination.items]
+    order_counts = {}
+    if user_ids:
+        order_counts = dict(
+            db.session.query(Order.user_id, func.count(Order.id))
+            .filter(Order.user_id.in_(user_ids))
+            .group_by(Order.user_id)
+            .all()
+        )
+
     return render_template(
         'admin/customers/list.html',
         pagination=pagination,
         customers=pagination.items,
+        order_counts=order_counts,
         current_search=search
     )
 
@@ -39,7 +51,7 @@ def index():
 @admin_required
 def detail(user_id):
     """Consulta de información de un cliente e historial de sus pedidos."""
-    customer = db.get_or_404(User, user_id)
+    customer = User.query.filter(User.id == user_id, User.role.has(name='customer')).first_or_404()
     orders = customer.orders.order_by(Order.created_at.desc()).all()
 
     total_spent = sum((o.total for o in orders if o.status not in ['CANCELLED', 'PENDING_CONFIRMATION']), 0)
@@ -56,7 +68,7 @@ def detail(user_id):
 @admin_required
 def toggle_status(user_id):
     """Desactiva o reactiva el acceso de un cliente al sistema."""
-    customer = db.get_or_404(User, user_id)
+    customer = User.query.filter(User.id == user_id, User.role.has(name='customer')).first_or_404()
     customer.is_active = not customer.is_active
     db.session.commit()
     estado_str = "reactivada" if customer.is_active else "desactivada"

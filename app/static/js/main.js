@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initApp() {
     initFlashAlerts();
     initThemeToggle();
-    initCookieConsent();
     initBackToTop();
     initMobileMenu();
     initScrollReveal();
@@ -15,14 +14,14 @@ function initApp() {
 
 // Cierre suave de alertas de Flask
 function initFlashAlerts() {
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            alert.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-            alert.style.opacity = '0';
-            alert.style.transform = 'translateY(-10px)';
-            setTimeout(() => alert.remove(), 400);
-        }, 5000);
+    // Los errores permanecen visibles hasta que el usuario los cierre.
+    document.querySelectorAll('.flash-container .alert, .admin-main .alert').forEach(alert => {
+        if (alert.querySelector('.alert-close')) return;
+        const close = document.createElement('button');
+        close.type = 'button'; close.className = 'toast-close alert-close';
+        close.setAttribute('aria-label', 'Cerrar mensaje'); close.textContent = '×';
+        close.addEventListener('click', () => alert.remove());
+        alert.append(close);
     });
 }
 
@@ -50,41 +49,6 @@ function initThemeToggle() {
     }
 }
 
-// Banner de Consentimiento de Cookies
-function initCookieConsent() {
-    const banner = document.getElementById('cookieConsentBanner');
-    if (!banner) return;
-
-    try {
-        const consent = localStorage.getItem('cookie_consent');
-        if (!consent) {
-            banner.style.display = 'block';
-        }
-    } catch(e) {
-        banner.style.display = 'block';
-    }
-
-    const acceptAll = document.getElementById('cookieAcceptAll');
-    const acceptEssential = document.getElementById('cookieAcceptEssential');
-
-    function saveConsent(type) {
-        try {
-            localStorage.setItem('cookie_consent', type);
-            document.cookie = "cookie_consent=" + type + "; path=/; max-age=31536000; SameSite=Lax";
-        } catch(e) {}
-        banner.style.display = 'none';
-    }
-
-    if (acceptAll && !acceptAll.dataset.bound) {
-        acceptAll.dataset.bound = "true";
-        acceptAll.addEventListener('click', function() { saveConsent('all'); });
-    }
-    if (acceptEssential && !acceptEssential.dataset.bound) {
-        acceptEssential.dataset.bound = "true";
-        acceptEssential.addEventListener('click', function() { saveConsent('essential'); });
-    }
-}
-
 // Botón Volver Arriba (Back to Top)
 function initBackToTop() {
     const backToTopBtn = document.getElementById('backToTopBtn');
@@ -103,7 +67,7 @@ function initBackToTop() {
         backToTopBtn.addEventListener('click', () => {
             window.scrollTo({
                 top: 0,
-                behavior: 'smooth'
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
             });
         });
     }
@@ -148,7 +112,7 @@ function initMobileMenu() {
 
 // Animaciones suaves al hacer scroll (Scroll Reveal)
 function initScrollReveal() {
-    if (!('IntersectionObserver' in window)) return;
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const revealElements = document.querySelectorAll(
         '.reveal-on-scroll, .product-card, .category-card, .kpi-card, .feature-item, .contact-card'
@@ -308,22 +272,32 @@ window.debounce = function(fn, delay = 300) {
     };
 };
 
-// Prevención de doble clic en botones de compra y formularios críticos
-document.addEventListener('submit', (e) => {
-    const form = e.target;
-    if (form && (form.classList.contains('prevent-double-submit') || form.id === 'checkoutForm')) {
-        const submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn && !submitBtn.disabled) {
-            submitBtn.disabled = true;
-            submitBtn.dataset.originalText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
-        }
+// Los formularios POST comparten estado y bloqueo; el submitter conserva su valor.
+document.addEventListener('submit', event => {
+    const form = event.target;
+    if (event.defaultPrevented || form.method.toLowerCase() !== 'post') return;
+    if (form.dataset.submitting) { event.preventDefault(); return; }
+    form.dataset.submitting = 'true';
+    form.setAttribute('aria-busy', 'true');
+    let status = form.querySelector('.form-status');
+    if (!status) {
+        status = document.createElement('p'); status.className = 'form-status';
+        status.setAttribute('role', 'status'); form.append(status);
     }
+    status.textContent = 'Enviando…';
+    // Deferir disabled para no excluir el campo submit antes de serializar el formulario.
+    setTimeout(() => {
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(button => {
+            if (!button.disabled) { button.dataset.submitDisabled = 'true'; button.disabled = true; }
+        });
+    }, 0);
 });
-
-// Exportar para recarga SPA
-window.initPageEnhancements = function() {
-    initScrollReveal();
-    initFlashAlerts();
-    initBackToTop();
-};
+window.addEventListener('pageshow', () => {
+    document.querySelectorAll('form[data-submitting]').forEach(form => {
+        delete form.dataset.submitting; form.removeAttribute('aria-busy');
+        form.querySelectorAll('[data-submit-disabled]').forEach(button => {
+            button.disabled = false; delete button.dataset.submitDisabled;
+        });
+        form.querySelector('.form-status')?.remove();
+    });
+});

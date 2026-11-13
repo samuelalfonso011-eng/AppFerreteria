@@ -1,7 +1,8 @@
+from app.models.consent import record_consent
 from urllib.parse import urlparse
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
+from itsdangerous import URLSafeTimedSerializer, BadSignature
 from app.extensions import db
 from app.models.user import User, Role, Address
 from app.forms.auth_forms import (
@@ -20,7 +21,7 @@ auth_bp = Blueprint('auth', __name__)
 
 def is_safe_next_url(target) -> bool:
     """Acepta solo rutas relativas internas (evita //host, /\\host y esquemas externos)."""
-    if not target or not target.startswith('/') or target.startswith('//') or '\\' in target:
+    if not target or not target.startswith('/') or target.startswith('//') or '\\' in target or any(ord(c) < 32 for c in target):
         return False
     parsed = urlparse(target)
     return not parsed.scheme and not parsed.netloc
@@ -58,6 +59,8 @@ def register():
         )
         user.set_password(form.password.data)
         db.session.add(user)
+        db.session.flush()
+        record_consent('registration', user_id=user.id)
         db.session.commit()
 
         # Iniciar sesión automáticamente
@@ -138,6 +141,7 @@ def profile():
     if form.validate_on_submit():
         current_user.full_name = form.full_name.data.strip()
         current_user.phone = form.phone.data.strip() if form.phone.data else None
+        record_consent('profile', user_id=current_user.id)
         db.session.commit()
         flash("Tus datos personales han sido actualizados.", "success")
         return redirect(url_for('auth.profile'))
@@ -164,7 +168,7 @@ def addresses():
             user_id=current_user.id,
             recipient_name=form.recipient_name.data.strip(),
             phone=form.phone.data.strip(),
-            department=(form.department.data or 'Antioquia').strip(),
+            department='Antioquia',
             city=city_val,
             neighborhood=form.neighborhood.data.strip(),
             street_address=form.street_address.data.strip(),
@@ -173,6 +177,7 @@ def addresses():
             is_default=form.is_default.data
         )
         db.session.add(new_addr)
+        record_consent('address', user_id=current_user.id)
         db.session.commit()
         flash("Dirección guardada exitosamente.", "success")
         return redirect(url_for('auth.addresses'))
@@ -230,7 +235,7 @@ def verify_reset_token(token: str, max_age: int = 1800) -> int:
         if not user or user.password_hash[-12:] != fingerprint:
             return None
         return user_id
-    except Exception:
+    except (BadSignature, ValueError, TypeError):
         return None
 
 
@@ -261,7 +266,6 @@ def forgot_password():
             # Nunca se muestra en pantalla ni se escribe en logs en producción.
             if current_app.debug or current_app.testing:
                 dev_reset_url = reset_url
-                current_app.logger.info(f"[RECUPERACIÓN CONTRASEÑA][DEV] {email_clean}: {reset_url}")
                 return render_template('auth/forgot_password.html', form=form, dev_reset_url=dev_reset_url)
             current_app.logger.info(f"[RECUPERACIÓN CONTRASEÑA] Solicitud para usuario id={user.id}")
 

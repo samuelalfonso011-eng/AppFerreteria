@@ -5,8 +5,7 @@ from app.extensions import db
 
 class ElectronicInvoice(db.Model):
     """
-    Modelo de Factura Electrónica de Venta según el estándar de la DIAN (Colombia).
-    Registra el consecutivo autorizado FE-XXXX, CUFE (SHA-384), desglose de IVA (19%) y QR de validación.
+    Comprobante de prueba. Nombres de campos heredados; sin autorización ni validación DIAN.
     """
     __tablename__ = 'electronic_invoices'
 
@@ -16,11 +15,11 @@ class ElectronicInvoice(db.Model):
     cufe = db.Column(db.String(128), unique=True, nullable=False, index=True)
 
     # Datos del Emisor (Ferretería El Constructor)
-    issuer_nit = db.Column(db.String(50), default="901.845.120-3", nullable=False)
+    issuer_nit = db.Column(db.String(50), default="DEMO-SIN-NIT", nullable=False)
     issuer_name = db.Column(db.String(150), default="Ferretería El Constructor S.A.S.", nullable=False)
     issuer_address = db.Column(db.String(255), default="Calle 50 # 45-20, Medellín, Antioquia", nullable=False)
     issuer_phone = db.Column(db.String(50), default="(+57) 300 000 0000", nullable=False)
-    dian_resolution = db.Column(db.String(150), default="Resolución DIAN No. 18764000001 de 2026. Rango: FE-0001 a FE-9999", nullable=False)
+    dian_resolution = db.Column(db.String(150), default="SIMULACIÓN: sin resolución ni autorización DIAN", nullable=False)
 
     # Datos del Adquirente (Cliente)
     customer_doc_type = db.Column(db.String(20), default="CC", nullable=False)

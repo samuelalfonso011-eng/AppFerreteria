@@ -19,6 +19,7 @@ def test_2_customer_can_register(client, app):
         'password': 'Password123*',
         'confirm_password': 'Password123*',
         'role': 'admin',  # Intento malicioso de asignarse admin
+        'accept_privacy': 'y', 'accept_terms': 'y',
         'role_id': 1
     }, follow_redirects=True)
 

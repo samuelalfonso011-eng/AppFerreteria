@@ -67,7 +67,7 @@
                 <a href="{{ url_for('products.catalog', categoria=cat.slug) }}" class="home-cat category-card-item">
                     <span class="home-cat-icon">{{ icon('tag', 24) }}</span>
                     <strong>{{ t_category(cat.name) }}</strong>
-                    <span class="home-cat-count">{{ cat.products.count() }} {{ t('products_count') }}</span>
+                    <span class="home-cat-count">{{ product_counts.get(cat.id, 0) }} {{ t('products_count') }}</span>
                 </a>
             {% endfor %}
         </div>

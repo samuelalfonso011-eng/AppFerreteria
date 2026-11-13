@@ -261,17 +261,18 @@
         </div>
 
         <div class="invoice-content">
+            <p class="alert alert-warning"><strong>SIMULACIÓN — SIN VALIDEZ FISCAL.</strong> No es una Factura Electrónica validada por la DIAN y no acredita un pago real. El IVA 19% es un cálculo de demostración.</p>
             <!-- Encabezado de Factura -->
             <div class="invoice-header">
                 <div class="invoice-brand">
-                    <h1>{{ invoice.issuer_name }}</h1>
-                    <p><strong>NIT:</strong> {{ invoice.issuer_nit }} | Responsable de IVA</p>
-                    <p><strong>Dirección:</strong> {{ invoice.issuer_address }}</p>
-                    <p><strong>Teléfono:</strong> {{ invoice.issuer_phone }} | <strong>Email:</strong> facturacion@ferreteriaelconstructor.com</p>
-                    <p class="text-muted small mt-1">{{ invoice.dian_resolution }}</p>
+                    <h1>{{ store_settings.store_name }}</h1>
+                    <p>Datos comerciales de demostración.</p>
+                    <p><strong>Dirección:</strong> {{ store_settings.address }}</p>
+                    <p><strong>Teléfono:</strong> {{ store_settings.phone }} | <strong>Email:</strong> {{ store_settings.email }}</p>
+                    <p class="text-muted small mt-1">Sin resolución de numeración ni autorización DIAN</p>
                 </div>
                 <div class="invoice-badge-box">
-                    <span class="badge-title">Factura Electrónica de Venta</span>
+                    <span class="badge-title">Comprobante de prueba</span>
                     <div class="invoice-number">{{ invoice.invoice_number }}</div>
                     <small class="text-muted d-block mt-1">Pedido Ref: {{ order.order_number }}</small>
                 </div>
@@ -362,13 +363,13 @@
             <!-- Sección DIAN: CUFE y Código QR -->
             <div class="invoice-dian-section">
                 <div class="invoice-qr-container">
-                    {{ invoice.qr_svg | safe }}
+                    <span class="legal-tag">DEMO</span>
                 </div>
                 <div class="invoice-cufe-box">
-                    <h4>Código Único de Factura Electrónica (CUFE)</h4>
+                    <h4>Referencia interna de simulación (campo CUFE legado)</h4>
                     <span class="cufe-code">{{ invoice.cufe }}</span>
                     <p class="invoice-legal-note">
-                        Esta representación gráfica de la Factura Electrónica de Venta cumple con los requerimientos técnicos y legales expedidos por la Unidad Administrativa Especial Dirección de Impuestos y Aduanas Nacionales (DIAN) de Colombia conforme a la Resolución No. 000042 de 2020 y el Decreto 358 de 2020.
+                        Este documento no ha sido transmitido, firmado ni validado por la DIAN. No debe usarse como soporte fiscal.
                     </p>
                 </div>
             </div>

@@ -1,12 +1,12 @@
 from flask_wtf import FlaskForm
 from wtforms import IntegerField, StringField, TextAreaField, DecimalField, SelectField, SubmitField
-from wtforms.validators import DataRequired, NumberRange, Length, Optional
+from wtforms.validators import DataRequired, InputRequired, NumberRange, Length, Optional
 from app.models.order import OrderStatus
 
 
 class StockAdjustmentForm(FlaskForm):
     target_stock = IntegerField('Nuevo stock total en existencias', validators=[
-        DataRequired(message="El nuevo stock es obligatorio."),
+        InputRequired(message="El nuevo stock es obligatorio."),
         NumberRange(min=0, message="El stock no puede ser negativo.")
     ])
     reason = StringField('Motivo u observación del ajuste', validators=[
@@ -53,7 +53,7 @@ class StoreSettingForm(FlaskForm):
         Length(max=255)
     ])
     default_shipping_cost = DecimalField('Costo de envío estándar ($)', places=2, validators=[
-        DataRequired(message="El costo de envío es obligatorio."),
+        InputRequired(message="El costo de envío es obligatorio."),
         NumberRange(min=0, message="El costo de envío no puede ser negativo.")
     ])
     free_shipping_threshold = DecimalField('Monto para envío gratis ($)', places=2, validators=[

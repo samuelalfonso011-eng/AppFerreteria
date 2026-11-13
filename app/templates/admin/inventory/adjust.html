@@ -19,9 +19,10 @@
 
         <form method="POST">
             {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
             <div class="admin-form-group">
-                <label>{{ form.target_stock.label.text }} *</label>
+                <label for="{{ form.target_stock.id }}">{{ form.target_stock.label.text }} *</label>
                 {{ form.target_stock(class="admin-form-control", placeholder="Ingresa la nueva cantidad física") }}
                 {% for err in form.target_stock.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>
@@ -29,7 +30,7 @@
             </div>
 
             <div class="admin-form-group">
-                <label>{{ form.reason.label.text }} *</label>
+                <label for="{{ form.reason.id }}">{{ form.reason.label.text }} *</label>
                 {{ form.reason(class="admin-form-control", placeholder="Ej. Conteo físico periódico / Merma por rotura / Entrada de proveedor") }}
                 {% for err in form.reason.errors %}
                     <span style="color: var(--danger); font-size: 0.8rem;">{{ err }}</span>

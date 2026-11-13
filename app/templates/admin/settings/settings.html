@@ -8,6 +8,7 @@
     <div class="admin-card">
         <form method="POST">
             {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
             <h3 style="font-size: 1.15rem; font-weight: 700; margin-top: 0; margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
                 Identidad y Contacto
@@ -15,28 +16,28 @@
 
             <div class="form-row">
                 <div class="admin-form-group">
-                    <label>{{ form.store_name.label.text }} *</label>
+                    <label for="{{ form.store_name.id }}">{{ form.store_name.label.text }} *</label>
                     {{ form.store_name(class="admin-form-control") }}
                 </div>
                 <div class="admin-form-group">
-                    <label>{{ form.phone.label.text }} *</label>
+                    <label for="{{ form.phone.id }}">{{ form.phone.label.text }} *</label>
                     {{ form.phone(class="admin-form-control") }}
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="admin-form-group">
-                    <label>{{ form.email.label.text }} *</label>
+                    <label for="{{ form.email.id }}">{{ form.email.label.text }} *</label>
                     {{ form.email(class="admin-form-control") }}
                 </div>
                 <div class="admin-form-group">
-                    <label>{{ form.address.label.text }} *</label>
+                    <label for="{{ form.address.id }}">{{ form.address.label.text }} *</label>
                     {{ form.address(class="admin-form-control") }}
                 </div>
             </div>
 
             <div class="admin-form-group">
-                <label>{{ form.business_hours.label.text }} *</label>
+                <label for="{{ form.business_hours.id }}">{{ form.business_hours.label.text }} *</label>
                 {{ form.business_hours(class="admin-form-control") }}
             </div>
 
@@ -46,12 +47,12 @@
 
             <div class="form-row">
                 <div class="admin-form-group">
-                    <label>{{ form.default_shipping_cost.label.text }} *</label>
+                    <label for="{{ form.default_shipping_cost.id }}">{{ form.default_shipping_cost.label.text }} *</label>
                     {{ form.default_shipping_cost(class="admin-form-control") }}
                     <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Tarifa fija para pedidos estándar.</span>
                 </div>
                 <div class="admin-form-group">
-                    <label>{{ form.free_shipping_threshold.label.text }}</label>
+                    <label for="{{ form.free_shipping_threshold.id }}">{{ form.free_shipping_threshold.label.text }}</label>
                     {{ form.free_shipping_threshold(class="admin-form-control") }}
                     <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Pedidos iguales o superiores a este monto tendrán envío gratis.</span>
                 </div>

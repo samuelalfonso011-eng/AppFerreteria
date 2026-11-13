@@ -1,7 +1,4 @@
 import os
-import uuid
-from PIL import Image
-from werkzeug.utils import secure_filename
 from flask import current_app
 
 
@@ -44,5 +41,6 @@ class ImageService:
                 os.remove(full_path)
                 return True
             except OSError:
+                current_app.logger.exception("No fue posible eliminar la imagen del producto")
                 return False
         return False

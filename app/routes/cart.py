@@ -1,3 +1,4 @@
+from app.utils.validation import strict_integer
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import current_user
 from app.services.cart_service import CartService
@@ -37,8 +38,8 @@ def add():
     is_json, data = _payload()
 
     try:
-        product_id = int(data.get('product_id'))
-        quantity = int(data.get('quantity', 1))
+        product_id = strict_integer(data.get('product_id'), minimum=1)
+        quantity = strict_integer(data.get('quantity', 1), minimum=1)
     except (TypeError, ValueError):
         msg = "Parámetros de producto inválidos."
         if is_json:
@@ -60,7 +61,7 @@ def add():
             return jsonify({'success': False, 'message': str(e)}), 400
         flash(str(e), "warning")
 
-    return redirect(request.referrer or url_for('cart.view'))
+    return redirect(url_for('cart.view'))
 
 
 @cart_bp.route('/actualizar', methods=['POST'])
@@ -69,8 +70,8 @@ def update():
     is_json, data = _payload()
 
     try:
-        product_id = int(data.get('product_id'))
-        quantity = int(data.get('quantity'))
+        product_id = strict_integer(data.get('product_id'), minimum=1)
+        quantity = strict_integer(data.get('quantity'), minimum=0)
     except (TypeError, ValueError):
         msg = "Datos de cantidad incorrectos."
         if is_json:
@@ -101,7 +102,7 @@ def remove():
     is_json, data = _payload()
 
     try:
-        product_id = int(data.get('product_id'))
+        product_id = strict_integer(data.get('product_id'), minimum=1)
     except (TypeError, ValueError):
         if is_json:
             return jsonify({'success': False, 'message': "ID inválido."}), 400

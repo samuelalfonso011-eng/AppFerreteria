@@ -1,11 +1,12 @@
+from app.forms.privacy import PrivacyForm
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, BooleanField, HiddenField, SubmitField
-from wtforms.validators import DataRequired, Length, Optional
+from wtforms.validators import DataRequired, Length, Optional, Email
 from app.models.payment import PaymentMethod
 from app.constants import MUNICIPALITY_CHOICES, DEFAULT_DEPARTMENT
 
 
-class CheckoutForm(FlaskForm):
+class CheckoutForm(PrivacyForm):
     # Selección de dirección guardada (0 para nueva dirección)
     saved_address_id = SelectField('Direcciones guardadas', coerce=int, default=0)
 
@@ -35,11 +36,11 @@ class CheckoutForm(FlaskForm):
         Length(max=100)
     ])
     delivery_instructions = TextAreaField('Indicaciones de entrega para el conductor', validators=[
-        Optional()
+        Optional(), Length(max=500)
     ])
 
     save_to_address_book = BooleanField('Guardar esta dirección en mi libreta de direcciones', default=True)
-    notes = TextAreaField('Notas sobre el pedido', validators=[Optional()])
+    notes = TextAreaField('Notas sobre el pedido', validators=[Optional(), Length(max=500)])
 
     # Datos para Facturación Electrónica DIAN
     fiscal_doc_type = SelectField('Tipo de Documento Fiscal', choices=[
@@ -50,9 +51,9 @@ class CheckoutForm(FlaskForm):
     ], default='CC')
     fiscal_doc_number = StringField('Número de Documento / NIT', validators=[Optional(), Length(max=50)])
     fiscal_name = StringField('Razón Social o Nombre Completo para Factura', validators=[Optional(), Length(max=150)])
-    fiscal_email = StringField('Correo para Envío de Factura Electrónica', validators=[Optional(), Length(max=150)])
+    fiscal_email = StringField('Correo para Envío de Factura Electrónica', validators=[Optional(), Length(max=150), Email(check_deliverability=False)])
 
-    idempotency_key = HiddenField('Clave de Idempotencia')
+    idempotency_key = HiddenField('Clave de Idempotencia', validators=[DataRequired(), Length(max=100)])
     submit = SubmitField('Continuar al pago')
 
 

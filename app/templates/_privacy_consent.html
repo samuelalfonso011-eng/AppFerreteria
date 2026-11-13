@@ -1,0 +1,12 @@
+<div class="privacy-consent">
+    <label for="{{ form.accept_privacy.id }}" class="consent-choice">
+        {{ form.accept_privacy(required=true, aria_describedby="privacy-purpose") }}
+        <span>Autorizo el tratamiento de mis datos para {{ consent_purpose }}.</span>
+    </label>
+    <p id="privacy-purpose">Responsable: {{ store_settings.store_name }}. Consulta la
+        <a href="{{ url_for('public.privacy_policy') }}" target="_blank" rel="noopener">Política de Privacidad</a> y la
+        <a href="{{ url_for('public.data_policy') }}" target="_blank" rel="noopener">Política de Tratamiento de Datos</a>.
+        Puedes solicitar acceso, corrección o revocación escribiendo a {{ store_settings.email }}.
+        Esta autorización no incluye publicidad.</p>
+    {% for error in form.accept_privacy.errors %}<p class="field-error" role="alert">{{ error }}</p>{% endfor %}
+</div>

@@ -54,7 +54,7 @@ class InventoryService:
         if target_stock < 0:
             raise ValueError("El nuevo stock no puede ser negativo.")
 
-        product = Product.query.filter_by(id=product_id).with_for_update().first()
+        product = Product.query.filter_by(id=product_id).populate_existing().with_for_update().first()
         if not product:
             raise ValueError("Producto no encontrado.")
 
@@ -87,22 +87,25 @@ class InventoryService:
         y descuenta el inventario de forma atómica.
         items_to_buy: [{'product_id': int, 'quantity': int}]
         """
-        # Ordenar por product_id para evitar deadlocks en transacciones concurrentes
-        sorted_items = sorted(items_to_buy, key=lambda x: x['product_id'])
+        quantities = {}
+        for item in items_to_buy:
+            product_id, quantity = item['product_id'], item['quantity']
+            if type(product_id) is not int or type(quantity) is not int or quantity <= 0:
+                raise ValueError("Los productos y cantidades deben ser enteros positivos.")
+            quantities[product_id] = quantities.get(product_id, 0) + quantity
+        products = cls._lock_products(quantities)
 
-        for item_data in sorted_items:
-            product_id = item_data['product_id']
-            qty = item_data['quantity']
-
-            product = Product.query.filter_by(id=product_id).with_for_update().first()
+        # Validar el lote completo antes de modificar existencias.
+        for product_id, qty in quantities.items():
+            product = products.get(product_id)
             if not product or not product.is_active:
                 raise ValueError(f"El producto con ID {product_id} no está disponible para la venta.")
-
             if product.stock < qty:
                 raise InsufficientStockError(product.name, product.stock, qty)
 
+        for product_id, qty in quantities.items():
             cls.record_movement(
-                product=product,
+                product=products[product_id],
                 user_id=user_id,
                 movement_type=MovementType.SALE_EXIT,
                 quantity=qty,
@@ -113,8 +116,9 @@ class InventoryService:
     @classmethod
     def restore_stock_for_cancelled_order(cls, order: Order, user_id: int, reason: str):
         """Repone las existencias en el inventario al cancelar un pedido."""
+        products = cls._lock_products({item.product_id for item in order.items})
         for item in order.items:
-            product = Product.query.filter_by(id=item.product_id).with_for_update().first()
+            product = products.get(item.product_id)
             if product:
                 cls.record_movement(
                     product=product,
@@ -124,3 +128,10 @@ class InventoryService:
                     reason=f"Reposición por cancelación de pedido #{order.order_number}: {reason}",
                     reference_id=order.order_number
                 )
+
+    @staticmethod
+    def _lock_products(product_ids) -> dict[int, Product]:
+        """Un SELECT, orden de bloqueo estable y estado actualizado del identity map."""
+        products = Product.query.filter(Product.id.in_(product_ids)).order_by(Product.id)\
+            .populate_existing().with_for_update().all()
+        return {product.id: product for product in products}

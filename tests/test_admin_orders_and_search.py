@@ -136,3 +136,17 @@ def test_admin_search_redirects_on_exact_sku_or_order(app, client):
     resp = client.get(f'/admin/buscar?q={sku}')
     assert resp.status_code == 302
     assert f"/admin/productos/{p.id}/editar" in resp.headers['Location']
+
+
+def test_admin_search_finds_customers_and_links_to_profile(app, client):
+    """Regresión: buscar un cliente no debe dar 500 y debe enlazar a su ficha (user_id)."""
+    from app.models.user import User
+    client.post('/login', data={'email': 'admin@ferreteria.com', 'password': 'AdminPass123*'}, follow_redirects=True)
+
+    with app.app_context():
+        customer = User.query.filter_by(email='cliente@correo.com').first()
+        cid = customer.id
+
+    resp = client.get('/admin/buscar?q=cliente@correo')
+    assert resp.status_code == 200
+    assert f'/admin/clientes/{cid}'.encode() in resp.data

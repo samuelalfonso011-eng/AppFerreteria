@@ -75,6 +75,9 @@ class Order(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
+        db.Index('ix_orders_user_created', 'user_id', 'created_at'),
+        db.Index('ix_orders_status_created', 'status', 'created_at'),
+
         db.CheckConstraint('subtotal >= 0', name='check_order_subtotal_positive'),
         db.CheckConstraint('shipping_cost >= 0', name='check_order_shipping_positive'),
         db.CheckConstraint('total >= 0', name='check_order_total_positive'),

@@ -13,11 +13,12 @@ def generate_slug(text: str) -> str:
 def generate_unique_slug(text: str, model, max_len: int = 200, exclude_id: int = None) -> str:
     """Genera un slug único para `model` añadiendo sufijo numérico si ya existe."""
     base = (generate_slug(text) or 'item')[:max_len - 8]
+    query = model.query.with_entities(model.slug).filter(model.slug.startswith(base, autoescape=True))
+    if exclude_id is not None:
+        query = query.filter(model.id != exclude_id)
+    occupied = {row[0] for row in query.all()}
     slug, n = base, 2
-    while True:
-        clash = model.query.filter_by(slug=slug).first()
-        if clash is None or (exclude_id is not None and clash.id == exclude_id):
-            break
+    while slug in occupied:
         slug = f"{base}-{n}"
         n += 1
     return slug

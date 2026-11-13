@@ -14,7 +14,7 @@
         </p>
     </div>
 
-    <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm);">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm);">
         <div style="border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div>
@@ -30,15 +30,16 @@
 
         <form action="{{ url_for('checkout.process_simulated_payment', order_number=order.order_number) }}" method="POST">
             {{ form.hidden_tag() }}
+            {% include '_form_errors.html' %}
 
             <div class="admin-form-group">
-                <label>{{ form.payment_method.label.text }}</label>
+                <label for="{{ form.payment_method.id }}">{{ form.payment_method.label.text }}</label>
                 {{ form.payment_method(class="admin-form-control") }}
                 <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Selecciona el canal de pago a simular.</span>
             </div>
 
             <div class="admin-form-group">
-                <label>{{ form.simulated_action.label.text }}</label>
+                <label for="{{ form.simulated_action.id }}">{{ form.simulated_action.label.text }}</label>
                 {{ form.simulated_action(class="admin-form-control") }}
                 <span style="font-size: 0.78rem; color: var(--muted); display: block; margin-top: 4px;">Permite verificar el comportamiento comercial del sistema ante éxito, rechazo o espera.</span>
             </div>

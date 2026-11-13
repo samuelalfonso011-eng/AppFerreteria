@@ -3,6 +3,7 @@ from flask import session
 from app.extensions import db
 from app.models.product import Product
 from app.models.cart import Cart, CartItem
+from sqlalchemy.orm import joinedload
 
 
 class CartService:
@@ -25,78 +26,49 @@ class CartService:
         return cart
 
     @classmethod
-    def get_cart_data(cls, user=None) -> dict:
-        """
-        Retorna la estructura normalizada del carrito con precios vigentes desde la base de datos.
-        Nunca confía en precios enviados por el cliente.
-        """
-        items = []
-        total_items = 0
-        subtotal = Decimal('0.00')
+    def _guest_quantities(cls) -> dict[int, int]:
+        """Normaliza la cookie firmada y descarta valores de versiones antiguas inválidos."""
+        raw = session.get(cls.SESSION_KEY, {})
+        if not isinstance(raw, dict):
+            return {}
+        quantities = {}
+        for key, quantity in list(raw.items())[:cls.MAX_CART_LINES]:
+            try:
+                product_id = int(key)
+            except (ValueError, TypeError):
+                continue
+            if product_id > 0 and type(quantity) is int and quantity > 0:
+                quantities[product_id] = quantity
+        return quantities
 
-        if user and user.is_authenticated:
-            from sqlalchemy.orm import joinedload
-            cart = Cart.query.options(joinedload(Cart.items).joinedload(CartItem.product)).filter_by(user_id=user.id).first()
-            if cart:
-                for ci in cart.items:
-                    product = ci.product
-                    if product and product.is_active:
-                        item_subtotal = Decimal(str(product.price)) * ci.quantity
-                        subtotal += item_subtotal
-                        total_items += ci.quantity
-                        items.append({
-                            'product_id': product.id,
-                            'name': product.name,
-                            'sku': product.sku,
-                            'price': Decimal(str(product.price)),
-                            'quantity': ci.quantity,
-                            'subtotal': item_subtotal,
-                            'stock': product.stock,
-                            'image': product.display_image,
-                            'is_available': product.stock >= ci.quantity
-                        })
-        else:
-            # Carrito de invitado en sesión: consulta en bloque O(N) evitando consultas en bucle
-            guest_cart = session.get(cls.SESSION_KEY, {})
-            valid_pids = []
-            for pid_str in guest_cart.keys():
-                try:
-                    valid_pids.append(int(pid_str))
-                except (ValueError, TypeError):
-                    continue
-
-            if valid_pids:
-                products_list = Product.query.filter(Product.id.in_(valid_pids)).all()
-                products_map = {p.id: p for p in products_list}
-            else:
-                products_map = {}
-
-            for product_id in valid_pids:
-                qty = guest_cart.get(str(product_id), guest_cart.get(product_id, 0))
-                if not qty or qty <= 0:
-                    continue
-                product = products_map.get(product_id)
-                if product and product.is_active:
-                    item_subtotal = Decimal(str(product.price)) * qty
-                    subtotal += item_subtotal
-                    total_items += qty
-                    items.append({
-                        'product_id': product.id,
-                        'name': product.name,
-                        'sku': product.sku,
-                        'price': Decimal(str(product.price)),
-                        'quantity': qty,
-                        'subtotal': item_subtotal,
-                        'stock': product.stock,
-                        'image': product.display_image,
-                        'is_available': product.stock >= qty
-                    })
-
+    @staticmethod
+    def _serialize_item(product: Product, quantity: int) -> dict:
+        price = Decimal(str(product.price))
         return {
-            'items': items,
-            'items_list': items,
-            'total_items': total_items,
-            'subtotal': subtotal
+            'product_id': product.id, 'name': product.name, 'sku': product.sku,
+            'price': price, 'quantity': quantity, 'subtotal': price * quantity,
+            'stock': product.stock, 'image': product.display_image,
+            'is_available': product.stock >= quantity,
+        }
+
+    @classmethod
+    def get_cart_data(cls, user=None) -> dict:
+        """Precios del servidor y carga anticipada, sin consultas por artículo."""
+        if user and user.is_authenticated:
+            cart = Cart.query.options(joinedload(Cart.items).joinedload(CartItem.product)
+                                      .joinedload(Product.category)).filter_by(user_id=user.id).first()
+            pairs = ((item.product, item.quantity) for item in cart.items) if cart else ()
+        else:
+            quantities = cls._guest_quantities()
+            products = Product.query.options(joinedload(Product.category)).filter(
+                Product.id.in_(quantities)).all() if quantities else []
+            pairs = ((product, quantities[product.id]) for product in products)
+        items = [cls._serialize_item(product, quantity) for product, quantity in pairs
+                 if product and product.is_active and quantity > 0]
+        return {
+            'items': items, 'items_list': items,
+            'total_items': sum(item['quantity'] for item in items),
+            'subtotal': sum((item['subtotal'] for item in items), Decimal('0.00')),
         }
 
     @classmethod
@@ -193,13 +165,14 @@ class CartService:
         return cls.get_cart_data(user)
 
     @classmethod
-    def clear_cart(cls, user=None):
+    def clear_cart(cls, user=None, *, commit: bool = True):
         """Vacía por completo el carrito de compras."""
         if user and user.is_authenticated:
             cart = Cart.query.filter_by(user_id=user.id).first()
             if cart:
                 CartItem.query.filter_by(cart_id=cart.id).delete()
-                db.session.commit()
+                if commit:
+                    db.session.commit()
         else:
             session.pop(cls.SESSION_KEY, None)
             session.modified = True
@@ -207,30 +180,23 @@ class CartService:
     @classmethod
     def sync_guest_cart_to_user(cls, user):
         """Sincroniza los artículos del carrito de invitado al registrarse o iniciar sesión."""
-        guest_cart = session.get(cls.SESSION_KEY, {})
-        if not guest_cart:
+        quantities = cls._guest_quantities()
+        if not quantities:
+            session.pop(cls.SESSION_KEY, None)
             return
-
         cart = cls._get_or_create_user_cart(user.id)
 
-        for pid_str, guest_qty in guest_cart.items():
-            try:
-                product_id = int(pid_str)
-                product = db.session.get(Product, product_id)
-                if not product or not product.is_active:
-                    continue
-
-                cart_item = CartItem.query.filter_by(cart_id=cart.id, product_id=product.id).first()
-                if cart_item:
-                    combined_qty = cart_item.quantity + guest_qty
-                    cart_item.quantity = min(combined_qty, product.stock)
-                else:
-                    qty_to_set = min(guest_qty, product.stock)
-                    if qty_to_set > 0:
-                        new_item = CartItem(cart_id=cart.id, product_id=product.id, quantity=qty_to_set)
-                        db.session.add(new_item)
-            except (ValueError, TypeError):
-                continue
+        products = Product.query.filter(Product.id.in_(quantities), Product.is_active.is_(True)).all()
+        existing_items = {item.product_id: item for item in cart.items}
+        for product in products:
+            cart_item = existing_items.get(product.id)
+            quantity = min((cart_item.quantity if cart_item else 0) + quantities[product.id], product.stock)
+            if cart_item and quantity <= 0:
+                db.session.delete(cart_item)
+            elif cart_item:
+                cart_item.quantity = quantity
+            elif quantity > 0:
+                db.session.add(CartItem(cart_id=cart.id, product_id=product.id, quantity=quantity))
 
         db.session.commit()
         session.pop(cls.SESSION_KEY, None)

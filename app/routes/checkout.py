@@ -1,3 +1,4 @@
+from app.utils.anti_spam import check_rate_limit, render_rate_limit_error
 import uuid
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from app.services.inventory_service import InsufficientStockError
@@ -20,6 +21,8 @@ checkout_bp = Blueprint('checkout', __name__, url_prefix='/checkout')
 @login_required
 def index():
     """Paso 1 del Checkout: Datos de entrega y revisión de subtotales."""
+    if request.method == 'POST' and not check_rate_limit('checkout', limit=10, window_seconds=60, identity=str(current_user.id)):
+        return render_rate_limit_error()
     OrderService.maybe_expire_stale_orders()  # libera stock de pedidos abandonados antes de validar
     cart_data = CartService.get_cart_data(current_user)
     if not cart_data['items']:
@@ -93,7 +96,7 @@ def index():
             shipping_data = {
                 'recipient_name': form.recipient_name.data.strip(),
                 'phone': form.phone.data.strip(),
-                'department': (form.department.data or 'Antioquia').strip(),
+                'department': 'Antioquia',
                 'city': city_val,
                 'neighborhood': form.neighborhood.data.strip(),
                 'street_address': form.street_address.data.strip(),
@@ -125,7 +128,8 @@ def index():
                 shipping_data=shipping_data,
                 idempotency_key=form.idempotency_key.data,
                 notes=form.notes.data.strip() if form.notes.data else None,
-                fiscal_data=fiscal_data
+                fiscal_data=fiscal_data,
+                privacy_authorized=form.accept_privacy.data
             )
             flash("Pedido registrado con éxito. Por favor completa el pago de prueba.", "info")
             return redirect(url_for('checkout.payment_view', order_number=order.order_number))
@@ -133,6 +137,7 @@ def index():
             flash(f"No se pudo procesar el pedido: {str(e)}", "danger")
             return redirect(url_for('cart.view'))
         except Exception:
+            db.session.rollback()
             current_app.logger.exception("Error inesperado al crear el pedido")
             flash("Ocurrió un error inesperado al procesar tu pedido. Intenta de nuevo.", "danger")
             return redirect(url_for('cart.view'))
@@ -166,6 +171,8 @@ def payment_view(order_number):
 @login_required
 def process_simulated_payment(order_number):
     """Procesa la transacción simulada en el servidor (aprobada, rechazada o pendiente)."""
+    if not check_rate_limit('payment', limit=10, window_seconds=60, identity=str(current_user.id)):
+        return render_rate_limit_error()
     order = Order.query.filter_by(order_number=order_number, user_id=current_user.id).first_or_404()
     form = PaymentSimulationForm()
 
@@ -194,6 +201,7 @@ def process_simulated_payment(order_number):
             flash(str(e), "danger")
             return redirect(url_for('checkout.payment_view', order_number=order.order_number))
         except Exception:
+            db.session.rollback()
             current_app.logger.exception("Error inesperado en el pago simulado")
             flash("Ocurrió un error inesperado al procesar el pago. Intenta de nuevo.", "danger")
             return redirect(url_for('checkout.payment_view', order_number=order.order_number))

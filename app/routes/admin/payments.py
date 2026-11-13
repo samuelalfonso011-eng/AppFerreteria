@@ -1,3 +1,4 @@
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request
 from sqlalchemy import or_
 from app.decorators import admin_required
@@ -15,7 +16,7 @@ def index():
     search = request.args.get('q', '').strip()
     status_filter = request.args.get('estado', '').strip()
 
-    query = Payment.query.join(Order)
+    query = Payment.query.options(joinedload(Payment.order).joinedload(Order.user)).join(Order)
 
     if search:
         query = query.filter(or_(

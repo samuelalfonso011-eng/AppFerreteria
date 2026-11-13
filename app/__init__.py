@@ -20,7 +20,16 @@ def create_app(config_name: str = None) -> Flask:
         env_mode = os.getenv('FLASK_ENV', 'development').lower()
         config_name = 'development' if env_mode == 'development' else ('testing' if env_mode == 'testing' else 'production')
 
-    app.config.from_object(config_by_name.get(config_name, config_by_name['default']))
+    if config_name not in config_by_name:
+        raise ValueError("Entorno de configuración desconocido")
+    app.config.from_object(config_by_name[config_name])
+    if config_name == 'production':
+        key = app.config.get('SECRET_KEY') or ''
+        if len(key) < 32 or key.startswith(('cambiar_', 'ferreteria-dev-')):
+            raise RuntimeError("Producción requiere una SECRET_KEY aleatoria de al menos 32 caracteres")
+        if not app.config.get('TRUSTED_HOSTS'):
+            raise RuntimeError("Producción requiere TRUSTED_HOSTS con los dominios autorizados")
+
 
     # Seguridad: nunca arrancar fuera de desarrollo/pruebas sin una SECRET_KEY real
     if not app.config.get('SECRET_KEY') and not app.testing:
@@ -39,7 +48,14 @@ def create_app(config_name: str = None) -> Flask:
     # Cargar usuario para Flask-Login
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        try:
+            identifier, fingerprint = user_id.split(':', 1)
+            user = db.session.get(User, int(identifier))
+        except (AttributeError, TypeError, ValueError):
+            return None
+        if user and user.is_active and secrets.compare_digest(user.session_fingerprint, fingerprint):
+            return user
+        return None
 
     # Registrar comandos CLI
     register_cli_commands(app)
@@ -137,7 +153,12 @@ def create_app(config_name: str = None) -> Flask:
 
     # ProxyFix para detección precisa de encabezados HTTPS en despliegues con proxy inverso
     from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    proxy_hops = app.config['TRUSTED_PROXY_HOPS']
+    if not 0 <= proxy_hops <= 5:
+        raise ValueError("TRUSTED_PROXY_HOPS debe estar entre 0 y 5")
+    if proxy_hops:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_hops, x_proto=proxy_hops,
+                               x_host=0, x_prefix=0)
 
     # Middleware para forzar HTTPS si FORCE_HTTPS está activo o en producción pública
     from flask import request, redirect
@@ -177,6 +198,8 @@ def create_app(config_name: str = None) -> Flask:
                       if os.getenv('CSP_REPORT_ONLY', 'false').lower() in ('true', '1', 'yes')
                       else 'Content-Security-Policy')
         response.headers[csp_header] = build_csp(getattr(g, 'csp_nonce', ''))
+        if request.endpoint != 'static':
+            response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
@@ -189,6 +212,9 @@ def create_app(config_name: str = None) -> Flask:
     # Manejo centralizado de errores HTTP sin exponer trazas internas
     @app.errorhandler(400)
     def bad_request_error(error):
+        from flask import jsonify
+        if request.is_json:
+            return jsonify(success=False, message='Solicitud inválida o sesión de seguridad vencida.'), 400
         return render_template('errors/400.html'), 400
 
     @app.errorhandler(403)
