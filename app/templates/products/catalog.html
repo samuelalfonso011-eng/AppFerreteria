@@ -1,129 +1,112 @@
 {% extends 'base.html' %}
 {% from '_icons.html' import icon %}
+{% from '_product_card.html' import product_card with context %}
 
-{% block title %}Catálogo de Productos — {{ store_settings.store_name }}{% endblock %}
+{% block title %}{{ t('catalog_title') }} — {{ store_settings.store_name }}{% endblock %}
+
+{% set view = 'lista' if request.args.get('vista') == 'lista' else 'cuadricula' %}
+{% set has_filters = current_query or current_category or current_min_price or current_max_price or current_availability %}
+{% set keep = dict(q=current_query, categoria=current_category, orden=current_sort, min_price=current_min_price, max_price=current_max_price, disponibilidad=current_availability) %}
 
 {% block content %}
+<!-- Riel de categorías -->
+<nav class="cat-rail" aria-label="{{ t('hardware_categories') }}">
+    <div class="cat-rail-track">
+        <a href="{{ url_for('products.catalog', q=current_query, orden=current_sort, vista=request.args.get('vista')) }}" class="cat-chip {% if not current_category %}is-active{% endif %}"{% if not current_category %} aria-current="page"{% endif %}>{{ t('all_categories') }}</a>
+        {% for cat in categories %}
+            <a href="{{ url_for('products.catalog', categoria=cat.slug, q=current_query, orden=current_sort, vista=request.args.get('vista')) }}" class="cat-chip {% if current_category == cat.slug %}is-active{% endif %}"{% if current_category == cat.slug %} aria-current="page"{% endif %}>{{ t_category(cat.name) }}</a>
+        {% endfor %}
+    </div>
+</nav>
+
 <div class="container">
-    <!-- CABECERA DE SECCIÓN -->
-    <div class="catalog-head">
+    <header class="catalog-head">
         <div>
-            <h1>Catálogo de Ferretería</h1>
+            <h1>{% if selected_category %}{{ t_category(selected_category.name) }}{% else %}{{ t('catalog_title') }}{% endif %}</h1>
             <p>
-                Mostrando {{ pagination.total }} producto(s) encontrado(s)
-                {% if selected_category %} en <strong>{{ selected_category.name }}</strong>{% endif %}
-                {% if current_query %} con la búsqueda "<strong>{{ current_query }}</strong>"{% endif %}
+                <b class="price">{{ pagination.total }}</b> producto(s)
+                {% if selected_category %}· {{ t('catalog_title') }}{% endif %}
+                {% if current_query %}· búsqueda «<strong>{{ current_query }}</strong>»{% endif %}
             </p>
         </div>
-        {% if current_query or current_category or current_min_price or current_max_price or current_availability %}
-            <a href="{{ url_for('products.catalog') }}" class="btn btn-outline btn-sm">Limpiar Filtros {{ icon('x', 14) }}</a>
-        {% endif %}
-    </div>
+        <div class="catalog-tools">
+            {% if has_filters %}
+                <a href="{{ url_for('products.catalog', vista=request.args.get('vista')) }}" class="btn btn-outline">{{ t('clear_filters') }} {{ icon('x', 16) }}</a>
+            {% endif %}
+            <div class="view-switch" role="group" aria-label="{{ t('view_mode') }}">
+                <a href="{{ url_for('products.catalog', page=pagination.page, **keep) }}" class="view-btn {% if view == 'cuadricula' %}is-active{% endif %}" {% if view == 'cuadricula' %}aria-current="true"{% endif %} title="{{ t('view_grid') }}">{{ icon('grid', 18) }}<span class="sr-only">{{ t('view_grid') }}</span></a>
+                <a href="{{ url_for('products.catalog', page=pagination.page, vista='lista', **keep) }}" class="view-btn {% if view == 'lista' %}is-active{% endif %}" {% if view == 'lista' %}aria-current="true"{% endif %} title="{{ t('view_list') }}">{{ icon('list', 18) }}<span class="sr-only">{{ t('view_list') }}</span></a>
+            </div>
+        </div>
+    </header>
 
     <div class="catalog-layout">
-        <!-- BARRA LATERAL DE FILTROS -->
-        <aside class="filter-panel">
-            <form action="{{ url_for('products.catalog') }}" method="GET">
+        <!-- FILTROS: plegables en móvil, abiertos en escritorio (data-open-wide) -->
+        {% set panel_filters = current_min_price or current_max_price or current_availability %}
+        <details class="filter-panel" data-open-wide {% if panel_filters %}open{% endif %}>
+            <summary class="filter-summary">{{ icon('sliders', 18) }} {{ t('filters') }}{% if panel_filters %} <span class="filter-count" aria-label="activos">●</span>{% endif %}</summary>
+            <form action="{{ url_for('products.catalog') }}" method="GET" class="filter-form">
                 <input type="hidden" name="q" value="{{ current_query }}">
+                {% if current_category %}<input type="hidden" name="categoria" value="{{ current_category }}">{% endif %}
+                {% if view == 'lista' %}<input type="hidden" name="vista" value="lista">{% endif %}
 
                 <div class="filter-group">
-                    <label class="filter-label" for="f-orden">Ordenar Por</label>
+                    <label class="filter-label" for="f-orden">{{ t('sort_by') }}</label>
                     <select id="f-orden" name="orden" data-autosubmit>
-                        <option value="nuevos" {% if current_sort == 'nuevos' %}selected{% endif %}>Más Recientes</option>
-                        <option value="precio_asc" {% if current_sort == 'precio_asc' %}selected{% endif %}>Precio: Menor a Mayor</option>
-                        <option value="precio_desc" {% if current_sort == 'precio_desc' %}selected{% endif %}>Precio: Mayor a Menor</option>
-                        <option value="nombre" {% if current_sort == 'nombre' %}selected{% endif %}>Nombre: A - Z</option>
+                        <option value="nuevos" {% if current_sort == 'nuevos' %}selected{% endif %}>{{ t('sort_newest') }}</option>
+                        <option value="precio_asc" {% if current_sort == 'precio_asc' %}selected{% endif %}>{{ t('sort_price_asc') }}</option>
+                        <option value="precio_desc" {% if current_sort == 'precio_desc' %}selected{% endif %}>{{ t('sort_price_desc') }}</option>
+                        <option value="nombre" {% if current_sort == 'nombre' %}selected{% endif %}>{{ t('sort_name_asc') }}</option>
                     </select>
                 </div>
 
                 <div class="filter-group">
-                    <span class="filter-label">Categoría</span>
-                    <nav class="filter-links" aria-label="Categorías">
-                        <a href="{{ url_for('products.catalog', q=current_query, orden=current_sort) }}" class="{% if not current_category %}is-active{% endif %}">Todas las categorías</a>
-                        {% for cat in categories %}
-                            <a href="{{ url_for('products.catalog', categoria=cat.slug, q=current_query, orden=current_sort) }}" class="{% if current_category == cat.slug %}is-active{% endif %}">{{ cat.name }}</a>
-                        {% endfor %}
-                    </nav>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label" for="f-disp">Disponibilidad</label>
+                    <label class="filter-label" for="f-disp">{{ t('availability') }}</label>
                     <select id="f-disp" name="disponibilidad" data-autosubmit>
                         <option value="" {% if not current_availability %}selected{% endif %}>Todos</option>
-                        <option value="in_stock" {% if current_availability == 'in_stock' %}selected{% endif %}>Solo en existencia</option>
-                        <option value="out_of_stock" {% if current_availability == 'out_of_stock' %}selected{% endif %}>Agotados</option>
+                        <option value="in_stock" {% if current_availability == 'in_stock' %}selected{% endif %}>{{ t('sign_available') }}</option>
+                        <option value="out_of_stock" {% if current_availability == 'out_of_stock' %}selected{% endif %}>{{ t('out_of_stock') }}</option>
                     </select>
                 </div>
 
-                <div class="filter-group">
-                    <span class="filter-label">Rango de Precio ($)</span>
+                <fieldset class="filter-group">
+                    <legend class="filter-label">{{ t('filter_by_price') }} (COP)</legend>
                     <div class="filter-range">
-                        <input type="number" name="min_price" aria-label="Precio mínimo" placeholder="Mín" value="{{ current_min_price if current_min_price is not none else '' }}">
-                        <span>-</span>
-                        <input type="number" name="max_price" aria-label="Precio máximo" placeholder="Máx" value="{{ current_max_price if current_max_price is not none else '' }}">
+                        <input type="number" inputmode="numeric" min="0" name="min_price" aria-label="Precio mínimo" placeholder="Mín" value="{{ current_min_price if current_min_price is not none else '' }}">
+                        <span aria-hidden="true">–</span>
+                        <input type="number" inputmode="numeric" min="0" name="max_price" aria-label="Precio máximo" placeholder="Máx" value="{{ current_max_price if current_max_price is not none else '' }}">
                     </div>
-                    <button type="submit" class="btn btn-secondary btn-sm btn-full">Aplicar Filtro</button>
-                </div>
+                </fieldset>
+                <button type="submit" class="btn btn-secondary btn-full">{{ t('filter_btn') }}</button>
             </form>
-        </aside>
+        </details>
 
-        <!-- GRILLA DE PRODUCTOS -->
-        <main>
+        <section class="catalog-results" aria-label="Resultados">
             {% if products %}
-                <div class="home-product-grid">
-                    {% for prod in products %}
-                        <article class="home-product product-card-item">
-                            <a href="{{ url_for('products.detail', slug=prod.slug) }}" class="home-product-media">
-                                <span class="home-sku">SKU: {{ prod.sku }}</span>
-                                {% if prod.stock == 0 %}<span class="badge-soldout">Agotado</span>{% endif %}
-                                <img class="hover-zoom" src="{{ url_for('static', filename=prod.display_image) }}" alt="{{ prod.name }}" data-img-fallback="{{ url_for('static', filename='img/placeholder-product.svg') }}" loading="lazy" decoding="async">
-                            </a>
-
-                            <div class="home-product-body">
-                                <span class="home-product-cat">{{ prod.category.name }}</span>
-                                <h3><a href="{{ url_for('products.detail', slug=prod.slug) }}">{{ prod.name }}</a></h3>
-
-                                <div class="home-product-foot">
-                                    <div>
-                                        <span class="home-product-label">Precio unitario</span>
-                                        <strong class="price">{{ prod.price | currency }}</strong>
-                                    </div>
-
-                                    {% if prod.stock > 0 %}
-                                        <button type="button" class="btn btn-primary btn-sm async-add-cart" data-product-id="{{ prod.id }}">+ Agregar</button>
-                                    {% else %}
-                                        <button type="button" class="btn btn-outline btn-sm" disabled>Agotado</button>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </article>
-                    {% endfor %}
+                <div class="pgrid {% if view == 'lista' %}is-list{% endif %}">
+                    {% for prod in products %}{{ product_card(prod, show_category=not current_category) }}{% endfor %}
                 </div>
 
-                <!-- PAGINACIÓN -->
                 {% if pagination.pages > 1 %}
-                    <div class="catalog-pager">
+                    <nav class="catalog-pager" aria-label="Paginación">
                         {% if pagination.has_prev %}
-                            <a href="{{ url_for('products.catalog', page=pagination.prev_num, q=current_query, categoria=current_category, orden=current_sort, min_price=current_min_price, max_price=current_max_price, disponibilidad=current_availability) }}" class="btn btn-outline btn-sm">&larr; Anterior</a>
+                            <a href="{{ url_for('products.catalog', page=pagination.prev_num, vista=request.args.get('vista'), **keep) }}" class="btn btn-outline">{{ icon('chevron-left', 18) }} Anterior</a>
                         {% endif %}
-
-                        <span>Página {{ pagination.page }} de {{ pagination.pages }}</span>
-
+                        <span class="pager-pos">Página <b class="price">{{ pagination.page }}</b> de <b class="price">{{ pagination.pages }}</b></span>
                         {% if pagination.has_next %}
-                            <a href="{{ url_for('products.catalog', page=pagination.next_num, q=current_query, categoria=current_category, orden=current_sort, min_price=current_min_price, max_price=current_max_price, disponibilidad=current_availability) }}" class="btn btn-outline btn-sm">Siguiente &rarr;</a>
+                            <a href="{{ url_for('products.catalog', page=pagination.next_num, vista=request.args.get('vista'), **keep) }}" class="btn btn-outline">Siguiente {{ icon('chevron-right', 18) }}</a>
                         {% endif %}
-                    </div>
+                    </nav>
                 {% endif %}
-
             {% else %}
                 <div class="empty-state">
-                    <div class="empty-state-icon">{{ icon('search-empty', 34) }}</div>
+                    <span class="sign-band sign-warn"><span>{{ t('sign_notice') }}</span></span>
                     <h3>No se encontraron productos</h3>
-                    <p>No hay productos que coincidan con los criterios de búsqueda o filtros seleccionados.</p>
-                    <a href="{{ url_for('products.catalog') }}" class="btn btn-primary btn-sm">Ver todo el catálogo</a>
+                    <p>Ningún producto coincide con la búsqueda o los filtros. Prueba con otra palabra, la referencia del producto o quita algún filtro.</p>
+                    <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">Ver todo el catálogo</a>
                 </div>
             {% endif %}
-        </main>
+        </section>
     </div>
 </div>
 {% endblock %}

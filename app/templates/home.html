@@ -1,143 +1,94 @@
 {% extends 'base.html' %}
 {% from '_icons.html' import icon %}
+{% from '_product_card.html' import product_card with context %}
 
 {% block title %}{{ t('home', 'Inicio') }} — {{ store_settings.store_name }}{% endblock %}
 
 {% block content %}
-<!-- HERO -->
-<section class="home-hero" style="background-image: linear-gradient(rgba(15, 23, 42, 0.86), rgba(15, 23, 42, 0.94)), url('{{ url_for('static', filename='img/hero-banner.svg') }}');">
-    <div class="home-hero-inner">
-        <span class="home-eyebrow">{{ t('hero_badge') }}</span>
-        <h1>{{ t('hero_title') }}</h1>
-        <p>{{ t('hero_desc') }}</p>
-        <div class="home-actions">
-            <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">{{ t('explore_catalog') }}</a>
-            <a href="{{ url_for('public.delivery_info') }}" class="btn btn-outline home-btn-ghost">{{ t('delivery_rates') }}</a>
-        </div>
-    </div>
-</section>
+<!-- Aviso de despacho: información real de la tienda en forma de señal -->
+<a href="{{ url_for('public.delivery_info') }}" class="notice-strip">
+    <span class="notice-strip-inner">
+        {{ icon('truck', 18) }}
+        <span class="notice-strip-text"><strong>{{ t('delivery_strip') }}</strong> · {{ t('free_shipping_from') }} <b class="price">{{ store_settings.free_shipping_threshold | currency }}</b></span>
+        {{ icon('chevron-right', 18) }}
+    </span>
+</a>
 
-<!-- BENEFICIOS -->
-<div class="home-benefits">
-    <div class="home-benefits-grid">
-        <div class="home-benefit">
-            <span class="home-benefit-icon">{{ icon('package', 26) }}</span>
-            <div>
-                <strong>{{ t('benefit_delivery') }}</strong>
-                <span>{{ t('benefit_delivery_desc') }}</span>
-            </div>
-        </div>
-        <div class="home-benefit">
-            <span class="home-benefit-icon">{{ icon('tag', 26) }}</span>
-            <div>
-                <strong>{{ t('benefit_shipping') }}</strong>
-                <span>{{ t('benefit_shipping_desc') }} ({{ store_settings.free_shipping_threshold | currency }})</span>
-            </div>
-        </div>
-        <div class="home-benefit">
-            <span class="home-benefit-icon">{{ icon('card', 26) }}</span>
-            <div>
-                <strong>{{ t('benefit_secure') }}</strong>
-                <span>{{ t('benefit_secure_desc') }}</span>
-            </div>
-        </div>
-        <div class="home-benefit">
-            <span class="home-benefit-icon">{{ icon('check', 26) }}</span>
-            <div>
-                <strong>{{ t('benefit_warranty') }}</strong>
-                <span>{{ t('benefit_warranty_desc') }}</span>
-            </div>
-        </div>
+<!-- Riel de categorías: un eje a la vez -->
+<nav class="cat-rail" aria-label="{{ t('hardware_categories') }}">
+    <div class="cat-rail-track">
+        <a href="{{ url_for('products.catalog') }}" class="cat-chip is-active">{{ t('all_categories') }}</a>
+        {% for cat in categories %}
+            <a href="{{ url_for('products.catalog', categoria=cat.slug) }}" class="cat-chip">
+                {{ t_category(cat.name) }} <span class="cat-chip-count">{{ product_counts.get(cat.id, 0) }}</span>
+            </a>
+        {% endfor %}
     </div>
-</div>
+</nav>
 
 <div class="container">
-    <!-- CATEGORÍAS -->
-    <section class="home-section">
-        <div class="home-section-head">
-            <div>
-                <span class="home-kicker">{{ t('explore_by_segment') }}</span>
-                <h2>{{ t('hardware_categories') }}</h2>
-            </div>
-            <a href="{{ url_for('products.catalog') }}" class="home-link">{{ t('view_all') }} &rarr;</a>
-        </div>
-
-        <div class="home-cat-grid">
-            {% for cat in categories %}
-                <a href="{{ url_for('products.catalog', categoria=cat.slug) }}" class="home-cat category-card-item">
-                    <span class="home-cat-icon">{{ icon('tag', 24) }}</span>
-                    <strong>{{ t_category(cat.name) }}</strong>
-                    <span class="home-cat-count">{{ product_counts.get(cat.id, 0) }} {{ t('products_count') }}</span>
-                </a>
-            {% endfor %}
-        </div>
-    </section>
-
-    <!-- BANNER INTERMEDIO -->
-    <section class="home-band">
-        <div class="home-band-copy">
-            <span class="home-band-kicker">{{ t('tech_advice_badge') }}</span>
-            <h3>{{ t('cta_banner_question') }}</h3>
-            <p>{{ t('cta_banner_desc') }}</p>
-        </div>
-        <div class="home-actions">
-            <a href="{{ url_for('public.contact') }}" class="btn btn-primary">{{ t('request_quote') }}</a>
-            <a href="{{ url_for('products.catalog') }}" class="btn btn-outline home-btn-ghost">{{ t('view_catalog') }}</a>
-        </div>
-    </section>
+    <h1 class="sr-only">{{ store_settings.store_name }} — {{ t('hero_title') }}</h1>
 
     <!-- DESTACADOS -->
-    <section class="home-section">
-        <div class="home-section-head">
-            <div>
-                <span class="home-kicker">{{ t('recommended_badge') }}</span>
-                <h2>{{ t('featured_products') }}</h2>
+    <section class="shelf" aria-labelledby="shelf-featured">
+        <div class="shelf-head">
+            <h2 id="shelf-featured">{{ t('featured_products') }}</h2>
+            <a href="{{ url_for('products.catalog') }}" class="shelf-link">{{ t('go_to_catalog') }} {{ icon('chevron-right', 16) }}</a>
+        </div>
+        {% if featured_products %}
+            <div class="pgrid">
+                {% for prod in featured_products %}{{ product_card(prod, show_category=true) }}{% endfor %}
             </div>
-            <a href="{{ url_for('products.catalog') }}" class="home-link">{{ t('go_to_catalog') }} &rarr;</a>
-        </div>
-
-        <div class="home-product-grid">
-            {% for prod in featured_products %}
-                <article class="home-product product-card-item">
-                    <a href="{{ url_for('products.detail', slug=prod.slug) }}" class="home-product-media">
-                        <span class="home-sku">SKU: {{ prod.sku }}</span>
-                        <img class="hover-zoom" src="{{ url_for('static', filename=prod.display_image) }}" alt="{{ prod.name }}" data-img-fallback="{{ url_for('static', filename='img/placeholder-product.svg') }}" loading="lazy" decoding="async">
-                    </a>
-                    <div class="home-product-body">
-                        <span class="home-product-cat">{{ t_category(prod.category.name) }}</span>
-                        <h3><a href="{{ url_for('products.detail', slug=prod.slug) }}">{{ prod.name }}</a></h3>
-                        <div class="home-product-foot">
-                            <div>
-                                <span class="home-product-label">{{ t('unit_price') }}</span>
-                                <strong class="price">{{ prod.price | currency }}</strong>
-                            </div>
-                            <button type="button" class="btn btn-primary btn-sm async-add-cart" data-product-id="{{ prod.id }}">{{ t('add') }}</button>
-                        </div>
-                    </div>
-                </article>
-            {% endfor %}
-        </div>
+        {% else %}
+            <div class="empty-state">
+                <span class="sign-band sign-warn"><span>{{ t('sign_notice') }}</span></span>
+                <h3>{{ t('no_products_found') }}</h3>
+                <a href="{{ url_for('products.catalog') }}" class="btn btn-primary">{{ t('view_catalog') }}</a>
+            </div>
+        {% endif %}
     </section>
 
-    <!-- CTA FINAL: registro para anónimos, panel de cliente para autenticados -->
-    {% if current_user.is_authenticated %}
-    <section class="home-cta">
-        <h3>{{ t('welcome_back') }}, {{ current_user.full_name }}</h3>
-        <p>{{ t('welcome_back_desc') }}</p>
-        <div class="home-actions home-actions-center">
-            <a href="{{ url_for('orders.my_orders') }}" class="btn btn-primary">{{ t('view_my_orders') }}</a>
-            <a href="{{ url_for('products.catalog') }}" class="btn btn-secondary">{{ t('catalog') }}</a>
+    <!-- NOVEDADES -->
+    {% if recent_products %}
+    <section class="shelf" aria-labelledby="shelf-new">
+        <div class="shelf-head">
+            <h2 id="shelf-new">{{ t('new_arrivals') }}</h2>
         </div>
-    </section>
-    {% else %}
-    <section class="home-cta">
-        <h3>{{ t('reg_banner_title') }}</h3>
-        <p>{{ t('reg_banner_desc') }}</p>
-        <div class="home-actions home-actions-center">
-            <a href="{{ url_for('auth.register') }}" class="btn btn-primary">{{ t('register_now') }}</a>
-            <a href="{{ url_for('products.catalog') }}" class="btn btn-secondary">{{ t('buy_online') }}</a>
+        <div class="pgrid">
+            {% for prod in recent_products %}{{ product_card(prod, show_category=true) }}{% endfor %}
         </div>
     </section>
     {% endif %}
+
+    <!-- COTIZACIÓN: el pedido por volumen pasa por un asesor -->
+    <section class="sign-panel">
+        <div class="sign-panel-body">
+            <div>
+                <h2>{{ t('cta_banner_question') }}</h2>
+                <p>{{ t('cta_banner_desc') }}</p>
+            </div>
+            <div class="sign-panel-actions">
+                <a href="{{ url_for('public.contact') }}" class="btn btn-primary">{{ t('request_quote') }}</a>
+                <a href="{{ url_for('public.delivery_info') }}" class="btn btn-outline">{{ t('delivery_rates') }}</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CUENTA: registro para anónimos, pedidos para autenticados -->
+    <section class="account-strip">
+        {% if current_user.is_authenticated %}
+            <div>
+                <h2>{{ t('welcome_back') }}, {{ current_user.full_name }}</h2>
+                <p>{{ t('welcome_back_desc') }}</p>
+            </div>
+            <a href="{{ url_for('orders.my_orders') }}" class="btn btn-secondary">{{ t('view_my_orders') }}</a>
+        {% else %}
+            <div>
+                <h2>{{ t('reg_banner_title') }}</h2>
+                <p>{{ t('reg_banner_desc') }}</p>
+            </div>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-secondary">{{ t('register_now') }}</a>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

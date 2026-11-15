@@ -1,12 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="300" height="200">
-  <rect width="300" height="200" rx="14" fill="#111111"/>
-  <rect x="10" y="10" width="280" height="180" rx="10" fill="none" stroke="#222222" stroke-width="2"/>
-  <g transform="translate(115, 45)">
-    <!-- Rodillo de pintura -->
-    <rect x="0" y="0" width="60" height="24" rx="6" fill="#FFD100"/>
-    <path d="M60 12 L75 12 L75 40 L35 40 L35 65" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="29" y="65" width="12" height="25" rx="3" fill="#E6BC00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="300" height="200" role="img" aria-hidden="true">
+  <!-- Provisional: pictograma de categoría dibujado para el rediseño Señal de obra (paleta fijada). Reemplazar por fotografía real del producto. -->
+  <rect width="300" height="200" fill="#F1F5F9"/>
+  <path d="M0 176h300" stroke="#CBD5E1" stroke-width="2"/>
+  <g fill="none" stroke="#1E293B" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="92" y="48" width="104" height="36" rx="6" fill="#F59E0B" stroke="#1E293B"/>
+    <path d="M196 66h16v34h-62v20"/>
+    <rect x="140" y="120" width="20" height="40" rx="4"/>
   </g>
-  <text x="150" y="155" font-family="'Inter', sans-serif" font-size="14" font-weight="800" fill="#FFD100" text-anchor="middle" letter-spacing="1">PINTURA Y ACABADOS</text>
-  <text x="150" y="175" font-family="'Inter', sans-serif" font-size="11" font-weight="500" fill="#9CA3AF" text-anchor="middle">Vinilos, Esmaltes y Brochas</text>
 </svg>

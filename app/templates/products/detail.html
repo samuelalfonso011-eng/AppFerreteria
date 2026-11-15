@@ -1,85 +1,73 @@
 {% extends 'base.html' %}
 {% from '_icons.html' import icon %}
+{% from '_product_card.html' import product_card, sign_band, sign_state with context %}
 
 {% block title %}{{ product.name }} — {{ store_settings.store_name }}{% endblock %}
 
 {% block content %}
+{% set state = sign_state(product) %}
 <div class="container">
-    <!-- BREADCRUMBS -->
     <nav class="pd-crumbs" aria-label="Ruta de navegación">
-        <a href="{{ url_for('public.home') }}">Inicio</a> /
-        <a href="{{ url_for('products.catalog') }}">Catálogo</a> /
-        <a href="{{ url_for('products.catalog', categoria=product.category.slug) }}">{{ product.category.name }}</a> /
-        <span>{{ product.name }}</span>
+        <a href="{{ url_for('public.home') }}">Inicio</a>
+        <span aria-hidden="true">/</span>
+        <a href="{{ url_for('products.catalog') }}">{{ t('catalog') }}</a>
+        <span aria-hidden="true">/</span>
+        <a href="{{ url_for('products.catalog', categoria=product.category.slug) }}">{{ t_category(product.category.name) }}</a>
     </nav>
 
-    <div class="pd-card">
-        <!-- IMAGEN PRINCIPAL -->
+    <article class="pd">
         <div class="pd-media">
-            <span class="home-sku">SKU: {{ product.sku }}</span>
-            <img src="{{ url_for('static', filename=product.display_image) }}" alt="{{ product.name }}" data-img-fallback="{{ url_for('static', filename='img/placeholder-product.svg') }}">
+            <img src="{{ url_for('static', filename=product.display_image) }}" alt="{{ product.name }}" data-img-fallback="{{ url_for('static', filename='img/placeholder-product.svg') }}" width="480" height="360">
         </div>
 
-        <!-- INFORMACIÓN COMERCIAL -->
-        <div>
-            <span class="home-kicker">{{ product.category.name }}</span>
+        <div class="pd-info">
+            <span class="pcard-ref">{{ t('ref') }} {{ product.sku }} · {{ t_category(product.category.name) }}</span>
             <h1 class="pd-title">{{ product.name }}</h1>
 
-            <div class="pd-price price">{{ product.price | currency }}</div>
+            <div class="pd-sign pcard-{{ state }}">
+                {{ sign_band(product) }}
+                <div class="pd-sign-body">
+                    <strong class="pd-price price">{{ product.price | currency }}</strong>
+                    <span class="pcard-unit">{{ t('per_unit') }}</span>
+                </div>
 
-            <!-- DISPONIBILIDAD -->
-            <div class="pd-stock">
-                {% if product.stock > 0 %}
-                    <span class="pd-pill pd-pill-ok">{{ icon('check', 16) }} En existencias ({{ product.stock }} unidades disponibles)</span>
+                {% if state != 'stop' %}
+                    <form action="{{ url_for('cart.add') }}" method="POST" class="pd-buy">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="product_id" value="{{ product.id }}">
+                        <label class="pd-qty-label" for="qty-{{ product.id }}">{{ t('quantity') }}</label>
+                        <div class="pd-buy-row">
+                            <input class="pd-qty" type="number" inputmode="numeric" name="quantity" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.stock }}">
+                            <button type="submit" class="btn btn-primary pd-add">{{ icon('cart', 20) }} {{ t('add_to_cart') }}</button>
+                        </div>
+                    </form>
                 {% else %}
-                    <span class="pd-pill pd-pill-out">{{ icon('x', 16) }} Agotado temporalmente</span>
+                    <p class="pd-notice">Este producto no tiene unidades disponibles en este momento. Vuelve a consultar pronto o escríbenos para conseguirlo.</p>
+                    <a href="{{ url_for('public.contact') }}" class="btn btn-outline btn-full">{{ t('request_quote') }}</a>
                 {% endif %}
             </div>
 
-            <!-- FORMULARIO DE AGREGAR AL CARRITO -->
-            {% if product.stock > 0 %}
-                <form action="{{ url_for('cart.add') }}" method="POST" class="pd-buy">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="product_id" value="{{ product.id }}">
-                    <label class="visually-hidden" for="qty-{{ product.id }}">Cantidad</label>
-                    <input class="pd-qty" type="number" name="quantity" id="qty-{{ product.id }}" value="1" min="1" max="{{ product.stock }}">
-                    <button type="submit" class="btn btn-primary pd-add">{{ icon('cart', 18) }} Agregar al Carrito</button>
-                </form>
-            {% else %}
-                <div class="pd-notice">Este producto no tiene unidades disponibles en este momento. Vuelve a consultar pronto o comunícate con la ferretería.</div>
+            {% if product.description %}
+            <section class="pd-section">
+                <h2>Descripción</h2>
+                <p>{{ product.description }}</p>
+            </section>
             {% endif %}
 
-            <!-- DESCRIPCIÓN -->
-            <div class="pd-section">
-                <h3>Descripción del Producto</h3>
-                <p>{{ product.description }}</p>
-            </div>
-
-            <!-- ESPECIFICACIONES TÉCNICAS -->
             {% if product.technical_specs %}
-                <div class="pd-section">
-                    <h3>Características Técnicas</h3>
-                    <div class="pd-specs">{{ product.technical_specs }}</div>
-                </div>
+            <section class="pd-section">
+                <h2>{{ t('technical_specifications') }}</h2>
+                <div class="pd-specs">{{ product.technical_specs }}</div>
+            </section>
             {% endif %}
         </div>
-    </div>
+    </article>
 
-    <!-- PRODUCTOS RELACIONADOS -->
     {% if related_products %}
-        <section>
-            <h2 class="pd-related-title">Productos Relacionados</h2>
-            <div class="pd-related-grid">
-                {% for rel in related_products %}
-                    <div class="pd-related product-card-item">
-                        <span class="home-product-label">SKU: {{ rel.sku }}</span>
-                        <h4><a href="{{ url_for('products.detail', slug=rel.slug) }}">{{ rel.name }}</a></h4>
-                        <div class="pd-related-foot">
-                            <strong class="price">{{ rel.price | currency }}</strong>
-                            <a href="{{ url_for('products.detail', slug=rel.slug) }}" class="btn btn-outline btn-sm">Ver detalle</a>
-                        </div>
-                    </div>
-                {% endfor %}
+        <section class="shelf" aria-labelledby="pd-related">
+            <div class="shelf-head"><h2 id="pd-related">Productos relacionados</h2></div>
+            <div class="pgrid">
+                {% for rel in related_products %}{{ product_card(rel) }}{% endfor %}
             </div>
         </section>
     {% endif %}

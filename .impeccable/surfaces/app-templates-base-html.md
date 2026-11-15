@@ -5,20 +5,21 @@ primary_target: "app/templates/base.html"
 related_targets: ["app/templates/admin/base_admin.html"]
 ---
 
-# Surface brief: tienda pública + panel admin (rediseño visual)
+# Surface brief: tienda pública (rediseño completo; el admin hereda después)
 
-Modo: Operate para el admin y para carrito/checkout/cuenta; la home y el catálogo venden, pero con prioridad a escanear y actuar. Audiencia: contratista en móvil (prioritario), comprador de hogar, personal de la ferretería. Restricciones: CSP estricta (sin scripts ni on* inline), SPA con `#main-content`, estilos inline existentes (~1.250) que apuntan a variables CSS.
+Modo: Operate con intención de venta. Home, catálogo, producto, carrito y checkout. Audiencia: contratista en móvil, a pleno sol y con guantes (prioritario); comprador de hogar. Restricciones: CSP estricta (sin scripts ni on* inline), SPA sobre `#main-content`, estilos inline existentes que apuntan a variables CSS, i18n, modo claro/oscuro.
 
 ## Direction contract
 
-THESIS: una ferretería se reconoce por su rotulación y su señalética de seguridad, no por un tema de tienda genérico; la interfaz es una pared de rotulado en pizarra con el ámbar como color de acción. Rechaza el e-commerce claro-con-acento-azul y el negro-neón.
+THESIS: el estado de cada producto y cada acción se lee como una señal de obra (NTC 1461): una banda de encabezado con una palabra en mayúsculas, legible a distancia y al sol. Rechaza la tienda blanca de tarjetas redondeadas con banner promocional y la "pared pizarra con rotulado" de la v1.3.
 
-OWN-WORLD: pizarra `#1E293B` (barras, pie, panel lateral) y `#0F172A` (texto, modo oscuro) sobre fondo `#F8FAFC`; ámbar `#F59E0B` solo para la acción principal y el estado activo; naranja de seguridad `#EA580C` reservado para alertas, bajo stock y acciones críticas, nunca decorativo; tipografía de rotulado industrial condensada (Barlow Condensed) para títulos, precios y cifras, Inter para lectura; esquinas de 8 a 12 px; bordes de 1 px; sombras con desplazamiento y desenfoque.
+OWN-WORLD: fondo `#F8FAFC`, pizarra `#1E293B` para la barra y el pie, tinta `#0F172A`. Las bandas de estado usan colores semánticos y no decoran: verde señal `#166534` = DISPONIBLE/INFORMACIÓN, ámbar `#F59E0B` = POCAS/PRECAUCIÓN, naranja `#EA580C` = AGOTADO/ALERTA. El ámbar es además el único color de la acción principal y del recorrido activo (carrito, checkout). Overpass (letra de señal vial) para bandas, títulos, precios y cifras; Atkinson Hyperlegible para lectura. Esquinas de 8–10 px, filete de 1 px, sin sombras difusas decorativas.
 
-STORY: el visitante ve precio, stock y unidad sin buscarlos, agrega con un toque grande y sabe qué pasó (toast); el administrador ve de un vistazo qué requiere acción.
+STORY: el visitante ve banda de estado, referencia, precio a tamaño de señal y unidad sin buscarlos; agrega con un botón de 44 px y una notificación con banda confirma qué pasó y el subtotal.
 
-FIRST VIEWPORT: barra superior pizarra con marca a la izquierda, buscador claro de ancho completo y carrito ámbar con contador a la derecha; debajo, el contenido de la página; en móvil el buscador baja a una segunda fila y todos los controles miden al menos 44 px.
+FIRST VIEWPORT: barra pizarra con marca a la izquierda y carrito ámbar con contador a la derecha; buscador de 48 px a lo ancho; riel de categorías con snap; título de sección grande; cuadrícula de tarjetas de 2 columnas en móvil (4–5 en escritorio), cada una con banda de estado arriba, imagen a escala fija, REF, nombre, precio grande, unidad y botón. Movimiento distintivo: la banda de señal, compartida por tarjetas, notificaciones, alertas y estados vacíos.
+Aportes: densidad sin relleno (vista de lista); ámbar solo para el recorrido activo; escala fija de imagen y precios sobre una línea base común; jerarquía por escala; un solo código (REF) visible en todo el recorrido; un eje a la vez en el riel móvil.
 
-FORM: dirección fijada por el usuario (paleta y prioridad dadas en su encargo y confirmadas en la entrevista); no se corrió el sorteo de conceptos. seed: none (unavailable)
+FORM: Señal de obra, candidata 6 de 7 de la lista propia, asignada por el sorteo y elegida por el usuario. seed:7d65e1bfbb7f852a
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-13T00:00:00Z",
+  "title": "Design System: Ferretería El Constructor",
+  "extensions": {
+    "colorMeta": {
+      "slate-ink": { "role": "secondary", "displayName": "Slate Ink", "canonical": "#0F172A", "tonalRamp": ["#020617", "#0F172A", "#1E293B", "#334155", "#475569", "#94A3B8", "#E2E8F0", "#F8FAFC"] },
+      "slate-bar": { "role": "secondary", "displayName": "Slate Bar", "canonical": "#1E293B", "tonalRamp": ["#020617", "#0F172A", "#1E293B", "#334155", "#475569", "#94A3B8", "#E2E8F0", "#F8FAFC"] },
+      "amber": { "role": "primary", "displayName": "Signal Amber", "canonical": "#F59E0B", "tonalRamp": ["#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A", "#FEF3C7"] },
+      "accent-text": { "role": "primary", "displayName": "Burnt Amber Text", "canonical": "#B45309", "tonalRamp": ["#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A", "#FEF3C7"] },
+      "sign-ok": { "role": "tertiary", "displayName": "Signal Green", "canonical": "#166534", "tonalRamp": ["#052E16", "#14532D", "#166534", "#15803D", "#16A34A", "#4ADE80", "#BBF7D0", "#DCFCE7"] },
+      "sign-warn": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#F59E0B", "tonalRamp": ["#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A", "#FEF3C7"] },
+      "sign-stop": { "role": "tertiary", "displayName": "Stop Orange", "canonical": "#C2410C", "tonalRamp": ["#431407", "#7C2D12", "#9A3412", "#C2410C", "#EA580C", "#FB923C", "#FED7AA", "#FFEDD5"] },
+      "safety": { "role": "tertiary", "displayName": "Safety Orange (no text on it)", "canonical": "#EA580C", "tonalRamp": ["#431407", "#7C2D12", "#9A3412", "#C2410C", "#EA580C", "#FB923C", "#FED7AA", "#FFEDD5"] },
+      "background": { "role": "neutral", "displayName": "Site Paper", "canonical": "#F8FAFC", "tonalRamp": ["#020617", "#0F172A", "#1E293B", "#334155", "#475569", "#94A3B8", "#E2E8F0", "#F8FAFC"] },
+      "background-alt": { "role": "neutral", "displayName": "Site Paper Alt", "canonical": "#F1F5F9" },
+      "panel": { "role": "neutral", "displayName": "Panel White", "canonical": "#FFFFFF" },
+      "border": { "role": "neutral", "displayName": "Hairline", "canonical": "#E2E8F0" },
+      "border-strong": { "role": "neutral", "displayName": "Frame Rule", "canonical": "#CBD5E1" },
+      "muted": { "role": "neutral", "displayName": "Muted Slate", "canonical": "#475569" },
+      "dark-background": { "role": "neutral", "displayName": "Night Site", "canonical": "#0B1220" },
+      "dark-panel": { "role": "neutral", "displayName": "Night Panel", "canonical": "#172236" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display / detail price", "purpose": "Price on the product detail sign, at sign size." },
+      "headline": { "displayName": "Headline", "purpose": "Catalog H1, detail title, page heads." },
+      "title": { "displayName": "Shelf title", "purpose": "Uppercase shelf headings under a 3px ink rule." },
+      "price": { "displayName": "Card price", "purpose": "Product card price, tabular; 1.35rem at ≤640px." },
+      "body": { "displayName": "Body", "purpose": "Reading text; 60–70ch max." },
+      "product-name": { "displayName": "Product name", "purpose": "Two-line clamped card name with fixed 2.6em min height." },
+      "label-sign": { "displayName": "Sign word", "purpose": "Uppercase band words; 0.7rem / 0.07em at ≤640px." },
+      "label-button": { "displayName": "Button label", "purpose": "All buttons and category chips." },
+      "label-ref": { "displayName": "REF code", "purpose": "The single product code shown across the journey." }
+    },
+    "shadows": [
+      { "name": "hover-lift", "value": "0 4px 12px -2px rgba(15, 23, 42, 0.14)", "purpose": "Product card hover only, with border darkening to ink; off on touch devices." },
+      { "name": "floating", "value": "0 12px 28px -6px rgba(15, 23, 42, 0.24)", "purpose": "Toasts only." },
+      { "name": "subtle", "value": "0 1px 2px rgba(15, 23, 42, 0.08)", "purpose": "Defined token (--shadow-sm); not part of the store's resting surfaces." },
+      { "name": "focus-ring", "value": "outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A", "purpose": "Every :focus-visible element." },
+      { "name": "dark-hover-lift", "value": "0 6px 16px rgba(0, 0, 0, 0.5)", "purpose": "Dark theme hover lift." },
+      { "name": "dark-floating", "value": "0 16px 36px rgba(0, 0, 0, 0.6)", "purpose": "Dark theme toasts." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The system easing for toast, band wipe, press and badge bump." },
+      { "name": "toast-in", "value": "toastIn 0.32s ease-out: opacity 0→1, translateY(-8px)→0", "purpose": "Toast entrance, the system's one motion moment." },
+      { "name": "band-wipe", "value": "bandWipe 0.42s ease-out 0.05s both: clip-path inset(0 100% 0 0)→inset(0)", "purpose": "Toast band reveals left to right after the toast lands." },
+      { "name": "toast-out", "value": "opacity→0, translateY(-6px), 0.2s ease", "purpose": "Toast exit." },
+      { "name": "state-color", "value": "background-color/border-color/color 0.15s; transform 0.12s ease-out", "purpose": "Button state feedback; 1px press on :active." },
+      { "name": "badge-bump", "value": "badgeBump 0.35s ease-out, scale 1.3 at 40%", "purpose": "Cart count after an add." },
+      { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce) all durations 0.001ms", "purpose": "Honoured globally." }
+    ],
+    "breakpoints": [
+      { "name": "xs", "value": "359px", "note": "max-width; grid falls to 1 column" },
+      { "name": "sm", "value": "640px", "note": "max-width; 2-column grid, short card labels, QUEDAN N band" },
+      { "name": "md", "value": "900px", "note": "max-width; catalog and detail stack, toasts move to bottom" },
+      { "name": "list-wide", "value": "861px", "note": "min-width; list view price/add columns, filter details open" },
+      { "name": "lg", "value": "1180px", "note": "max-width; search on its own row, nav becomes drawer" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Sign Band",
+      "kind": "custom",
+      "refersTo": "sign-band-ok",
+      "description": "The signature: one uppercase state word plus tabular count, at the top of cards, detail sign, toasts and empty states. Semantic only.",
+      "html": "<div class=\"ds-sign-stack\"><div class=\"ds-sign ds-sign-ok\"><span>Disponible</span><span class=\"ds-sign-meta\">25 und</span></div><div class=\"ds-sign ds-sign-warn\"><span>Pocas unidades</span><span class=\"ds-sign-meta\">quedan 3</span></div><div class=\"ds-sign ds-sign-stop\"><span>Agotado</span></div></div>",
+      "css": ".ds-sign-stack { display: flex; flex-direction: column; gap: 8px; width: 240px; } .ds-sign { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; padding: 5px 10px; font-family: \"Overpass\", \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 900; font-size: 0.78rem; line-height: 1.1; letter-spacing: 0.1em; text-transform: uppercase; } .ds-sign-meta { font-weight: 800; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-sign-ok { background: #166534; color: #FFFFFF; } .ds-sign-warn { background: #F59E0B; color: #0F172A; } .ds-sign-stop { background: #C2410C; color: #FFFFFF; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Amber; the active path only (detail add-to-cart, quote CTA, primary action).",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Solicitar cotización</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid transparent; border-radius: 8px; font-family: \"Overpass\", \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 800; font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.1; cursor: pointer; transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; } .ds-btn-primary { background: #F59E0B; color: #0F172A; } .ds-btn-primary:hover { background: #FBBF24; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Slate; card add-to-cart and secondary account actions.",
+      "html": "<button class=\"ds-btn2 ds-btn2-secondary\">+ Agregar</button>",
+      "css": ".ds-btn2 { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border: 1px solid transparent; border-radius: 8px; font-family: \"Overpass\", \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 800; font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; transition: background-color 0.15s, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn2:active { transform: translateY(1px); } .ds-btn2:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; } .ds-btn2-secondary { background: #1E293B; color: #FFFFFF; } .ds-btn2-secondary:hover { background: #334155; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Framed white; alternatives beside a primary and 'Ver detalle' on sold-out cards.",
+      "html": "<button class=\"ds-btn3\">Tarifas de envío</button>",
+      "css": ".ds-btn3 { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; background: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; border-radius: 8px; font-family: \"Overpass\", \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 800; font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; transition: border-color 0.15s; } .ds-btn3:hover { border-color: #0F172A; } .ds-btn3:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "48px search in the slate bar with an inset 44px slate submit.",
+      "html": "<div class=\"ds-search-bar\"><form class=\"ds-search\"><input type=\"search\" placeholder=\"Buscar herramientas, materiales o SKU\"><button type=\"button\" aria-label=\"Buscar\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg></button></form></div>",
+      "css": ".ds-search-bar { background: #1E293B; padding: 10px 16px; width: 360px; } .ds-search { position: relative; display: flex; margin: 0; } .ds-search input { width: 100%; height: 48px; padding: 0 56px 0 16px; border: 2px solid transparent; border-radius: 8px; background: #FFFFFF; color: #0F172A; font-family: \"Atkinson Hyperlegible\", system-ui, sans-serif; font-size: 1rem; outline: none; } .ds-search input::placeholder { color: #64748B; } .ds-search input:focus { border-color: #F59E0B; } .ds-search button { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 6px; background: #1E293B; color: #FFFFFF; cursor: pointer; } .ds-search button:hover { background: #334155; }"
+    },
+    {
+      "name": "Top Bar",
+      "kind": "nav",
+      "refersTo": "topbar",
+      "description": "Slate bar: uppercase brand left, amber cart button with ink count right.",
+      "html": "<header class=\"ds-topbar\"><span class=\"ds-brand\">Ferretería El Constructor</span><a class=\"ds-nav\" href=\"#\">Catálogo</a><a class=\"ds-cart\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"20\" r=\"1.5\"/><circle cx=\"18\" cy=\"20\" r=\"1.5\"/><path d=\"M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h9.7a1 1 0 0 0 1-.8L21 7H6\"/></svg><span>Carrito</span><span class=\"ds-badge\">2</span></a></header>",
+      "css": ".ds-topbar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #1E293B; color: #E2E8F0; border-bottom: 1px solid #0F172A; } .ds-brand { font-family: \"Overpass\", system-ui, sans-serif; font-weight: 900; font-size: 1.2rem; line-height: 1; text-transform: uppercase; letter-spacing: 0.01em; color: #FFFFFF; margin-right: auto; } .ds-nav { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; border-radius: 6px; font-family: \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 700; font-size: 0.95rem; color: #E2E8F0; text-decoration: none; } .ds-nav:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.08); } .ds-cart { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 8px; background: #F59E0B; color: #0F172A; font-family: \"Overpass\", system-ui, sans-serif; font-weight: 900; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none; } .ds-cart:hover { background: #FBBF24; } .ds-cart:focus-visible, .ds-nav:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; } .ds-badge { min-width: 26px; padding: 3px 7px; border-radius: 999px; background: #0F172A; color: #FFFFFF; font-size: 0.82rem; text-align: center; line-height: 1.2; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Category Chip",
+      "kind": "chip",
+      "refersTo": "cat-chip",
+      "description": "Rail chip with tabular count; active is solid slate.",
+      "html": "<div class=\"ds-rail\"><a class=\"ds-chip ds-chip-active\" href=\"#\">Todas las categorías</a><a class=\"ds-chip\" href=\"#\">Plomería <span class=\"ds-chip-count\">12</span></a></div>",
+      "css": ".ds-rail { display: flex; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #0F172A; font-family: \"Overpass\", system-ui, sans-serif; font-weight: 800; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; text-decoration: none; } .ds-chip:hover { border-color: #0F172A; } .ds-chip:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; } .ds-chip-active { background: #1E293B; border-color: #1E293B; color: #FFFFFF; } .ds-chip-count { font-size: 0.78rem; color: #475569; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Product Card",
+      "kind": "card",
+      "refersTo": "product-card",
+      "description": "Band, fixed 4:3 image well, REF, two-line name, sign-size price, unit, slate add button.",
+      "html": "<article class=\"ds-pcard\"><div class=\"ds-pband\"><span>Pocas unidades</span><span class=\"ds-pmeta\">quedan 3</span></div><div class=\"ds-pmedia\"><svg width=\"64\" height=\"64\" viewBox=\"0 0 64 64\" fill=\"none\" stroke=\"#1E293B\" stroke-width=\"3\" stroke-linecap=\"round\"><path d=\"M14 50 44 20\"/><path d=\"M18 20l26 30\"/><circle cx=\"46\" cy=\"18\" r=\"5\"/><path d=\"M12 18h10\" stroke=\"#F59E0B\"/></svg></div><div class=\"ds-pbody\"><span class=\"ds-pref\">REF HE-TAL-650 · Herramientas eléctricas</span><h3 class=\"ds-pname\">Taladro Percutor 1/2 Pulgada 650W</h3><strong class=\"ds-pprice\">$ 185.000</strong><span class=\"ds-punit\">precio por unidad</span><button class=\"ds-padd\">+ Agregar</button></div></article>",
+      "css": ".ds-pcard { display: flex; flex-direction: column; width: 240px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 10px; overflow: hidden; color: #0F172A; transition: border-color 0.15s, box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1); } .ds-pcard:hover { border-color: #0F172A; box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.14); } .ds-pband { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; padding: 5px 10px; background: #F59E0B; color: #0F172A; font-family: \"Overpass\", system-ui, sans-serif; font-weight: 900; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; } .ds-pmeta { font-weight: 800; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; } .ds-pmedia { aspect-ratio: 4 / 3; margin: 10px 10px 0; display: grid; place-items: center; background: #F1F5F9; border-radius: 6px; } .ds-pbody { display: flex; flex-direction: column; padding: 10px 12px 12px; font-family: \"Atkinson Hyperlegible\", system-ui, sans-serif; } .ds-pref { font-size: 0.75rem; letter-spacing: 0.05em; color: #475569; text-transform: uppercase; font-variant-numeric: tabular-nums; } .ds-pname { margin: 4px 0 10px; font-family: \"Atkinson Hyperlegible\", system-ui, sans-serif; font-weight: 700; font-size: 1rem; line-height: 1.3; min-height: 2.6em; } .ds-pprice { font-family: \"Overpass\", system-ui, sans-serif; font-weight: 900; font-size: 1.6rem; line-height: 1; font-variant-numeric: tabular-nums; } .ds-punit { margin-top: 3px; font-size: 0.78rem; color: #475569; } .ds-padd { margin-top: 12px; min-height: 44px; border: 0; border-radius: 8px; background: #1E293B; color: #FFFFFF; font-family: \"Overpass\", system-ui, sans-serif; font-weight: 800; font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; } .ds-padd:hover { background: #334155; } .ds-padd:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; box-shadow: 0 0 0 5px #0F172A; }"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "sign-band-ok",
+      "description": "Framed notification whose band wipes in left to right; the only motion moment.",
+      "html": "<div class=\"ds-toast\"><span class=\"ds-toast-band\"><span>Listo</span><button class=\"ds-toast-close\" aria-label=\"Cerrar\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M6 6l12 12M18 6 6 18\"/></svg></button></span><span class=\"ds-toast-text\">Taladro agregado al carrito. Subtotal $ 185.000</span></div>",
+      "css": ".ds-toast { width: 340px; overflow: hidden; background: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; border-radius: 10px; box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.24); animation: ds-toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); } .ds-toast-band { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 4px 0 12px; background: #166534; color: #FFFFFF; font-family: \"Overpass\", system-ui, sans-serif; font-weight: 900; font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase; animation: ds-band-wipe 0.42s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; } .ds-toast-close { margin-left: auto; width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; } .ds-toast-close:hover { background: rgba(0, 0, 0, 0.12); } .ds-toast-close:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; } .ds-toast-text { display: block; padding: 10px 14px 12px; font-family: \"Atkinson Hyperlegible\", system-ui, sans-serif; font-size: 0.98rem; line-height: 1.4; } @keyframes ds-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } } @keyframes ds-band-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } } @media (prefers-reduced-motion: reduce) { .ds-toast, .ds-toast-band { animation: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Señal de obra",
+    "overview": "The state of every product and every action reads like a construction-site sign (after NTC 1461): a header band carrying one uppercase word, legible at a distance and in full sun. The world is built for the contractor holding a phone on site, with gloves on and the sun on the screen, so information that decides a purchase (availability, REF, price, unit) sits at fixed positions on every card and never has to be hunted for.\n\nThe surface is a pale working floor (`background`) with slate structure: a slate bar on top, a near-black slate footer, white panels framed by a 1px rule. Colour is spent on meaning, not decoration. Three sign colours say DISPONIBLE, POCAS UNIDADES and AGOTADO; amber, in addition, marks the one path the visitor is on (add to cart, cart, quote). Hierarchy comes from scale: prices set at sign size in Overpass, reading text in Atkinson Hyperlegible. Density is honest: a 2-column grid on phones, 4 to 5 columns on desktop, and a list view for people who already know what they want.\n\nThe world explicitly rejects the white store of soft rounded cards with a promotional banner, and the earlier \"slate wall with lettering\" of v1.3.\n\nScope of what is built: the public store (top bar, home, catalog, product detail, toasts, footer) is redesigned in this world. Cart, checkout, auth, account, legal pages and the admin panel inherit the tokens only and have not been redesigned yet; new work on them should adopt the components below rather than their current inline styles.",
+    "keyCharacteristics": [
+      "One shared signature, the sign band, used by product cards, the detail sign, toasts, alerts and empty states.",
+      "Amber only on the active path; everything else is slate, white or semantic sign colour.",
+      "Overpass for bands, headings, prices and figures; Atkinson Hyperlegible for reading.",
+      "8 to 10px corners, 1px rules, no decorative diffuse shadows.",
+      "44px minimum touch target everywhere; 48px search; 52px detail add-to-cart.",
+      "One motion moment: the toast entrance and its band wipe."
+    ],
+    "rules": [
+      { "name": "The Active Path Rule", "body": "Amber marks only where the visitor is going: primary action, cart button, detail add-to-cart, quote CTA. Card add buttons are slate secondary. If two amber buttons compete on one screen, one is wrong.", "section": "colors" },
+      { "name": "The Sign Means Something Rule", "body": "Green, caution amber and stop orange appear only as state: DISPONIBLE / INFORMACIÓN, POCAS UNIDADES / PRECAUCIÓN, AGOTADO / ERROR. A band never decorates a section and never acts as an eyebrow above a heading.", "section": "colors" },
+      { "name": "The Legible Orange Rule", "body": "Any band or button that carries text in the stop state uses `sign-stop` (#C2410C) with white text, not `safety` (#EA580C), because white on #EA580C is about 3.6:1 and fails AA.", "section": "colors" },
+      { "name": "The Two Voices Rule", "body": "Overpass speaks in signs, headings, prices, counts and buttons; Atkinson speaks in sentences and product names. Never set paragraphs in Overpass.", "section": "typography" },
+      { "name": "The Tabular Figures Rule", "body": "Prices, stock counts, cart badge, REF and table figures use tabular numerals so columns of numbers do not jitter.", "section": "typography" },
+      { "name": "The Shared Baseline Rule", "body": "Every card in a row puts its price on the same line: fixed image ratio, fixed two-line name height, price row pushed to the bottom.", "section": "layout" },
+      { "name": "The Rule-Not-Shadow Rule", "body": "Panels are framed by a 1px `border-strong` line and sit flat. A shadow at rest is a defect.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** put a sign band at the top of every product card, detail sign, toast and empty state, with the state computed from stock (stop at 0, warn at or below the minimum alert, ok otherwise).",
+      "**Do** keep amber for the active path: primary action, cart button, detail add-to-cart, quote CTA.",
+      "**Do** use `sign-stop` (#C2410C) under white text for AGOTADO / ERROR.",
+      "**Do** set ink text, not white, on caution amber.",
+      "**Do** keep REF, name, price and unit at fixed positions so prices align across a row.",
+      "**Do** give every interactive element a 44px minimum target and the amber-and-ink focus ring.",
+      "**Do** show the REF code as the single product code throughout the journey."
+    ],
+    "donts": [
+      "**Don't** use a sign band as decoration, a section label or an eyebrow above a heading.",
+      "**Don't** put white text on `safety` (#EA580C); it is about 3.6:1.",
+      "**Don't** make card add buttons amber; they are slate secondary.",
+      "**Don't** add resting shadows to panels or cards; frame them with the 1px rule.",
+      "**Don't** add motion beyond the toast entrance and band wipe without a reason tied to state.",
+      "**Don't** introduce stock photography or invented product imagery; the category pictograms in `app/static/img/temp/` are interim until the owner supplies real product photos."
+    ]
+  }
+}

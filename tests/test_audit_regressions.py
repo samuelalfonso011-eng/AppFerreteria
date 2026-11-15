@@ -100,7 +100,7 @@ def test_listing_counts_use_one_grouped_query(app, client):
         # Público: solo productos activos, una consulta agrupada para todas las categorías
         with select_queries() as queries:
             html = client.get("/").get_data(as_text=True)
-        counts = re.findall(r'home-cat-count">\s*(\d+)', html)
+        counts = re.findall(r'cat-chip-count">\s*(\d+)', html)
         assert "12" in counts and counts.count("1") == 4
         assert len(_count_queries(queries, "products")) == 1
 

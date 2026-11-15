@@ -1,0 +1,41 @@
+{#- Tarjeta de producto con banda de señal de obra.
+    Estados: DISPONIBLE (verde señal), POCAS UNIDADES (ámbar), AGOTADO (naranja). -#}
+{% macro sign_state(prod) -%}
+    {%- if prod.stock <= 0 -%}stop{%- elif prod.stock <= prod.min_stock_alert -%}warn{%- else -%}ok{%- endif -%}
+{%- endmacro %}
+
+{% macro sign_band(prod, tag='div') -%}
+    {%- set state = sign_state(prod) -%}
+    <{{ tag }} class="sign-band sign-{{ state }}">
+        {%- if state == 'stop' -%}
+            <span>{{ t('out_of_stock') }}</span>
+        {%- elif state == 'warn' -%}
+            <span>{{ t('sign_low') }}</span><span class="sign-band-meta">{{ t('sign_left') }} {{ prod.stock }}</span>
+        {%- else -%}
+            <span>{{ t('sign_available') }}</span><span class="sign-band-meta">{{ prod.stock }} {{ t('units_short') }}</span>
+        {%- endif -%}
+    </{{ tag }}>
+{%- endmacro %}
+
+{% macro product_card(prod, show_category=false) -%}
+    {%- set state = sign_state(prod) -%}
+    <article class="pcard pcard-{{ state }}">
+        {{ sign_band(prod) }}
+        <a href="{{ url_for('products.detail', slug=prod.slug) }}" class="pcard-media" tabindex="-1" aria-hidden="true">
+            <img src="{{ url_for('static', filename=prod.display_image) }}" alt="" data-img-fallback="{{ url_for('static', filename='img/placeholder-product.svg') }}" loading="lazy" decoding="async" width="240" height="180">
+        </a>
+        <div class="pcard-body">
+            <span class="pcard-ref">{{ t('ref') }} {{ prod.sku }}{% if show_category and prod.category %} · {{ t_category(prod.category.name) }}{% endif %}</span>
+            <h3 class="pcard-name"><a href="{{ url_for('products.detail', slug=prod.slug) }}">{{ prod.name }}</a></h3>
+            <div class="pcard-price-row">
+                <strong class="pcard-price price">{{ prod.price | currency }}</strong>
+                <span class="pcard-unit">{{ t('per_unit') }}</span>
+            </div>
+            {% if state != 'stop' %}
+                <button type="button" class="btn btn-secondary pcard-add async-add-cart" data-product-id="{{ prod.id }}" aria-label="{{ t('add_to_cart') }}: {{ prod.name }}"><span class="lbl-long">{{ t('add_to_cart') }}</span><span class="lbl-short" aria-hidden="true">{{ t('add') }}</span></button>
+            {% else %}
+                <a href="{{ url_for('products.detail', slug=prod.slug) }}" class="btn btn-outline pcard-add">{{ t('view_detail') }}</a>
+            {% endif %}
+        </div>
+    </article>
+{%- endmacro %}

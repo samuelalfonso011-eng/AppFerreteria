@@ -10,6 +10,20 @@ function initApp() {
     initBackToTop();
     initMobileMenu();
     initScrollReveal();
+    initWideDetails();
+}
+
+// Paneles <details data-open-wide>: abiertos en escritorio, plegables en móvil
+function initWideDetails() {
+    const wide = window.matchMedia('(min-width: 861px)');
+    const sync = () => document.querySelectorAll('details[data-open-wide]').forEach(d => {
+        if (wide.matches) d.open = true;
+    });
+    sync();
+    if (!document.documentElement.dataset.wideBound) {
+        document.documentElement.dataset.wideBound = 'true';
+        wide.addEventListener('change', sync);
+    }
 }
 
 // Cierre suave de alertas de Flask
@@ -19,7 +33,8 @@ function initFlashAlerts() {
         if (alert.querySelector('.alert-close')) return;
         const close = document.createElement('button');
         close.type = 'button'; close.className = 'toast-close alert-close';
-        close.setAttribute('aria-label', 'Cerrar mensaje'); close.textContent = '×';
+        close.setAttribute('aria-label', 'Cerrar mensaje');
+        close.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
         close.addEventListener('click', () => alert.remove());
         alert.append(close);
     });
@@ -166,9 +181,19 @@ function showToast(message, type = 'info', duration = 2800) {
 
     toast.setAttribute('role', type === 'danger' || type === 'error' ? 'alert' : 'status');
 
+    // Banda de señal de obra: una palabra que se lee de un vistazo
+    const en = document.documentElement.lang === 'en';
+    const words = en
+        ? { success: 'Done', danger: 'Error', error: 'Error', warning: 'Caution', info: 'Notice' }
+        : { success: 'Listo', danger: 'Error', error: 'Error', warning: 'Precaución', info: 'Aviso' };
+    const bandEl = document.createElement('span');
+    bandEl.className = 'toast-band';
     const iconEl = document.createElement('span');
     iconEl.className = 'toast-icon';
     iconEl.innerHTML = icons[type] || icons.info;
+    const wordEl = document.createElement('span');
+    wordEl.textContent = words[type] || words.info;
+    bandEl.append(iconEl, wordEl);
 
     // El mensaje se inserta como TEXTO (nunca como HTML) para evitar XSS
     const textEl = document.createElement('span');
@@ -178,24 +203,23 @@ function showToast(message, type = 'info', duration = 2800) {
     const closeEl = document.createElement('button');
     closeEl.type = 'button';
     closeEl.className = 'toast-close';
-    closeEl.setAttribute('aria-label', 'Cerrar');
-    closeEl.textContent = '×';
+    closeEl.setAttribute('aria-label', en ? 'Close' : 'Cerrar');
+    closeEl.innerHTML = svg('<path d="M18 6 6 18M6 6l12 12"/>');
 
-    toast.append(iconEl, textEl, closeEl);
+    bandEl.append(closeEl);
+    toast.append(bandEl, textEl);
     const closeBtn = toast.querySelector('.toast-close');
     closeBtn.addEventListener('click', () => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(50px)';
-        setTimeout(() => toast.remove(), 250);
+        toast.classList.add('is-leaving');
+        setTimeout(() => toast.remove(), 220);
     });
 
     container.appendChild(toast);
 
     setTimeout(() => {
         if (toast.parentElement) {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(50px)';
-            setTimeout(() => toast.remove(), 250);
+            toast.classList.add('is-leaving');
+            setTimeout(() => toast.remove(), 220);
         }
     }, duration);
 }
