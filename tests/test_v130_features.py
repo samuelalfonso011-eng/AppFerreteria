@@ -1,6 +1,6 @@
 """
 Suite de Pruebas Automatizadas para la Versión 1.3.0
-Cubre al 100% los 9 Criterios de Aceptación especificados en PLAN_V1.3.0.md:
+Cubre los 9 criterios de aceptación de la versión 1.3.0:
 1. Política de reembolsos (Ley 1480 y Decreto 587) y enlaces en Footer (ES/EN).
 2. Generación automática de Factura Electrónica (FE-XXXX) con CUFE y vista imprimible.
 3. Ocultamiento de banners de registro para usuarios autenticados.

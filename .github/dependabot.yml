@@ -1,0 +1,15 @@
+# Dependabot: revisa semanalmente las dependencias fijadas en requirements*.txt
+# y abre pull requests de actualización (incluidas las de seguridad).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencias"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
