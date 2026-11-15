@@ -67,3 +67,20 @@ htmlcov/
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# Logs y volcados locales
+*.log
+*.dump
+*.bak
+
+# Herramientas locales del asistente y del editor
+.claude/
+node_modules/
+
+# Impeccable: solo se versionan PRODUCT.md, DESIGN.md, design.json y los briefs;
+# capturas, maquetas de decisión y configuración local son artefactos de trabajo.
+.impeccable/review/
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/build/
+.impeccable/config.local.json

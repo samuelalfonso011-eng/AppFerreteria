@@ -44,8 +44,8 @@ python -m venv venv
 # Activar entorno virtual en Windows
 .\venv\Scripts\activate
 
-# Instalar dependencias
-pip install -r requirements.txt
+# Instalar dependencias (versiones fijadas). Producción: requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### 3. Configurar Variables de Entorno (`.env`)
@@ -55,10 +55,11 @@ Copia la plantilla `.env.example` como `.env`:
 Copy-Item .env.example .env
 ```
 
-Edita el archivo `.env` con tus credenciales:
+Edita el archivo `.env` con tus credenciales. Genera la clave con
+`python -c "import secrets; print(secrets.token_hex(32))"`. El archivo `.env` está en `.gitignore`: **nunca lo subas al repositorio**.
 ```ini
 FLASK_ENV=development
-SECRET_KEY=clave_secreta_criptografica_generada
+SECRET_KEY=<pega_aqui_la_clave_generada>
 DATABASE_URL=postgresql://postgres:tu_password@db.tu_proyecto.supabase.co:5432/postgres
 FLASK_RUN_PORT=5000
 FLASK_RUN_HOST=127.0.0.1
