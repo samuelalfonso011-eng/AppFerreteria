@@ -781,3 +781,188 @@ async function boot() {
 renderCart();
 loadSession().then(handleHash);
 boot();
+
+/* ---------- Asistente FerrePro (chat flotante) ----------
+   Contrato de POST /api/chat (backend de Codex, no se modifica aqui):
+   pide {message: 1..500 caracteres, history: ultimos 6 turnos {role: "user"|"assistant", content}}
+   y responde {reply, mode: "gemini"|"fallback", suggested_products: [{id, slug, name, category, price, stock}]}.
+   Limite: 10 mensajes por minuto (429 con retry_after). Como todo POST, va con el token CSRF de api(). */
+const CHAT_MAX = 500, CHAT_HISTORY = 6, CHAT_KEEP = 30, CHAT_KEY = "ferrepro.chat";
+const CHAT_PROMPTS = ["¿Qué taladros tienen?", "Ver herramientas en stock", "Garantías y envíos"];
+const chat = {open:false, pending:false, started:false, history:[], lastFailed:null};
+const chatFab = $("#chatFab"), chatPanel = $("#chatPanel"), chatLog = $("#chatLog");
+const chatText = $("#chatText"), chatSend = $("#chatSend"), chatCount = $("#chatCount");
+
+// La conversacion sobrevive a recargar la pagina, solo dentro de la pestana (sessionStorage)
+try {
+  const saved = JSON.parse(sessionStorage.getItem(CHAT_KEY));
+  if (Array.isArray(saved)) chat.history = saved.filter(t => t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string").slice(-CHAT_KEEP);
+} catch {}
+const saveChat = () => { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(chat.history.slice(-CHAT_KEEP))); } catch {} };
+
+// Respuesta del asistente: todo se escapa; solo se respeta **negrita**
+const formatReply = text => esc(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+function scrollChat() {
+  chatLog.scrollTo({top:chatLog.scrollHeight, behavior:reducedMotion() ? "instant" : "smooth"});
+}
+function addMessage(role, html, extra = "") {
+  const bubble = document.createElement("div");
+  bubble.className = "msg " + (role === "user" ? "user" : "bot") + (extra ? " " + extra : "");
+  bubble.innerHTML = html;
+  chatLog.appendChild(bubble);
+  scrollChat();
+  return bubble;
+}
+function renderConversation() {
+  chatLog.innerHTML = "";
+  addMessage("assistant", "Hola, soy el asistente de FerrePro. Te ayudo a encontrar herramientas, revisar precios y stock, o resolver dudas de envíos y garantías.");
+  if (!chat.history.length) {
+    const chips = document.createElement("div");
+    chips.className = "chatChips";
+    chips.setAttribute("role", "group");
+    chips.setAttribute("aria-label", "Preguntas sugeridas");
+    chips.innerHTML = CHAT_PROMPTS.map(p => '<button type="button" class="chatChip" data-chat-prompt="' + esc(p) + '">' + esc(p) + "</button>").join("");
+    chatLog.appendChild(chips);
+  }
+  for (const turn of chat.history) addMessage(turn.role, turn.role === "user" ? esc(turn.content) : formatReply(turn.content));
+}
+function renderSuggestions(list) {
+  const items = list.slice(0, 4).map(s => {
+    const p = state.byId.get(Number(s.id));
+    const name = p ? p.name : String(s.name || "");
+    const price = p ? p.price : Number(s.price) || 0;
+    const available = p ? p.available : false;
+    const note = p && available && p.stock <= 5 ? " · Quedan " + p.stock : "";
+    const action = p && available
+      ? '<button type="button" class="add" data-chat-add="' + p.id + '" aria-label="Agregar ' + esc(name) + ' al carrito">Agregar</button>'
+      : '<button type="button" class="add" disabled>' + (p ? "Agotado" : "No disponible") + "</button>";
+    return '<li class="chatProduct">' + art(p ? p.art : "wrench") + "<div><strong>" + esc(name) + "</strong><span>" + money(price) + note + "</span></div>" + action + "</li>";
+  });
+  if (!items.length) return;
+  const ul = document.createElement("ul");
+  ul.className = "chatProducts";
+  ul.setAttribute("aria-label", "Productos sugeridos");
+  ul.innerHTML = items.join("");
+  chatLog.appendChild(ul);
+  scrollChat();
+}
+
+// Panel no modal: se abre y se cierra sin bloquear la tienda; Escape lo cierra
+function updateChatViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  document.documentElement.style.setProperty("--chat-vh", vv.height + "px");
+  document.documentElement.style.setProperty("--chat-top", vv.offsetTop + "px");
+}
+function openChat() {
+  if (chat.open) return;
+  chat.open = true;
+  if (!chat.started) { renderConversation(); chat.started = true; }
+  updateChatViewport();
+  chatPanel.hidden = false;
+  document.body.classList.add("chatOpen");
+  chatFab.setAttribute("aria-expanded", "true");
+  chatFab.setAttribute("aria-label", "Cerrar el asistente de FerrePro");
+  updateChatInput();
+  chatText.focus({preventScroll:true});
+  scrollChat();
+}
+function closeChat(returnFocus = true) {
+  if (!chat.open) return;
+  chat.open = false;
+  chatPanel.hidden = true;
+  document.body.classList.remove("chatOpen");
+  chatFab.setAttribute("aria-expanded", "false");
+  chatFab.setAttribute("aria-label", "Abrir el asistente de FerrePro");
+  if (returnFocus) chatFab.focus();
+}
+chatFab.addEventListener("click", () => (chat.open ? closeChat() : openChat()));
+$("#chatClose").addEventListener("click", () => closeChat());
+chatPanel.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); closeChat(); } });
+if (window.visualViewport) {
+  // El teclado del movil encoge el area visible: el panel la sigue para no quedar tapado
+  window.visualViewport.addEventListener("resize", () => { if (chat.open) { updateChatViewport(); scrollChat(); } });
+  window.visualViewport.addEventListener("scroll", () => { if (chat.open) updateChatViewport(); });
+}
+
+// Entrada: 500 caracteres como el backend, contador visible desde el 80 %, crece hasta 4 lineas
+function updateChatInput() {
+  const length = chatText.value.length;
+  const over = length > CHAT_MAX;
+  chatSend.disabled = chat.pending || !chatText.value.trim() || over;
+  chatCount.textContent = length >= CHAT_MAX * 0.8 ? length + " / " + CHAT_MAX : "";
+  chatCount.classList.toggle("over", over);
+  chatText.setAttribute("aria-invalid", String(over));
+  chatText.style.height = "auto";
+  chatText.style.height = Math.min(chatText.scrollHeight, 120) + "px";
+  chatText.style.overflowY = chatText.scrollHeight > 120 ? "auto" : "hidden"; // barra solo pasadas 4 lineas
+}
+chatText.addEventListener("input", updateChatInput);
+chatText.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (!chatSend.disabled) sendChat(chatText.value);
+  }
+});
+$("#chatForm").addEventListener("submit", e => { e.preventDefault(); sendChat(chatText.value); });
+
+async function sendChat(raw, retry = null) {
+  const message = (retry ? retry.message : raw).trim();
+  if (chat.pending || !message || message.length > CHAT_MAX) return;
+  const history = retry ? retry.history : chat.history.slice(-CHAT_HISTORY);
+  if (!retry) {
+    chatLog.querySelector(".chatChips")?.remove();
+    addMessage("user", esc(message));
+    chat.history.push({role:"user", content:message});
+    saveChat();
+    chatText.value = "";
+  }
+  chat.pending = true;
+  chatSend.setAttribute("aria-busy", "true");
+  updateChatInput();
+  const typing = addMessage("assistant", '<span class="typing" role="img" aria-label="El asistente está escribiendo"><i></i><i></i><i></i></span>');
+  try {
+    const data = await api("/chat", {method:"POST", body:{message, history}});
+    typing.remove();
+    const reply = typeof data.reply === "string" && data.reply.trim()
+      ? data.reply.trim()
+      : "No encontré una respuesta para eso. Prueba con el nombre de una herramienta.";
+    addMessage("assistant", formatReply(reply));
+    chat.history.push({role:"assistant", content:reply});
+    saveChat();
+    chat.lastFailed = null;
+    if (Array.isArray(data.suggested_products)) renderSuggestions(data.suggested_products);
+  } catch (err) {
+    typing.remove();
+    let text = "No pudimos conectar con el asistente. Revisa tu conexión e inténtalo de nuevo.";
+    if (err.status === 429) text = "Enviaste muchos mensajes seguidos. Espera " + (err.data.retry_after || 60) + " segundos y vuelve a intentarlo.";
+    else if (err.status === 400) text = err.message;
+    chat.lastFailed = {message, history};
+    const canRetry = err.status !== 400;
+    addMessage("assistant", esc(text) + (canRetry ? '<div class="msgActions"><button type="button" class="pill" data-chat-retry>Reintentar</button></div>' : ""), "error");
+  } finally {
+    chat.pending = false;
+    chatSend.removeAttribute("aria-busy");
+    updateChatInput();
+    if (chat.open && document.activeElement === document.body) chatText.focus({preventScroll:true});
+  }
+}
+
+chatLog.addEventListener("click", e => {
+  const prompt = e.target.closest("[data-chat-prompt]");
+  if (prompt) { sendChat(prompt.dataset.chatPrompt); return; }
+  const retry = e.target.closest("[data-chat-retry]");
+  if (retry && chat.lastFailed) { retry.closest(".msg").remove(); sendChat("", chat.lastFailed); return; }
+  const add = e.target.closest("[data-chat-add]");
+  if (add) {
+    const id = add.dataset.chatAdd;
+    const before = cart[id] || 0;
+    change(id, 1);
+    if ((cart[id] || 0) > before) {
+      add.textContent = "Agregado";
+      add.dataset.done = "";
+      setTimeout(() => { if (add.isConnected) { add.textContent = "Agregar"; delete add.dataset.done; } }, 1600);
+    }
+  }
+});

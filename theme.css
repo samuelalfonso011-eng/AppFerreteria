@@ -47,6 +47,16 @@
   --radius-tile:24px;--card-width:285px;--skeleton-card-h:356px;--skeleton-tile-h:330px;
   --skeleton-line:12px;--skeleton-row-h:64px;--avatar-md:36px;--gutter-mobile:16px;
   --pad-tile-mobile:28px 20px;--pad-dialog-mobile:24px 20px;
+  /* Asistente (chat flotante). Burbuja del usuario: #0071e3 en ambos temas (blanco sobre #2997ff
+     solo llega a 3.02:1; sobre #0071e3 da 4.70:1). Las capas quedan bajo el aviso (8) y la cookie (9);
+     los modales viven en la capa superior del navegador y siempre quedan encima. */
+  --bubble-user:#0071e3;--on-bubble-user:#fff;--bubble-bot:#e9e9eb;--on-bubble-bot:#1d1d1f;
+  --chat-width:380px;--chat-height:540px;--chat-radius:24px;--bubble-radius:18px;
+  --fab-size:56px;--fab-offset:24px;--chat-gap:16px;--z-chat:7;
+  --focus-ring:3px;--hit:44px;--control-sm:36px;--icon-lg:26px;--icon-md:20px;--icon-sm:18px;
+  --dot-sm:7px;--dot-md:8px;--hairline-gap:2px;--chat-input-max:120px;--chat-input-pad:11px 16px;
+  --chat-art-w:48px;--chat-art-h:36px;--radius-mini:14px;--typing-h:22px;--typing-gap:5px;--typing-lift:3px;
+  --dur-typing:1.2s;--glass:saturate(180%) blur(20px);
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -62,6 +72,7 @@
   --info-text:#64b5ff;--info-soft:#0b2540;
   --neutral-soft:#2c2c2e;
   --canvas:#000;--switch-on:#30d158;
+  --bubble-bot:#2c2c2e;--on-bubble-bot:#f5f5f7;
   --shadow-hover:0 5px 16px rgba(0,0,0,.6);
   --shadow-sheet:0 24px 60px rgba(0,0,0,.6);
 }
