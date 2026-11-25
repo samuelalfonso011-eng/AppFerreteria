@@ -1,0 +1,67 @@
+/* Fuente unica de verdad del tema. Tienda y Modo Admin leen solo estas variables.
+   Claro: valores de la Fase 1. Oscuro: paleta Apple (#000, #1d1d1f, #2c2c2e, #f5f5f7, #a1a1a6, #2997ff). */
+:root{
+  color-scheme:light;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Consolas,monospace;
+
+  /* Constantes de marca (no cambian con el tema) */
+  --black:#000;--cloud:#f5f5f7;--silver:#a1a1a6;--sky:#2997ff;--orange:#fb883d;
+  --hero-bg:#000;--hero-text:#f5f5f7;--hero-text-2:#d7d7da;
+
+  /* Superficies y texto */
+  --bg:#fff;--surface:#f5f5f7;--elevated:#fff;--control:#f5f5f7;--control-hover:#e8e8ed;
+  --text:#1d1d1f;--text-2:#6e6e73;--line:#d2d2d7;--line-strong:#86868b;
+  --nav-bg:rgba(251,251,253,.8);--backdrop:rgba(0,0,0,.5);
+  --tile-strong:#1d1d1f;--tile-strong-text:#f5f5f7;
+  --badge-bg:#1d1d1f;--badge-fg:#fff;--toast-bg:#1d1d1f;--toast-fg:#fff;
+
+  /* Accion: el boton mantiene #0071e3 en ambos temas porque el texto blanco sobre #2997ff no alcanza 4.5:1 */
+  --accent:#0071e3;--accent-hover:#0069d4;--accent-active:#006edb;--on-accent:#fff;
+  --link:#0066cc;--focus:#0071e3;
+  --danger:#d70015;--danger-hover:#bf0012;--on-danger:#fff;--danger-text:#d70015;--danger-soft:#fff0f1;
+  --success-text:#1b7a33;--success-soft:#eaf7ee;
+  --warning-text:#9a4b00;--warning-soft:#fff5e6;
+  --info-text:#0058b0;--info-soft:#eaf3ff;
+  --neutral-soft:#f0f0f3;
+  --canvas:#f5f5f7;--switch-on:#34c759;--knob:#fff;
+
+  --shadow-hover:0 5px 16px rgba(0,0,0,.07);
+  --shadow-sheet:0 24px 60px rgba(0,0,0,.18);
+
+  /* Ilustraciones de producto */
+  --art-metal-edge:#979b9e;--art-metal-fastener:#a6a8aa;--art-roller-handle:#85888b;
+  --art-lamp-glass:#ffe6a3;--art-lamp-rim:#dba55e;--art-lamp-thread:#a5a6a8;
+  --art-helmet-highlight:#ffc184;--art-helmet-crease:#9c4819;
+
+  /* Escala */
+  --nav-height:2.75rem;--menu-stroke-width:1.125rem;--menu-stroke-height:.125rem;--menu-stroke-offset:.1875rem;
+  --radius-card:20px;--radius-sheet:22px;--radius-pill:980px;--radius-field:12px;
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;
+  --text-xs:12px;--text-sm:14px;--text-md:17px;--text-lg:21px;--text-display:clamp(42px,8vw,64px);
+  --dur-fast:.15s;--dur:.25s;--ease:cubic-bezier(.25,.1,.25,1);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#000;--surface:#1d1d1f;--elevated:#1d1d1f;--control:#2c2c2e;--control-hover:#3a3a3c;
+  --text:#f5f5f7;--text-2:#a1a1a6;--line:#424245;--line-strong:#6e6e73;
+  --nav-bg:rgba(29,29,31,.8);--backdrop:rgba(0,0,0,.7);
+  --tile-strong:#2c2c2e;--tile-strong-text:#f5f5f7;
+  --badge-bg:#f5f5f7;--badge-fg:#000;--toast-bg:#f5f5f7;--toast-fg:#000;
+  --link:#2997ff;--focus:#2997ff;
+  --danger-text:#ff6961;--danger-soft:#3a1214;
+  --success-text:#30d158;--success-soft:#0f2e17;
+  --warning-text:#ffb340;--warning-soft:#3a2408;
+  --info-text:#64b5ff;--info-soft:#0b2540;
+  --neutral-soft:#2c2c2e;
+  --canvas:#000;--switch-on:#30d158;
+  --shadow-hover:0 5px 16px rgba(0,0,0,.6);
+  --shadow-sheet:0 24px 60px rgba(0,0,0,.6);
+}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--text)}
+
+/* Interruptor de tema: muestra el icono del tema al que se cambiara */
+.themeToggle .moon{display:block}.themeToggle .sun{display:none}
+:root[data-theme="dark"] .themeToggle .moon{display:none}
+:root[data-theme="dark"] .themeToggle .sun{display:block}

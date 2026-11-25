@@ -1,0 +1,4 @@
+# Dependencias de desarrollo y pruebas (no se instalan en produccion).
+-r requirements.txt
+pytest==9.1.1
+aiosmtpd==1.4.6

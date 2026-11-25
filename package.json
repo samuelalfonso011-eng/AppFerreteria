@@ -1,0 +1,21 @@
+{
+  "name": "ferrepro",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Tienda FerrePro: frontend estatico y herramientas de verificacion de diseno",
+  "type": "module",
+  "scripts": {
+    "gate:states": "node scripts/verify_states.mjs index.html && node scripts/verify_states.mjs index.html --dark",
+    "gate:axe": "node scripts/axe_audit.mjs index.html && node scripts/axe_audit.mjs admin.html",
+    "gate:responsive": "node scripts/verify_responsive.mjs index.html --scale=1.25",
+    "gate:keyboard": "node scripts/verify_keyboard.mjs admin.html",
+    "gate:target": "node scripts/verify_target_size.mjs index.html",
+    "gate:intent": "node scripts/lint_intent.mjs admin.html",
+    "backend:test": "cd backend && venv\\Scripts\\python -m pytest -q",
+    "backend:dev": "cd backend && venv\\Scripts\\python run.py"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.1",
+    "playwright": "^1.65.1"
+  }
+}

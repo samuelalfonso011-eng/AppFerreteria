@@ -1,0 +1,19 @@
+# Lista blanca: nada entra a la imagen salvo lo necesario. backend/.env, venv y la base local quedan fuera.
+*
+!index.html
+!admin.html
+!styles.css
+!theme.css
+!admin.css
+!app.js
+!admin.js
+!theme-init.js
+!backend/requirements.txt
+!backend/requirements-dev.txt
+!backend/run.py
+!backend/app/
+!backend/tests/
+!supabase/*.sql
+!docker/postgres-init/
+**/__pycache__
+**/*.pyc

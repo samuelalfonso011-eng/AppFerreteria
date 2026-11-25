@@ -1,0 +1,94 @@
+﻿# FerrePro en local con Docker.
+#   1. Copia .env.docker.example como .env (en esta carpeta) y completa las tres claves.
+#   2. docker compose up -d --build
+#   3. docker compose exec backend flask create-admin
+#   Tienda: http://localhost:8000   Admin: http://localhost:8000/admin
+# Para usar Supabase en lugar del PostgreSQL local, define DATABASE_URL en .env.
+
+name: ferrepro
+
+services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/db.Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ferrepro
+      POSTGRES_USER: ferrepro_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      BACKEND_DB_PASSWORD: ${BACKEND_DB_PASSWORD:?Define BACKEND_DB_PASSWORD en .env}
+    volumes:
+      # Los scripts de supabase/ van dentro de la imagen y corren solo con el volumen vacio
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ferrepro_owner -d ferrepro"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+  backend:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://ferrepro_backend:${BACKEND_DB_PASSWORD}@db:5432/ferrepro}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-localhost,127.0.0.1}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+      CACHE_TTL: ${CACHE_TTL:-300}
+      ORDER_PENDING_EXPIRY_MINUTES: ${ORDER_PENDING_EXPIRY_MINUTES:-2880}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      # Correo de cuentas (activacion y recuperacion). Sin SMTP_HOST no se envia nada.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-FerrePro}
+      ACCOUNT_ACTIVATION_MAX_AGE: ${ACCOUNT_ACTIVATION_MAX_AGE:-172800}
+      PASSWORD_RESET_MAX_AGE: ${PASSWORD_RESET_MAX_AGE:-1800}
+      SMTP_SSL: ${SMTP_SSL:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+    ports:
+      # Solo accesible desde este equipo
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 384m
+
+  # Bandeja de correo local para desarrollo: atrapa todo lo que envia el backend, no sale a internet.
+  # docker compose --profile mail up -d   y en .env: SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_STARTTLS=false
+  # Bandeja: http://localhost:8025
+  mailpit:
+    profiles: [mail]
+    image: axllent/mailpit:v1.33.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    mem_limit: 96m
+
+  tests:
+    profiles: [test]
+    build:
+      context: .
+      target: test
+    environment:
+      FLASK_ENV: testing
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  pgdata:
