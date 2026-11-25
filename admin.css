@@ -260,7 +260,9 @@ table.stack td.cellLead{display:block;text-align:left;padding-bottom:var(--space
 table.stack td.cellLead::before,table.stack td.cellActions::before{content:none}
 table.stack td.cellActions{display:block;padding-top:var(--space-3)}
 table.stack td.cellActions .rowActions{justify-content:flex-start;flex-wrap:wrap}
+table.stack .cellValue{display:grid;justify-items:end;gap:2px;min-width:0}
 @media(min-width:640px){
+  table.stack .cellValue{display:contents}
   table.stack thead{position:static;width:auto;height:auto;overflow:visible;clip-path:none;display:table-header-group}
   table.stack{display:table}
   table.stack tbody{display:table-row-group}

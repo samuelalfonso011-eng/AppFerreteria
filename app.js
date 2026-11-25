@@ -62,33 +62,78 @@ const findProduct = ref => state.bySlug.get(ref) || state.byId.get(Number(ref));
 
 function renderCategories() {
   const promos = state.categories.filter(c => c.headline).slice(0, 4);
-  $("#categorias").innerHTML = promos.map(c =>
+  const section = $("#categorias");
+  section.innerHTML = promos.map(c =>
     '<article class="tile">' + art(c.art) + '<h3>' + esc(c.headline) + '</h3><a href="#catalogo" data-filter="' + esc(c.name) + '">Explorar categoría ›</a></article>'
   ).join("");
+  section.removeAttribute("aria-busy");
 }
 
-function catalog(term = "") {
+/* Catalogo progresivo: se pintan bloques de PAGE_SIZE tarjetas, no todo el DOM de golpe.
+   Mas productos llegan con "Cargar mas" o al deslizar el carrusel hasta el final. */
+const PAGE_SIZE = 12;
+let catalogLimit = PAGE_SIZE, catalogTerm = null;
+const matches = term => {
+  const needle = normalize(term);
+  return state.products.filter(p => normalize(p.name + " " + p.category).includes(needle));
+};
+function cardHTML(p) {
+  const note = !p.available ? '<span class="stockNote out">Agotado</span>'
+    : p.stock <= 5 ? '<span class="stockNote">Quedan ' + p.stock + ' unidades</span>' : "";
+  const action = p.available
+    ? '<button class="add" data-add="' + p.id + '">Agregar al carrito</button>'
+    : '<button class="add" disabled>Agotado</button>';
+  return '<article class="card">' + art(p.art) + '<small>' + esc(p.category) + '</small><h3>' + esc(p.name) + '</h3><p>' + money(p.price) + '</p>' + note + action + '</article>';
+}
+function catalog(term = "", {more = false} = {}) {
   const cards = $("#cards");
   if (!state.loaded) return;
-  const needle = normalize(term);
-  cards.innerHTML = state.products.map(p => {
-    if (!normalize(p.name + " " + p.category).includes(needle)) return "";
-    const note = !p.available ? '<span class="stockNote out">Agotado</span>'
-      : p.stock <= 5 ? '<span class="stockNote">Quedan ' + p.stock + ' unidades</span>' : "";
-    const action = p.available
-      ? '<button class="add" data-add="' + p.id + '">Agregar al carrito</button>'
-      : '<button class="add" disabled>Agotado</button>';
-    return '<article class="card">' + art(p.art) + '<small>' + esc(p.category) + '</small><h3>' + esc(p.name) + '</h3><p>' + money(p.price) + '</p>' + note + action + '</article>';
-  }).join("") || '<div class="catalogState"><p>Sin resultados. Prueba con otra herramienta.</p></div>';
+  if (term !== catalogTerm) catalogLimit = PAGE_SIZE; // una busqueda nueva empieza por el primer bloque
+  catalogTerm = term;
+  const list = matches(term);
+  if (more) {
+    const start = cards.querySelectorAll(".card").length;
+    catalogLimit = start + PAGE_SIZE;
+    cards.insertAdjacentHTML("beforeend", list.slice(start, catalogLimit).map(cardHTML).join(""));
+    reveal(".card");
+  } else {
+    cards.innerHTML = list.slice(0, catalogLimit).map(cardHTML).join("")
+      || '<div class="catalogState"><p>Sin resultados. Prueba con otra herramienta.</p></div>';
+    cards.scrollLeft = 0;
+  }
+  const remaining = list.length - catalogLimit;
+  const loadMore = $("#loadMore");
+  loadMore.hidden = remaining <= 0;
+  loadMore.textContent = "Cargar más productos (" + Math.max(remaining, 0) + ")";
   cards.removeAttribute("aria-busy");
-  cards.scrollLeft = 0;
   $("#reset").hidden = !term;
   updateArrows();
+  watchCatalogEnd(remaining > 0);
 }
+// Carga controlada al llegar al final del carrusel (solo si quedan productos)
+const endObserver = "IntersectionObserver" in window ? new IntersectionObserver(entries => {
+  if (entries.some(e => e.isIntersecting)) catalog(catalogTerm || "", {more:true});
+}, {root:$("#cards"), rootMargin:"0px 320px 0px 0px"}) : null;
+function watchCatalogEnd(hasMore) {
+  if (!endObserver) return;
+  endObserver.disconnect();
+  const last = $("#cards .card:last-of-type");
+  if (hasMore && last) endObserver.observe(last);
+}
+$("#loadMore").addEventListener("click", () => {
+  const before = $("#cards").querySelectorAll(".card").length;
+  catalog(catalogTerm || "", {more:true});
+  const first = $("#cards").querySelectorAll(".card")[before];
+  if (first) first.scrollIntoView({behavior:reducedMotion() ? "instant" : "smooth", block:"nearest", inline:"start"});
+});
 function catalogError() {
   const cards = $("#cards");
   cards.removeAttribute("aria-busy");
   cards.innerHTML = '<div class="catalogState"><p>No pudimos cargar el catálogo.</p><button class="pill" data-retry>Reintentar</button></div>';
+  const tiles = $("#categorias");
+  tiles.innerHTML = "";
+  tiles.removeAttribute("aria-busy");
+  $("#loadMore").hidden = true;
   updateArrows();
 }
 function updateArrows() {
@@ -154,10 +199,19 @@ function renderCart() {
       : s.free_shipping_threshold ? "Tu pedido tiene envío gratis." : "";
 }
 let toastTimer;
+// Reinicia una animacion CSS aunque la clase ya este puesta
+function replay(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
 function toast(message) {
-  $("#status").textContent = message;
+  const status = $("#status");
+  const showing = status.textContent !== "";
+  status.textContent = message;
+  if (showing) replay(status, "again"); // un aviso nuevo sobre otro visible se nota sin parpadear
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $("#status").textContent = "", 2200);
+  toastTimer = setTimeout(() => { status.textContent = ""; status.classList.remove("again"); }, 2400);
 }
 function change(id, delta) {
   const p = state.byId.get(Number(id));
@@ -171,7 +225,8 @@ function change(id, delta) {
   if (qty > 0) cart[p.id] = qty; else delete cart[p.id];
   saveCart();
   renderCart();
-  if (delta > 0 && qty > current && !drawer.open && !details.open) toast("Producto agregado al carrito");
+  if (qty > current) replay($("#badge"), "bump"); // el contador del navbar late al entrar un producto
+  if (delta > 0 && qty > current && !drawer.open && !details.open) toast("Agregaste " + p.name + " al carrito");
 }
 function showDetail(html) {
   $("#detailBody").innerHTML = html;
@@ -664,9 +719,24 @@ $("#noticeOk").onclick = () => { try { localStorage.setItem(NOTICE_KEY, "2026-11
 
 /* ---------- Animacion de entrada (Fase 1) ---------- */
 const canReveal = "IntersectionObserver" in window && !reducedMotion();
+// La entrada arranca cuando el elemento ya asoma (no al tocar el borde), para que se vea completa
 const observer = canReveal ? new IntersectionObserver(entries => entries.forEach(({target, isIntersecting}) => {
   if (isIntersecting) { target.classList.remove("pending"); observer.unobserve(target); }
-})) : null;
+}), {rootMargin:"0px 0px -8% 0px"}) : null;
+
+/* Render por viewport: una seccion se pinta cuando el usuario esta a ~400px de verla.
+   Sin IntersectionObserver se pinta de inmediato, y si el observador nunca avisa (pestana
+   en segundo plano, navegadores raros) se pinta igual tras unos segundos: el contenido
+   nunca se queda en esqueleto. */
+const NEAR_FALLBACK_MS = 3000;
+function whenNear(element, callback) {
+  if (!("IntersectionObserver" in window)) { callback(); return; }
+  let done = false;
+  const run = () => { if (done) return; done = true; watcher.disconnect(); clearTimeout(fallback); callback(); };
+  const watcher = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) run(); }, {rootMargin:"400px 0px"});
+  const fallback = setTimeout(run, NEAR_FALLBACK_MS);
+  watcher.observe(element);
+}
 function reveal(selector) {
   if (!observer) return;
   document.querySelectorAll(selector).forEach(el => {
@@ -698,10 +768,10 @@ async function boot() {
     return;
   }
   const notes = reconcileCart();
-  renderCategories();
-  catalog($("#query").value);
   renderCart();
-  reveal(".tile,.card");
+  whenNear($("#categorias"), () => { renderCategories(); reveal(".tile"); });
+  // El catalogo se pinta al acercarse, o antes si una busqueda o un filtro lo necesita
+  whenNear($("#catalogo"), () => { if (catalogTerm === null) catalog($("#query").value); reveal(".card"); });
   if (state.store) {
     $("#legalName").textContent = state.store.legal_name || state.store.store_name;
     $("#year").textContent = new Date().getFullYear();

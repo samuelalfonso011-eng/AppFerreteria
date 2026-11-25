@@ -243,8 +243,38 @@ const numberValue = raw => {
 };
 
 /* ---------- Router por pestañas ---------- */
-const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, productos:renderProducts,
+const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, productos:renderProducts,
   categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings};
+
+/* Tablas que se apilan en el telefono: cada celda recibe la etiqueta de su columna (data-label),
+   la primera es la principal (cellLead) y la de botones va aparte (cellActions). El CSS de
+   admin.css (table.stack) las muestra como tarjetas hasta 640px y como tabla desde ahi.
+   Un observador lo aplica a toda tabla nueva del panel y del modal, sin tocar cada plantilla. */
+function stackTables(root) {
+  $$("table:not(.stack)", root).forEach(table => {
+    const labels = $$("thead th", table).map(th => th.textContent.trim());
+    table.classList.add("stack");
+    $$("tbody tr", table).forEach(row => {
+      Array.from(row.cells).forEach((cell, i) => {
+        if (labels[i]) cell.dataset.label = labels[i];
+        if (i === 0) cell.classList.add("cellLead");
+        if (cell.querySelector(".rowActions")) cell.classList.add("cellActions");
+        // Celdas de varias partes (valor + texto secundario): se agrupan para apilarse a la derecha de la etiqueta
+        if (i > 0 && !cell.classList.contains("cellActions") && cell.childNodes.length > 1) {
+          const value = document.createElement("span");
+          value.className = "cellValue";
+          value.append(...cell.childNodes);
+          cell.append(value);
+        }
+      });
+    });
+  });
+}
+const tableWatcher = new MutationObserver(records => records.forEach(r => {
+  if (r.target instanceof Element) stackTables(r.target);
+}));
+tableWatcher.observe($("#view"), {childList:true, subtree:true});
+tableWatcher.observe($("#modalBody"), {childList:true, subtree:true});
 const currentView = () => { const v = location.hash.slice(1); return VIEWS[v] ? v : "resumen"; };
 async function route() {
   if (!state.me) return;
@@ -347,6 +377,61 @@ async function loadOrders() {
     '<button class="btn secondary small" data-page="' + (d.page - 1) + '"' + (d.page <= 1 ? " disabled" : "") + ">Anterior</button> " +
     '<button class="btn secondary small" data-page="' + (d.page + 1) + '"' + (d.page >= d.pages ? " disabled" : "") + ">Siguiente</button></span></div>";
 }
+/* ---------- Clientes ---------- */
+const customerFilter = {status:"all", q:"", page:1};
+const CUSTOMER_STATUS = {
+  verified:["ok", ICON.check, "Verificado"],
+  pending:["warn", ICON.clock, "Pendiente"],
+  disabled:["", ICON.dot, "Desactivado"]
+};
+async function renderCustomers(view) {
+  view.innerHTML = head("Clientes", "Cuentas registradas en la tienda. Solo lectura: nunca se muestran contraseñas ni datos de sesión.") +
+    '<div class="toolbar"><label class="field search"><span class="sr">Buscar clientes</span><input type="search" id="customerSearch" placeholder="Buscar por nombre o correo" value="' + esc(customerFilter.q) + '" autocomplete="off"></label></div>' +
+    '<div class="chips" role="group" aria-label="Filtrar clientes" id="customerChips"></div>' +
+    '<div class="card flush" id="customersBox"></div>';
+  $("#customerSearch").addEventListener("input", debounce(e => { customerFilter.q = e.target.value.trim(); customerFilter.page = 1; loadCustomers(); }, 200));
+  await loadCustomers();
+}
+function renderCustomerChips(counts) {
+  const chips = [["all", "Todos"], ["verified", "Verificados"], ["pending", "Pendientes"]];
+  $("#customerChips").innerHTML = chips.map(([v, l]) =>
+    '<button class="chip" data-customer-status="' + v + '" aria-pressed="' + (v === customerFilter.status) + '">' + l +
+    '<span class="count">' + (counts ? counts[v] : "") + "</span></button>").join("");
+}
+async function loadCustomers() {
+  const box = $("#customersBox");
+  if (!box) return;
+  const params = new URLSearchParams({status:customerFilter.status, page:customerFilter.page});
+  if (customerFilter.q) params.set("q", customerFilter.q);
+  box.setAttribute("aria-busy", "true");
+  if (!box.querySelector("table")) box.innerHTML = '<p class="sr">Cargando clientes…</p>' + '<div class="skeleton skeletonRow"></div>'.repeat(4);
+  const d = await api("/admin/customers?" + params);
+  box.removeAttribute("aria-busy");
+  renderCustomerChips(d.counts);
+  if (!d.customers.length) {
+    const filtered = customerFilter.q || customerFilter.status !== "all";
+    box.innerHTML = emptyState(filtered ? "Ningún cliente coincide" : "Todavía no hay clientes",
+      filtered ? "Prueba con otro nombre, correo o filtro." : "Las cuentas que se registren en la tienda aparecerán aquí.");
+    return;
+  }
+  box.innerHTML = '<div class="tableWrap"><table><thead><tr><th scope="col">Cliente</th><th scope="col">Estado</th><th scope="col">Registro</th><th scope="col" class="right">Pedidos</th><th scope="col">Habeas Data</th></tr></thead><tbody>' +
+    d.customers.map(c => {
+      const [tone, icon, label] = CUSTOMER_STATUS[c.status] || CUSTOMER_STATUS.disabled;
+      const consent = c.habeas_data.accepted
+        ? badge("ok", ICON.check, "Aceptada") + '<span class="cellSub">' + fmtDate(c.habeas_data.accepted_at) + " · v" + esc(c.habeas_data.policy_version) + "</span>"
+        : badge("bad", ICON.x, "Sin registro");
+      return '<tr><td><div class="customerHead"><span class="initial" aria-hidden="true">' + esc((c.name.trim()[0] || "?").toUpperCase()) + "</span>" +
+        '<span><span class="cellMain">' + esc(c.name) + '</span><span class="cellSub">' + esc(c.email) + "</span></span></div></td>" +
+        "<td>" + badge(tone, icon, label) + "</td>" +
+        "<td>" + fmtDate(c.created_at) + '<span class="cellSub">' + (c.last_login_at ? "Último acceso " + fmtDate(c.last_login_at) : "Aún no inicia sesión") + "</span></td>" +
+        '<td class="right">' + c.orders + "</td><td>" + consent + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    (d.pages > 1 ? '<div class="pager"><span>' + d.total + " clientes · página " + d.page + " de " + d.pages + "</span><span>" +
+      '<button class="btn secondary small" data-customer-page="' + (d.page - 1) + '"' + (d.page <= 1 ? " disabled" : "") + ">Anterior</button> " +
+      '<button class="btn secondary small" data-customer-page="' + (d.page + 1) + '"' + (d.page >= d.pages ? " disabled" : "") + ">Siguiente</button></span></div>"
+      : '<div class="pager"><span>' + d.total + (d.total === 1 ? " cliente" : " clientes") + "</span></div>");
+}
+
 const statusLabel = code => (state.meta.statuses.find(s => s.code === code) || {label:code}).label;
 async function openOrder(id) {
   const {order:o} = await api("/admin/orders/" + id);
@@ -634,6 +719,12 @@ document.addEventListener("click", async event => {
       await loadOrders();
     } else if ("page" in d) {
       orderFilter.page = Number(d.page); await loadOrders();
+    } else if ("customerStatus" in d) {
+      customerFilter.status = d.customerStatus; customerFilter.page = 1;
+      $$("[data-customer-status]").forEach(c => c.setAttribute("aria-pressed", String(c === el)));
+      await loadCustomers();
+    } else if ("customerPage" in d) {
+      customerFilter.page = Number(d.customerPage); await loadCustomers();
     } else if ("productStatus" in d) {
       productFilter.status = d.productStatus;
       $$("[data-product-status]").forEach(c => c.setAttribute("aria-pressed", String(c === el)));
