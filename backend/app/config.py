@@ -49,6 +49,9 @@ class Config:
     TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "0"))
     TRUSTED_HOSTS = [h.strip() for h in os.getenv("TRUSTED_HOSTS", "").split(",") if h.strip()] or None
 
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+
     CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
     ORDER_PENDING_EXPIRY_MINUTES = int(os.getenv("ORDER_PENDING_EXPIRY_MINUTES", "2880"))
     AUTO_CREATE_DB = False

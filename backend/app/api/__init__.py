@@ -24,7 +24,7 @@ _admin_nested = False
 def register_api(app):
     global _admin_nested
     # Los modulos agregan sus rutas al importarse (una sola vez por proceso)
-    from app.api import auth, orders, public  # noqa: F401
+    from app.api import auth, chat, orders, public  # noqa: F401
     from app.api.admin import admin_bp
     if not _admin_nested:
         # Anidado bajo /api: hereda la verificacion CSRF y de origen de api_bp

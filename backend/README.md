@@ -138,3 +138,29 @@ El registro y reenvío esperan la aceptación del servidor SMTP. Si falla el env
 ### Pruebas
 
 Desde la raíz, instala `backend/requirements-dev.txt` y ejecuta `python -m pytest backend/tests -q`. El flujo SMTP abre una conexión TCP local y recupera el enlace del mensaje recibido. Para ejecutar esa misma prueba con PostgreSQL, crea una base **desechable** con `schema.sql`, `rls_policies.sql` y `seed.sql`, asigna credenciales al rol `ferrepro_backend`, define `FERREPRO_TEST_POSTGRES_URL` con esa conexión y ejecuta `python -m pytest backend/tests/test_auth_smtp.py -q`. La prueba crea cuentas en esa base.
+
+## Asistente de catálogo
+
+`POST /api/chat` acepta `{"message":"…","history":[{"role":"user","content":"…"}]}`.
+El historial es opcional y se conservan las últimas seis entradas. La respuesta contiene
+`reply`, `mode` y `suggested_products`. Como en las otras escrituras, envía la cookie
+y el token de `GET /api/auth/csrf` en `X-CSRF-Token`. El límite local es de diez solicitudes
+por minuto por IP y por proceso.
+
+Configura `GEMINI_API_KEY` y, si corresponde, `GEMINI_MODEL` en el entorno del proceso Flask.
+En Docker esas dos variables deben llegar al contenedor backend. Para mantener el costo
+en cero usa un proyecto de Google AI Studio sin facturación habilitada y un modelo con
+cuota gratuita disponible. El modo IA envía a Google la pregunta y el historial reciente,
+junto con un subconjunto del catálogo público y las políticas. Evita incluir datos personales
+en los mensajes de prueba.
+
+Con el servidor en ejecución, desde la raíz:
+
+```powershell
+python backend/tests/smoke_chat.py http://127.0.0.1:5000 --expect fallback
+python backend/tests/smoke_chat.py http://127.0.0.1:5000 --expect ai
+```
+
+Ejecuta el primer comando con `GEMINI_API_KEY` vacía y el segundo tras reiniciar con una
+llave válida y cuota disponible. `python -m pytest backend/tests/test_chat.py -q` comprueba
+ambos modos, incluyendo una respuesta de Gemini simulada, HTTP 429 y fallos de conexión.

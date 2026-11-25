@@ -147,6 +147,7 @@ def limiter(name):
     limits = {
         "login": (5, 900),        # 5 intentos por correo e IP cada 15 minutos
         "login_ip": (20, 900),    # 20 intentos por IP cada 15 minutos
+        "chat": (10, 60),
         "checkout": (10, 600),
         "lookup": (10, 600),
         "register": (5, 600),         # 5 registros por IP cada 10 minutos

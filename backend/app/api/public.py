@@ -13,13 +13,23 @@ def _active_products():
             .filter(Product.is_active.is_(True), Category.is_active.is_(True)))
 
 
+def build_categories():
+    rows = (Category.query.filter_by(is_active=True)
+            .order_by(Category.sort_order.asc(), Category.name.asc()).all())
+    return {"categories": [c.to_public() for c in rows]}
+
+
 @api_bp.get("/catalog/categories")
 def catalog_categories():
-    def build():
-        rows = (Category.query.filter_by(is_active=True)
-                .order_by(Category.sort_order.asc(), Category.name.asc()).all())
-        return {"categories": [c.to_public() for c in rows]}
-    return cached_json_response(SCOPE_CATALOG, "catalog:categories", build)
+    return cached_json_response(SCOPE_CATALOG, "catalog:categories", build_categories)
+
+
+def build_products(category=""):
+    query = _active_products()
+    if category:
+        query = query.filter(Category.slug == category)
+    rows = query.order_by(Product.created_at.asc(), Product.id.asc()).all()
+    return {"products": [p.to_public() for p in rows]}
 
 
 @api_bp.get("/catalog/products")
@@ -28,13 +38,8 @@ def catalog_products():
     if category and (len(category) > 100 or not SLUG_RE.fullmatch(category)):
         abort(400)
 
-    def build():
-        query = _active_products()
-        if category:
-            query = query.filter(Category.slug == category)
-        rows = query.order_by(Product.created_at.asc(), Product.id.asc()).all()
-        return {"products": [p.to_public() for p in rows]}
-    return cached_json_response(SCOPE_CATALOG, f"catalog:products:{category or 'all'}", build)
+    return cached_json_response(SCOPE_CATALOG, f"catalog:products:{category or 'all'}",
+                                lambda: build_products(category))
 
 
 @api_bp.get("/catalog/products/<slug>")
@@ -50,10 +55,13 @@ def catalog_product(slug):
     return cached_json_response(SCOPE_CATALOG, f"catalog:product:{slug}", build)
 
 
+def build_store():
+    return {"store": StoreSetting.get().to_public()}
+
+
 @api_bp.get("/store")
 def store_info():
-    return cached_json_response(SCOPE_STORE, "store:public",
-                                lambda: {"store": StoreSetting.get().to_public()})
+    return cached_json_response(SCOPE_STORE, "store:public", build_store)
 
 
 @api_bp.get("/legal")
