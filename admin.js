@@ -18,7 +18,14 @@ const ICON = {
   truck:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4h8v7h-8zM9.5 6.5h3l2 2.5v2h-5"/><circle cx="4.5" cy="12" r="1.3"/><circle cx="11.5" cy="12" r="1.3"/></svg>',
   x:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7m0-7-7 7"/></svg>',
   alert:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3M8 11.5v.2"/></svg>',
-  dot:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/></svg>'
+  dot:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/></svg>',
+  shield:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v4c0 3-2.2 5.3-5 6.6-2.8-1.3-5-3.6-5-6.6v-4z"/></svg>',
+  briefcase:'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="5" width="12" height="8.5" rx="1.5"/><path d="M5.5 5V3.5h5V5M2 9h12"/></svg>',
+  person:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.6"/><path d="M3 14a5 5 0 0 1 10 0"/></svg>',
+  store:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6.5 3 3h10l1 3.5M3 6.5V13h10V6.5M6.5 13V9.5h3V13"/></svg>',
+  globe:'<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.8 1.8 10.2 0 12M8 2c-1.8 1.8-1.8 10.2 0 12"/></svg>',
+  phone:'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.2h2"/></svg>',
+  home:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg>'
 };
 const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';
 const STATUS_STYLE = {
@@ -84,12 +91,22 @@ function confirmAction({title, text, action}) {
   $("[data-confirm=no]", confirmDialog).focus();
   return new Promise(resolve => { confirmResolve = resolve; });
 }
-confirmDialog.addEventListener("close", () => { if (confirmResolve) { confirmResolve(confirmDialog.returnValue === "yes"); confirmResolve = null; } });
+// La decision se resuelve en el mismo clic o tecla; no espera al evento "close", que algunos
+// navegadores entregan solo al pintar el siguiente cuadro (pestanas en segundo plano).
+function settleConfirm(value) {
+  if (!confirmResolve) return;
+  const resolve = confirmResolve;
+  confirmResolve = null;
+  resolve(value);
+}
 confirmDialog.addEventListener("click", e => {
   const b = e.target.closest("[data-confirm]");
-  if (b) confirmDialog.close(b.dataset.confirm);
+  if (!b) return;
+  settleConfirm(b.dataset.confirm === "yes");
+  confirmDialog.close(b.dataset.confirm);
 });
-confirmDialog.addEventListener("cancel", () => { confirmDialog.returnValue = "no"; });
+confirmDialog.addEventListener("cancel", () => { confirmDialog.returnValue = "no"; settleConfirm(false); });
+confirmDialog.addEventListener("close", () => settleConfirm(confirmDialog.returnValue === "yes"));
 
 function setBusy(button, busy, busyText) {
   if (!button) return;
@@ -243,7 +260,7 @@ const numberValue = raw => {
 };
 
 /* ---------- Router por pestañas ---------- */
-const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, productos:renderProducts,
+const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, usuarios:renderUsers, productos:renderProducts,
   categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings};
 
 /* Tablas que se apilan en el telefono: cada celda recibe la etiqueta de su columna (data-label),
@@ -342,15 +359,22 @@ async function renderDashboard(view) {
 /* ---------- Pedidos ---------- */
 const orderFilter = {status:"", q:"", page:1};
 function ordersTable(rows) {
-  return '<table><thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Estado</th><th scope="col" class="right">Total</th></tr></thead><tbody>' +
-    rows.map(o => '<tr><td><button class="linkBtn" data-order="' + o.id + '">' + esc(o.order_number) + '</button><span class="cellSub">' + fmtDate(o.created_at) + "</span></td>" +
-      '<td><span class="cellMain">' + esc(o.customer_name) + '</span><span class="cellSub">' + esc(o.city) + " · " + o.item_count + " u.</span></td>" +
-      "<td>" + statusBadge(o.status, o.status_label) + '</td><td class="right">' + money(o.total) + "</td></tr>").join("") +
+  return '<table><thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Canal</th><th scope="col">Estado</th><th scope="col" class="right">Total</th></tr></thead><tbody>' +
+    rows.map(o => {
+      const employee = o.employee_id ? staffName(o.employee_id) : "";
+      return '<tr><td><button class="linkBtn" data-order="' + o.id + '">' + esc(o.order_number) + '</button><span class="cellSub">' + fmtDate(o.created_at) + "</span></td>" +
+        '<td><span class="cellMain">' + esc(o.customer_name) + '</span><span class="cellSub">' + esc(o.city || "Sin envío") + " · " + o.item_count + " u." +
+        (employee ? " · Atendió " + esc(employee) : "") + "</span></td>" +
+        "<td>" + channelBadge(o.channel) + "</td>" +
+        "<td>" + statusBadge(o.status, o.status_label) + '</td><td class="right">' + money(o.total) + "</td></tr>";
+    }).join("") +
     "</tbody></table>";
 }
 async function renderOrders(view) {
   const chips = [["", "Todos"], ...state.meta.statuses.map(s => [s.code, s.label])];
-  view.innerHTML = head("Pedidos", "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.") +
+  try { await loadUsersCache(); } catch {} // solo para mostrar quien atendio; sin esto la lista igual carga
+  view.innerHTML = head("Pedidos", "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.",
+      '<button class="btn primary" data-new-order>Nuevo pedido</button>') +
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar pedidos</span><input type="search" id="orderSearch" placeholder="Buscar por número, cliente o correo" value="' + esc(orderFilter.q) + '"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por estado">' +
     chips.map(([code, label]) => '<button class="chip" data-order-status="' + code + '" aria-pressed="' + (code === orderFilter.status) + '">' + esc(label) + "</button>").join("") +
@@ -431,6 +455,252 @@ async function loadCustomers() {
       '<button class="btn secondary small" data-customer-page="' + (d.page + 1) + '"' + (d.page >= d.pages ? " disabled" : "") + ">Siguiente</button></span></div>"
       : '<div class="pager"><span>' + d.total + (d.total === 1 ? " cliente" : " clientes") + "</span></div>");
 }
+
+/* ---------- Usuarios y roles ----------
+   Contrato (backend de Codex): GET /admin/users?page (25 por pagina), POST /admin/users
+   {name, email, password, role, is_active}, PATCH /admin/users/{id} {role?, is_active?}.
+   Cambiar rol o estado revoca las sesiones; el admin autenticado no puede quitarse el rol. */
+const ROLE_INFO = {
+  admin:["info", ICON.shield, "Administrador"],
+  employee:["", ICON.briefcase, "Empleado"],
+  customer:["", ICON.person, "Cliente"]
+};
+const roleBadge = role => { const [tone, icon, label] = ROLE_INFO[role] || ["", ICON.dot, role]; return badge(tone, icon, label); };
+const CHANNEL_INFO = {presencial:[ICON.store, "Presencial"], web:[ICON.globe, "Web"], app:[ICON.phone, "App"], domicilio:[ICON.home, "Domicilio"]};
+const channelBadge = channel => { const [icon, label] = CHANNEL_INFO[channel] || CHANNEL_INFO.web; return badge("", icon, label); };
+const userFilter = {q:"", role:"all"};
+let usersCache = null;
+async function loadUsersCache(force = false) {
+  if (usersCache && !force) return usersCache;
+  const all = [];
+  let page = 1, pages = 1;
+  do {
+    const d = await api("/admin/users?page=" + page);
+    all.push(...d.users);
+    pages = d.pages;
+    page += 1;
+  } while (page <= pages && page <= 40);
+  usersCache = all;
+  return all;
+}
+const staffName = id => (usersCache || []).find(u => u.id === id)?.name || "empleado #" + id;
+const isMe = u => state.me && u.email === state.me.email;
+function accountState(u) {
+  if (u.email_verification_pending) return badge("warn", ICON.clock, "Sin verificar");
+  return u.is_active ? badge("ok", ICON.check, "Activa") : badge("", ICON.dot, "Inactiva");
+}
+async function renderUsers(view) {
+  await loadUsersCache(true);
+  view.innerHTML = head("Usuarios", "Equipo y clientes. Cambiar el rol o desactivar una cuenta cierra sus sesiones abiertas.",
+      '<button class="btn primary" data-new-user>Nuevo usuario</button>') +
+    '<div class="toolbar"><label class="field search"><span class="sr">Buscar usuarios</span><input type="search" id="userSearch" placeholder="Buscar por nombre o correo" value="' + esc(userFilter.q) + '" autocomplete="off"></label></div>' +
+    '<div class="chips" role="group" aria-label="Filtrar por rol" id="userChips"></div><div class="card flush" id="usersBox"></div>';
+  $("#userSearch").addEventListener("input", debounce(e => { userFilter.q = e.target.value.trim(); drawUsers(); }, 120));
+  drawUsers();
+}
+function drawUsers() {
+  const box = $("#usersBox");
+  if (!box) return;
+  const all = usersCache || [];
+  const counts = {all:all.length};
+  for (const role of Object.keys(ROLE_INFO)) counts[role] = all.filter(u => u.role === role).length;
+  $("#userChips").innerHTML = [["all", "Todos"], ["admin", "Administradores"], ["employee", "Empleados"], ["customer", "Clientes"]]
+    .map(([v, l]) => '<button class="chip" data-user-role="' + v + '" aria-pressed="' + (v === userFilter.role) + '">' + l + '<span class="count">' + counts[v] + "</span></button>").join("");
+  const q = normalize(userFilter.q);
+  const list = all.filter(u => (userFilter.role === "all" || u.role === userFilter.role) && (!q || normalize(u.name + " " + u.email).includes(q)));
+  if (!list.length) {
+    box.innerHTML = emptyState("Ningún usuario coincide", "Prueba con otro nombre, correo o rol.");
+    return;
+  }
+  box.innerHTML = '<div class="tableWrap"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Registro</th><th scope="col" class="right"><span class="sr">Acciones</span></th></tr></thead><tbody>' +
+    list.map(u => {
+      const me = isMe(u);
+      const toggleBtn = me ? ""
+        : u.is_active
+          ? '<button class="btn dangerGhost small" data-user-toggle="' + u.id + '">Desactivar</button>'
+          : '<button class="btn secondary small" data-user-toggle="' + u.id + '">Activar</button>';
+      return '<tr><td><div class="customerHead"><span class="initial" aria-hidden="true">' + esc((u.name.trim()[0] || "?").toUpperCase()) + "</span>" +
+        '<span><span class="cellMain">' + esc(u.name) + (me ? ' <span class="muted">(tú)</span>' : "") + '</span><span class="cellSub">' + esc(u.email) + "</span></span></div></td>" +
+        "<td>" + roleBadge(u.role) + "</td><td>" + accountState(u) + "</td>" +
+        "<td>" + fmtDate(u.created_at) + '<span class="cellSub">' + (u.last_login_at ? "Último acceso " + fmtDate(u.last_login_at) : "Aún no inicia sesión") + "</span></td>" +
+        '<td><div class="rowActions"><button class="btn secondary small" data-edit-user="' + u.id + '">Editar</button>' + toggleBtn + "</div></td></tr>";
+    }).join("") + '</tbody></table></div><div class="pager"><span>' + list.length + " de " + all.length + (all.length === 1 ? " cuenta" : " cuentas") + "</span></div>";
+}
+const ROLE_CHOICES = [{value:"admin", label:"Administrador"}, {value:"employee", label:"Empleado"}, {value:"customer", label:"Cliente"}];
+function openUserForm(id) {
+  const user = id ? (usersCache || []).find(u => u.id === Number(id)) : null;
+  const me = user && isMe(user);
+  openModal(
+    '<form data-form="' + (user ? "userEdit" : "user") + '" data-id="' + (user ? user.id : "") + '" novalidate>' +
+    '<div class="sheetHead"><h2 id="modalTitle">' + (user ? "Editar usuario" : "Nuevo usuario") + "</h2>" + closeButton + "</div>" +
+    '<div class="sheetBody"><div class="formGrid">' +
+      (user
+        ? '<dl class="facts full">' + fact("Nombre", user.name) + fact("Correo", user.email) + "</dl>"
+        : '<div class="full">' + field("name", "Nombre completo", "", 'required minlength="3" maxlength="150" autocomplete="off"') + "</div>" +
+          field("email", "Correo electrónico", "", 'required type="email" maxlength="254" autocomplete="off"') +
+          '<div>' + field("password", "Contraseña inicial", "", 'required type="password" minlength="12" maxlength="128" autocomplete="new-password"') +
+          '<p class="hint">Mínimo 12 caracteres, con letras y números. Compártela por un canal seguro.</p></div>') +
+      choices("role", "Rol", ROLE_CHOICES, user ? user.role : "employee") +
+      toggle("is_active", "Cuenta activa", user ? user.is_active : true) +
+      (me ? '<p class="hint full">Es tu cuenta: conserva el rol de administrador y queda activa.</p>' : "") +
+    '</div><p class="formError" role="alert"></p><div class="sheetActions"><button class="btn secondary" type="button" data-close>Cancelar</button><button class="btn primary" type="submit"' + (me ? " disabled" : "") + ">" + (user ? "Guardar cambios" : "Crear usuario") + "</button></div></div></form>");
+  if (me) $$("#modalBody input").forEach(input => { input.disabled = true; });
+}
+function mergeUser(user) {
+  const i = (usersCache || []).findIndex(u => u.id === user.id);
+  if (i >= 0) usersCache[i] = user; else (usersCache = usersCache || []).push(user);
+}
+async function submitUser(form) {
+  const f = form.elements;
+  const body = {name:f.name.value.trim(), email:f.email.value.trim().toLowerCase(), password:f.password.value, role:f.role.value, is_active:f.is_active.checked};
+  const button = $("button[type=submit]", form);
+  setBusy(button, true, "Creando…");
+  try {
+    const {user} = await api("/admin/users", {method:"POST", body});
+    mergeUser(user);
+    modal.close();
+    toast("Usuario creado: " + user.name + ".");
+    drawUsers();
+  } catch (err) {
+    setBusy(button, false);
+    showFieldErrors(form, err.data.error === "email_taken" ? {email:err.message} : err.data.fields, err.message);
+  }
+}
+async function patchUser(id, changes, button) {
+  const user = (usersCache || []).find(u => u.id === Number(id));
+  if (changes.is_active === false && user && user.is_active) {
+    const ok = await confirmAction({title:"¿Desactivar a " + user.name + "?",
+      text:"Se cerrarán sus sesiones y no podrá iniciar sesión hasta que reactives la cuenta. Sus pedidos y facturas se conservan.",
+      action:"Desactivar cuenta"});
+    if (!ok) return false;
+  }
+  setBusy(button, true, "Guardando…");
+  try {
+    const {user: updated} = await api("/admin/users/" + id, {method:"PATCH", body:changes});
+    mergeUser(updated);
+    toast(updated.is_active ? "Cambios guardados. Las sesiones de " + updated.name + " se cerraron." : updated.name + " quedó desactivado.");
+    drawUsers();
+    return true;
+  } finally {
+    if (button.isConnected) setBusy(button, false);
+  }
+}
+async function submitUserEdit(form) {
+  const user = (usersCache || []).find(u => u.id === Number(form.dataset.id));
+  const changes = {};
+  if (form.elements.role.value !== user.role) changes.role = form.elements.role.value;
+  if (form.elements.is_active.checked !== user.is_active) changes.is_active = form.elements.is_active.checked;
+  if (!Object.keys(changes).length) { modal.close(); return; }
+  try {
+    if (await patchUser(user.id, changes, $("button[type=submit]", form))) modal.close();
+  } catch (err) {
+    showFieldErrors(form, err.data.fields, err.message);
+  }
+}
+
+/* ---------- Nuevo pedido con canal ----------
+   POST /api/orders (el mismo checkout de la tienda): channel presencial|web|app|domicilio,
+   customer_id opcional; presencial no exige direccion ni cobra envio. El operador queda
+   registrado por la sesion. Los dos consentimientos son obligatorios tambien aqui. */
+const CHANNEL_CHOICES = [{value:"presencial", label:"Presencial"}, {value:"web", label:"Web"}, {value:"app", label:"App"}, {value:"domicilio", label:"Domicilio"}];
+const DOC_CHOICES = [{value:"CC", label:"CC"}, {value:"CE", label:"CE"}, {value:"NIT", label:"NIT"}, {value:"PAS", label:"Pasaporte"}];
+const draft = {lines:new Map(), products:[], customers:[], key:null};
+async function openNewOrder() {
+  const [{products}, {customers}] = await Promise.all([api("/admin/products?status=active"), api("/admin/customers?status=verified")]);
+  draft.products = products.filter(p => p.is_active && p.stock > 0);
+  draft.customers = customers;
+  draft.lines = new Map();
+  draft.key = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+  openModal(
+    '<form data-form="order" novalidate>' +
+    '<div class="sheetHead"><h2 id="modalTitle">Nuevo pedido</h2>' + closeButton + "</div>" +
+    '<div class="sheetBody"><div class="formGrid">' +
+      choices("channel", "Canal", CHANNEL_CHOICES, "presencial") +
+      '<div class="full">' + listbox({name:"customer_id", label:"Cliente registrado (opcional)", value:"",
+        options:[{value:"", label:"Sin cuenta"}, ...customers.map(c => ({value:c.id, label:c.name + " · " + c.email}))]}) + "</div>" +
+      '<div class="full">' + field("name", "Nombre completo", "", 'required minlength="3" maxlength="150" autocomplete="off"') + "</div>" +
+      field("email", "Correo electrónico", "", 'required type="email" maxlength="254" autocomplete="off"') +
+      field("phone", "Celular", "", 'required inputmode="tel" maxlength="20" autocomplete="off"') +
+      choices("doc_type", "Documento", DOC_CHOICES, "CC") +
+      '<div class="full">' + field("doc_number", "Número de documento", "", 'required maxlength="20" autocomplete="off"') + "</div>" +
+      '<fieldset class="full choiceSet orderAddress" hidden><legend>Dirección de entrega</legend><div class="formGrid">' +
+        field("department", "Departamento", "", 'maxlength="100"') + field("city", "Ciudad", "", 'maxlength="100"') +
+        field("neighborhood", "Barrio", "", 'maxlength="100"') + field("street_address", "Dirección", "", 'maxlength="255"') +
+      "</div></fieldset>" +
+      '<fieldset class="full choiceSet"><legend>Productos</legend><div class="lineAdd">' +
+        listbox({name:"line_product", label:"Producto", value:"", placeholder:"Elige un producto",
+          options:draft.products.map(p => ({value:p.id, label:p.name + " · " + money(p.price) + " · " + p.stock + " u."}))}) +
+        field("line_qty", "Cantidad", "1", 'inputmode="numeric" maxlength="3" autocomplete="off"') +
+        '<button class="btn secondary" type="button" data-add-line>Agregar</button></div>' +
+        '<ul class="list orderLines" id="orderLines"></ul><input type="hidden" name="items"></fieldset>' +
+      '<label class="check full"><input type="checkbox" name="accept_terms"><span>El cliente acepta los Términos y condiciones y la Política de devoluciones.</span></label>' +
+      '<label class="check full"><input type="checkbox" name="accept_privacy"><span>El cliente autoriza el tratamiento de sus datos personales (Ley 1581 de 2012).</span></label>' +
+    '</div><p class="formError" role="alert"></p><div class="sheetActions"><button class="btn secondary" type="button" data-close>Cancelar</button><button class="btn primary" type="submit">Registrar pedido</button></div></div></form>');
+  drawLines();
+}
+function drawLines() {
+  const ul = $("#orderLines");
+  if (!ul) return;
+  let total = 0;
+  ul.innerHTML = [...draft.lines.entries()].map(([id, qty]) => {
+    const p = draft.products.find(x => x.id === id);
+    total += p.price * qty;
+    return '<li><span><span class="cellMain">' + esc(p.name) + '</span><span class="cellSub">' + qty + " × " + money(p.price) + '</span></span><span class="lineEnd"><span class="num">' + money(p.price * qty) + '</span><button class="btn dangerGhost small" type="button" data-remove-line="' + id + '" aria-label="Quitar ' + esc(p.name) + '">Quitar</button></span></li>';
+  }).join("") + (draft.lines.size ? '<li><strong>Subtotal</strong><strong class="num">' + money(total) + "</strong></li>" : '<li class="muted">Aún no agregas productos.</li>');
+}
+function addLine(form) {
+  const id = Number(form.elements.line_product.value);
+  const qty = Number(form.elements.line_qty.value);
+  const p = draft.products.find(x => x.id === id);
+  const errors = {};
+  if (!p) errors.line_product = "Elige un producto.";
+  if (!Number.isInteger(qty) || qty < 1) errors.line_qty = "Escribe una cantidad válida.";
+  else if (p && (draft.lines.get(id) || 0) + qty > Math.min(p.stock, 99)) errors.line_qty = "Solo hay " + Math.min(p.stock, 99) + " unidades disponibles.";
+  clearFieldErrors(form);
+  if (Object.keys(errors).length) { showFieldErrors(form, errors); return; }
+  draft.lines.set(id, (draft.lines.get(id) || 0) + qty);
+  form.elements.line_qty.value = "1";
+  drawLines();
+}
+async function submitOrder(form) {
+  const f = form.elements;
+  const channel = f.channel.value;
+  const text = name => (f[name]?.value || "").trim();
+  const body = {
+    channel, name:text("name"), email:text("email").toLowerCase(), phone:text("phone"), doc_type:f.doc_type.value, doc_number:text("doc_number"),
+    accept_terms:f.accept_terms.checked, accept_privacy:f.accept_privacy.checked, idempotency_key:draft.key,
+    items:[...draft.lines.entries()].map(([product_id, quantity]) => ({product_id, quantity}))
+  };
+  if (f.customer_id.value) body.customer_id = Number(f.customer_id.value);
+  if (channel !== "presencial") for (const k of ["department", "city", "neighborhood", "street_address"]) body[k] = text(k);
+  const missing = {};
+  if (!body.items.length) missing.items = "Agrega al menos un producto.";
+  if (!body.accept_terms) missing.accept_terms = "El cliente debe aceptar los Términos.";
+  if (!body.accept_privacy) missing.accept_privacy = "El cliente debe autorizar el tratamiento de sus datos.";
+  if (Object.keys(missing).length) { showFieldErrors(form, missing, missing.items); return; }
+  const button = $("button[type=submit]", form);
+  setBusy(button, true, "Registrando…");
+  try {
+    const {order} = await api("/orders", {method:"POST", body});
+    modal.close();
+    toast("Pedido " + order.order_number + " registrado (" + (CHANNEL_INFO[order.channel] || CHANNEL_INFO.web)[1].toLowerCase() + ").");
+    if (currentView() === "pedidos") await loadOrders();
+    if (order.id) await openOrder(order.id);
+  } catch (err) {
+    setBusy(button, false);
+    showFieldErrors(form, err.data.fields, err.message);
+  }
+}
+// Canal presencial: sin direccion. El cliente registrado rellena nombre y correo.
+$("#modalBody").addEventListener("change", e => {
+  const form = e.target.form;
+  if (!form || form.dataset.form !== "order") return;
+  if (e.target.name === "channel") $(".orderAddress", form).hidden = e.target.value === "presencial";
+  if (e.target.name === "customer_id") {
+    const c = draft.customers.find(x => String(x.id) === e.target.value);
+    if (c) { form.elements.name.value = c.name; form.elements.email.value = c.email; }
+  }
+});
 
 const statusLabel = code => (state.meta.statuses.find(s => s.code === code) || {label:code}).label;
 async function openOrder(id) {
@@ -719,6 +989,23 @@ document.addEventListener("click", async event => {
       await loadOrders();
     } else if ("page" in d) {
       orderFilter.page = Number(d.page); await loadOrders();
+    } else if ("newUser" in d) {
+      openUserForm(null);
+    } else if ("editUser" in d) {
+      openUserForm(d.editUser);
+    } else if ("userToggle" in d) {
+      const user = (usersCache || []).find(u => u.id === Number(d.userToggle));
+      if (user) await patchUser(user.id, {is_active:!user.is_active}, el);
+    } else if ("userRole" in d) {
+      userFilter.role = d.userRole;
+      drawUsers();
+    } else if ("newOrder" in d) {
+      await openNewOrder();
+    } else if ("addLine" in d) {
+      addLine(el.form);
+    } else if ("removeLine" in d) {
+      draft.lines.delete(Number(d.removeLine));
+      drawLines();
     } else if ("customerStatus" in d) {
       customerFilter.status = d.customerStatus; customerFilter.page = 1;
       $$("[data-customer-status]").forEach(c => c.setAttribute("aria-pressed", String(c === el)));
@@ -769,7 +1056,8 @@ document.addEventListener("submit", event => {
   if (!kind) return;
   event.preventDefault();
   clearFieldErrors(form);
-  ({product:submitProduct, category:submitCategory, adjust:submitAdjust, settings:submitSettings})[kind](form);
+  ({product:submitProduct, category:submitCategory, adjust:submitAdjust, settings:submitSettings,
+    user:submitUser, userEdit:submitUserEdit, order:submitOrder})[kind](form);
 });
 
 /* ---------- Sesion ---------- */

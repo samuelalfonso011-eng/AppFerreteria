@@ -287,3 +287,13 @@ table.stack .cellValue{display:grid;justify-items:end;gap:2px;min-width:0}
   .skeleton::after{animation:none;opacity:0}
   .barFill{transition:none}
 }
+
+/* ---------- Fase financiera: usuarios, nuevo pedido ---------- */
+.check{display:grid;grid-template-columns:var(--space-5) 1fr;gap:var(--space-3);align-items:start;color:var(--text);font-size:var(--text-sm);line-height:1.5}
+.check input{width:var(--icon-md);height:var(--icon-md);margin:var(--hairline-gap) 0 0;accent-color:var(--accent);cursor:pointer}
+.check input:focus-visible{outline:var(--focus-ring) solid var(--focus);outline-offset:var(--hairline-gap)}
+.check .fieldError{grid-column:2}
+.lineAdd{display:grid;gap:var(--space-3);align-items:end}
+.lineEnd{display:flex;align-items:center;gap:var(--space-2)}
+.orderLines li{gap:var(--space-3)}
+@media(min-width:640px){.lineAdd{grid-template-columns:1fr calc(var(--hit) * 2) auto}}
