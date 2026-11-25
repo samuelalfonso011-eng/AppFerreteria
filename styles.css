@@ -16,7 +16,7 @@ dialog{border:0;color:var(--text);background:var(--elevated);padding:32px;border
 }
 @media(max-width:800px){.heroInner{min-height:420px}}
 @media(max-width:620px){.heroInner{grid-template-columns:1fr;text-align:center;padding:48px 20px 22px}.ctas{justify-content:center}.hero figure{width:min(340px,100%);margin:20px auto 0}#categorias{grid-template-columns:1fr}.columns{grid-template-columns:1fr 1fr}.sectionHead button{display:none}.feature{padding-top:42px}}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before{animation-duration:.01ms!important;transition-duration:.01ms!important}.pending{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.pending{opacity:1;transform:none}}
 
 /* ---------- Fase 2: estados del catalogo ---------- */
 .catalogState{flex:1 0 100%;min-height:220px;display:grid;place-content:center;justify-items:center;gap:var(--space-3);text-align:center;color:var(--text-2);font-size:var(--text-md)}
@@ -147,3 +147,101 @@ dialog{border:0;color:var(--text);background:var(--elevated);padding:32px;border
 .pwToggle[aria-pressed="true"]{color:var(--link)}
 .pwToggle svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6}
 .fieldHint{font-size:var(--text-xs);color:var(--text-2);line-height:1.4}
+
+/* ---------- Fase 5B: movimiento, carga progresiva y responsive ----------
+   Tesis de movimiento: el momento propio es "agregar al carrito" (el contador late y llega
+   una notificacion estilo iOS). El resto solo explica estados: hojas que entran y salen,
+   carrito que se desliza, buscador y menu que se despliegan. Solo transform y opacity,
+   entrada 320 ms y salida 200 ms con la curva de theme.css. */
+
+/* Hojas y modales: entrada y salida reales con @starting-style (sin soporte, abren al instante) */
+dialog{opacity:0;transform:translateY(var(--shift-lg)) scale(.98);transition:opacity var(--dur-exit) var(--ease),transform var(--dur-exit) var(--ease),overlay var(--dur-exit) allow-discrete,display var(--dur-exit) allow-discrete}
+dialog[open]{opacity:1;transform:none;transition-duration:var(--dur-enter)}
+@starting-style{dialog[open]{opacity:0;transform:translateY(var(--shift-lg)) scale(.98)}}
+dialog::backdrop{opacity:0;transition:opacity var(--dur-exit) var(--ease),overlay var(--dur-exit) allow-discrete,display var(--dur-exit) allow-discrete}
+dialog[open]::backdrop{opacity:1;transition-duration:var(--dur-enter)}
+@starting-style{dialog[open]::backdrop{opacity:0}}
+
+/* Carrito: pantalla completa en movil, panel lateral desde 621px; entra desde la derecha */
+#drawer{width:100%;max-width:100%;opacity:1;transform:translateX(100%)}
+#drawer[open]{animation:none;transform:none}
+@starting-style{#drawer[open]{transform:translateX(100%)}}
+
+/* Buscador y menu de cuenta: se despliegan desde su origen */
+#searchBar{transition:opacity var(--dur-exit) var(--ease),transform var(--dur-exit) var(--ease),display var(--dur-exit) allow-discrete}
+#searchBar:not([hidden]){transition-duration:var(--dur-enter)}
+#searchBar[hidden]{display:none;opacity:0;transform:translateY(calc(0px - var(--shift-md)))}
+@starting-style{#searchBar:not([hidden]){opacity:0;transform:translateY(calc(0px - var(--shift-md)))}}
+.accountMenu{transform-origin:top right;transition:opacity var(--dur-exit) var(--ease),transform var(--dur-exit) var(--ease),display var(--dur-exit) allow-discrete}
+.accountMenu[hidden]{opacity:0;transform:scale(.96)}
+@starting-style{.accountMenu:not([hidden]){opacity:0;transform:scale(.96)}}
+
+/* Botones pildora: respuesta tactil inmediata */
+.primary,.outline,.add,.pill,.close,.sectionHead button,.menuItem{transition:transform var(--dur-feedback) var(--ease),background-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.outline:active,.close:active,.sectionHead button:active{transform:scale(var(--press-scale))}
+.outline:hover{background:color-mix(in srgb,var(--sky) 12%,transparent)}
+
+/* Tarjetas: la tarjeta no se mueve (no se escapa del puntero); se eleva su sombra y la ilustracion se acerca apenas */
+.card,.tile{transition:box-shadow var(--dur) var(--ease)}
+.card svg,.tile svg{transition:transform var(--dur-enter) var(--ease)}
+@media(hover:hover){.card:hover svg{transform:scale(1.03)}.tile:hover svg{transform:scale(1.02)}}
+
+/* Contador del carrito: late cuando entra un producto (la clase la pone app.js) */
+#badge{display:inline-block}
+#badge.bump{animation:badgeBump var(--dur-reveal) var(--ease)}
+@keyframes badgeBump{0%{transform:scale(1)}30%{transform:scale(1.35)}100%{transform:scale(1)}}
+
+/* Aviso tipo notificacion de iOS/macOS */
+#status{display:flex;align-items:center;gap:var(--space-2);max-width:calc(100vw - var(--space-6));padding:var(--space-2) var(--space-4) var(--space-2) var(--space-3);font-size:var(--text-sm);font-weight:550;box-shadow:var(--shadow-sheet);background:color-mix(in srgb,var(--toast-bg) 92%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+#status::before{content:"";flex:0 0 auto;width:var(--space-5);height:var(--space-5);border-radius:50%;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m6 10.5 2.5 2.5L14 7.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+#status:not(:empty){animation:toastIn var(--dur-enter) var(--ease)}
+#status.again{animation:toastAgain var(--dur-enter) var(--ease)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,var(--toast-rise)) scale(.96)}}
+@keyframes toastAgain{from{transform:translate(-50%,0) scale(.97)}}
+
+/* Esqueletos de carga: misma silueta que las tarjetas reales, sin saltos al llegar los datos */
+.skeleton{position:relative;overflow:hidden;background:var(--surface)}
+.skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--control-hover) 70%,transparent),transparent);transform:translateX(-100%);animation:shimmer var(--dur-shimmer) var(--ease) infinite}
+@keyframes shimmer{to{transform:translateX(100%)}}
+.skeletonCard{flex:0 0 min(var(--card-width),84vw);height:var(--skeleton-card-h);border-radius:var(--radius-tile)}
+.skeletonTile{min-height:var(--skeleton-tile-h);border-radius:var(--radius-tile)}
+.skeletonLine{display:block;height:var(--skeleton-line);border-radius:var(--shift-md);background:var(--control-hover);margin-top:var(--space-3)}
+
+/* Render diferido: el navegador no dibuja lo que esta lejos del viewport */
+#categorias,#catalogo,footer{content-visibility:auto;contain-intrinsic-size:auto 640px}
+
+/* Carrusel tactil: desliza sin arrastrar la pagina */
+#cards{overscroll-behavior-x:contain;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+#loadMore{display:block;margin:var(--space-2) auto 0}
+#loadMore[hidden]{display:none}
+
+/* Responsive: 360-430 movil, 768-1024 tablet, 1280+ escritorio */
+html,body{overflow-x:clip}
+@media(min-width:621px){#drawer{width:min(440px,94vw)}}
+@media(max-width:430px){
+  #catalogo{padding:var(--space-7) var(--gutter-mobile)}
+  .tile{padding:var(--pad-tile-mobile)}
+  dialog{padding:var(--pad-dialog-mobile)}
+  .sheet{max-height:100dvh}
+  .ctas{flex-wrap:wrap}
+}
+@media(min-width:768px) and (max-width:1024px){
+  .heroInner{gap:var(--space-5)}
+  .card{flex-basis:calc((100% - var(--space-6)) / 2.4)}
+}
+
+/* Movimiento reducido: sin desplazamientos ni pulsos; se conservan los cambios de opacidad que confirman acciones */
+@media(prefers-reduced-motion:reduce){
+  dialog,dialog[open],#searchBar[hidden],.accountMenu[hidden],.card svg,.tile svg{transform:none}
+  @starting-style{dialog[open],#searchBar:not([hidden]),.accountMenu:not([hidden]){transform:none}}
+  #drawer,#drawer[open]{transform:none;transition:opacity var(--dur-exit) linear,overlay var(--dur-exit) allow-discrete,display var(--dur-exit) allow-discrete}
+  @starting-style{#drawer[open]{transform:none;opacity:0}}
+  #drawer:not([open]){opacity:0}
+  @media(hover:hover){.card:hover svg,.tile:hover svg{transform:none}}
+  #badge.bump{animation:none}
+  #status:not(:empty),#status.again{animation:toastFade var(--dur-exit) linear}
+  .skeleton::after{animation:none;opacity:0}
+  #cards{scroll-behavior:auto}
+  .primary:active,.add:active,.pill:active,.outline:active,.close:active{transform:none}
+}
+@keyframes toastFade{from{opacity:0}}

@@ -221,4 +221,67 @@ dialog::backdrop{background:var(--backdrop,rgba(0,0,0,.55))}
   .dash .wide{grid-column:1/-1}
   .split{grid-template-columns:2fr 1fr;align-items:start}
 }
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* ---------- Fase 5B: movimiento, carga y tablas en movil ---------- */
+/* Pestanas y botones: respuesta inmediata */
+.tabs button{transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur-feedback) var(--ease)}
+.tabs button:active,.chip:active{transform:scale(var(--press-scale))}
+.btn:active{transform:scale(var(--press-scale))}
+.chip{transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur-feedback) var(--ease)}
+.chip .count{margin-left:var(--shift-md);font-variant-numeric:tabular-nums;opacity:.72}
+
+/* Cambio de pestana: el contenido nuevo entra con un fundido corto (sin coreografia de carga) */
+.view > *,#modalBody > *{transition:opacity var(--dur-enter) var(--ease),transform var(--dur-enter) var(--ease)}
+@starting-style{.view > *,#modalBody > *{opacity:0;transform:translateY(var(--shift-md))}}
+
+/* Hojas modales: entrada y salida */
+dialog{opacity:0;transform:translateY(var(--shift-lg)) scale(.98);transition:opacity var(--dur-exit) var(--ease),transform var(--dur-exit) var(--ease),overlay var(--dur-exit) allow-discrete,display var(--dur-exit) allow-discrete}
+dialog[open]{opacity:1;transform:none;transition-duration:var(--dur-enter)}
+@starting-style{dialog[open]{opacity:0;transform:translateY(var(--shift-lg)) scale(.98)}}
+dialog::backdrop{opacity:0;transition:opacity var(--dur-exit) var(--ease),overlay var(--dur-exit) allow-discrete,display var(--dur-exit) allow-discrete}
+dialog[open]::backdrop{opacity:1;transition-duration:var(--dur-enter)}
+@starting-style{dialog[open]::backdrop{opacity:0}}
+.lbList{transform-origin:top center;transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),display var(--dur-fast) allow-discrete}
+@starting-style{.lbList:not([hidden]){opacity:0;transform:translateY(calc(0px - var(--shift-sm)))}}
+
+/* Esqueletos con brillo suave */
+.skeleton{position:relative;overflow:hidden}
+.skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--control-hover) 70%,transparent),transparent);transform:translateX(-100%);animation:shimmer var(--dur-shimmer) var(--ease) infinite}
+@keyframes shimmer{to{transform:translateX(100%)}}
+.skeletonRow{height:var(--skeleton-row-h);border-radius:0;border:0;border-top:1px solid var(--line);background:var(--elevated)}
+
+/* Tablas: en movil cada fila es una tarjeta con etiquetas; desde 640px vuelven a ser tabla */
+table.stack thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+table.stack,table.stack tbody,table.stack tr,table.stack td{display:block;width:100%}
+table.stack tr{padding:var(--space-4) var(--space-5);border-top:1px solid var(--line)}
+table.stack tbody tr:first-child{border-top:0}
+table.stack td,table.stack td:first-child,table.stack td:last-child{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);padding:var(--space-1) 0;border:0;text-align:right}
+table.stack td::before{content:attr(data-label);flex:0 0 auto;color:var(--text-2);font-size:var(--text-xs);font-weight:600;text-align:left}
+table.stack td.cellLead{display:block;text-align:left;padding-bottom:var(--space-2)}
+table.stack td.cellLead::before,table.stack td.cellActions::before{content:none}
+table.stack td.cellActions{display:block;padding-top:var(--space-3)}
+table.stack td.cellActions .rowActions{justify-content:flex-start;flex-wrap:wrap}
+@media(min-width:640px){
+  table.stack thead{position:static;width:auto;height:auto;overflow:visible;clip-path:none;display:table-header-group}
+  table.stack{display:table}
+  table.stack tbody{display:table-row-group}
+  table.stack tr{display:table-row;padding:0;border:0}
+  table.stack td,table.stack td.cellLead,table.stack td.cellActions{display:table-cell;width:auto;padding:var(--space-3) var(--space-4);border-top:1px solid var(--line);text-align:left}
+  table.stack td.right{text-align:right}
+  table.stack td:first-child{padding-left:var(--space-5)}
+  table.stack td:last-child{padding-right:var(--space-5)}
+  table.stack td::before{content:none}
+  table.stack td.cellActions .rowActions{justify-content:flex-end;flex-wrap:nowrap}
+}
+
+/* Clientes */
+.customerHead{display:flex;align-items:center;gap:var(--space-3)}
+.initial{display:grid;place-items:center;flex:0 0 auto;width:var(--avatar-md);height:var(--avatar-md);border-radius:50%;background:var(--control);color:var(--text);font-weight:650;font-size:var(--text-sm)}
+
+/* Movimiento reducido: sin desplazamientos ni brillo; se conservan los fundidos que confirman cambios */
+@media(prefers-reduced-motion:reduce){
+  .view > *,#modalBody > *,dialog,dialog[open]{transform:none}
+  @starting-style{.view > *,#modalBody > *,dialog[open],.lbList:not([hidden]){transform:none}}
+  .btn:active,.tabs button:active,.chip:active{transform:none}
+  .skeleton::after{animation:none;opacity:0}
+  .barFill{transition:none}
+}

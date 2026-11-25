@@ -40,6 +40,13 @@
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;
   --text-xs:12px;--text-sm:14px;--text-md:17px;--text-lg:21px;--text-display:clamp(42px,8vw,64px);
   --dur-fast:.15s;--dur:.25s;--ease:cubic-bezier(.25,.1,.25,1);
+  /* Movimiento (Fase 5B): curva Apple. Entrar mas lento que salir; el feedback es inmediato. */
+  --dur-feedback:.12s;--dur-enter:.32s;--dur-exit:.2s;--dur-reveal:.6s;--dur-shimmer:1.4s;
+  --press-scale:.98;--shift-lg:12px;--shift-md:6px;--shift-sm:4px;--toast-rise:16px;
+  /* Medidas de componentes de la tienda y del admin */
+  --radius-tile:24px;--card-width:285px;--skeleton-card-h:356px;--skeleton-tile-h:330px;
+  --skeleton-line:12px;--skeleton-row-h:64px;--avatar-md:36px;--gutter-mobile:16px;
+  --pad-tile-mobile:28px 20px;--pad-dialog-mobile:24px 20px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -65,3 +72,7 @@ body{background:var(--bg);color:var(--text)}
 .themeToggle .moon{display:block}.themeToggle .sun{display:none}
 :root[data-theme="dark"] .themeToggle .moon{display:none}
 :root[data-theme="dark"] .themeToggle .sun{display:block}
+
+/* Superficies del navegador con la paleta del tema (seleccion, cursor de texto, barras de desplazamiento) */
+:root{accent-color:var(--accent);caret-color:var(--focus);scrollbar-color:var(--line-strong) transparent}
+::selection{background:color-mix(in srgb,var(--focus) 28%,transparent);color:inherit}
