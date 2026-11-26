@@ -70,4 +70,20 @@ create policy server_access on public.invoice_items to ferrepro_backend using (t
 drop policy if exists server_access on public.payments;
 create policy server_access on public.payments to ferrepro_backend using (true) with check (true);
 
+revoke all on public.integrity_ledger, public.integrity_verifications
+    from public, anon, authenticated, service_role, ferrepro_backend;
+grant select, insert on public.integrity_ledger, public.integrity_verifications to ferrepro_backend;
+grant select on public.integrity_ledger, public.integrity_verifications to service_role;
+revoke all on sequence public.integrity_ledger_id_seq, public.integrity_verifications_id_seq
+    from public, anon, authenticated, service_role, ferrepro_backend;
+grant usage on sequence public.integrity_ledger_id_seq, public.integrity_verifications_id_seq to ferrepro_backend;
+grant update(status) on public.invoices to ferrepro_backend;
+drop policy if exists server_append on public.integrity_ledger;
+create policy server_append on public.integrity_ledger for insert to ferrepro_backend with check (true);
+drop policy if exists server_read on public.integrity_ledger;
+create policy server_read on public.integrity_ledger for select to ferrepro_backend using (true);
+drop policy if exists server_append on public.integrity_verifications;
+create policy server_append on public.integrity_verifications for insert to ferrepro_backend with check (true);
+drop policy if exists server_read on public.integrity_verifications;
+create policy server_read on public.integrity_verifications for select to ferrepro_backend using (true);
 commit;

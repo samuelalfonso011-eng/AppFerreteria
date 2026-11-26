@@ -87,6 +87,17 @@ def seed_demo_data():
 
 
 def register_cli(app):
+    @app.cli.command("verify-integrity")
+    def verify_integrity():
+        """Audita la cadena como sistema. Sale con código 1 si encuentra una divergencia."""
+        import json
+        from app.services.integrity_service import verify_chain
+
+        report = verify_chain()
+        click.echo(json.dumps(report.to_dict(), ensure_ascii=False))
+        if report.status == "compromised":
+            raise click.exceptions.Exit(1)
+
     @app.cli.command("init-db")
     def init_db():
         """Crea las tablas y las filas base (ajustes y tokens de cache)."""

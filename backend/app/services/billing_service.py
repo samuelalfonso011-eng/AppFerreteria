@@ -6,6 +6,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models.billing import Invoice, InvoiceItem, Payment
 from app.models.order import Order, OrderStatus, OrderStatusHistory
+from app.services import integrity_service
 from app.services.errors import BusinessError
 from app.utils.timeutils import utcnow
 
@@ -43,6 +44,7 @@ def issue_invoice(order, actor, discount):
             changed_by_user_id=actor.id, comment="Pedido confirmado al emitir factura.",
         ))
     db.session.add(invoice)
+    integrity_service.append_event("invoice", invoice, "issued")
     db.session.commit()
     return invoice, True
 
@@ -53,6 +55,7 @@ def register_payment(invoice_id, actor, method, amount, receipt_type, receipt_da
         raise BusinessError("Factura no encontrada.", code="not_found", status=404)
     # El mismo bloqueo del pedido serializa las reservas del saldo.
     staff_order(invoice.order_id, actor, lock=True)
+    db.session.refresh(invoice)
     if invoice.status != "emitida":
         raise BusinessError("La factura fue anulada.", code="invoice_void")
     reserved = db.session.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
@@ -67,5 +70,30 @@ def register_payment(invoice_id, actor, method, amount, receipt_type, receipt_da
         status="aprobado" if approved else "pendiente", paid_at=utcnow() if approved else None,
     )
     db.session.add(payment)
+    integrity_service.append_event("payment", payment, "payment_recorded")
     db.session.commit()
     return payment
+
+
+def void_invoice(invoice_id, actor):
+    from app.models.integrity import LedgerEntry
+
+    invoice = db.session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise BusinessError("Factura no encontrada.", code="not_found", status=404)
+    staff_order(invoice.order_id, actor, lock=True)
+    db.session.refresh(invoice)
+    if invoice.status == "anulada":
+        return invoice
+    if Payment.query.filter(Payment.invoice_id == invoice.id,
+                            Payment.status.in_(("aprobado", "pendiente"))).first():
+        raise BusinessError("La factura tiene pagos activos.", code="active_payments")
+    integrity_service.lock_chain()
+    last = LedgerEntry.query.filter_by(entity_type="invoice", entity_id=invoice.id).order_by(
+        LedgerEntry.seq_no.desc()).first()
+    if last is None or last.canonical_payload != integrity_service.snapshot("invoice", invoice):
+        raise BusinessError("Verifica la integridad antes de anular.", code="integrity_conflict")
+    invoice.status = "anulada"
+    integrity_service.append_event("invoice", invoice, "voided")
+    db.session.commit()
+    return invoice
