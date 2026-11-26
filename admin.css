@@ -297,3 +297,27 @@ table.stack .cellValue{display:grid;justify-items:end;gap:2px;min-width:0}
 .lineEnd{display:flex;align-items:center;gap:var(--space-2)}
 .orderLines li{gap:var(--space-3)}
 @media(min-width:640px){.lineAdd{grid-template-columns:1fr calc(var(--hit) * 2) auto}}
+
+/* Filtro de canal: control segmentado (una sola opcion activa) */
+.segmentedFilter{display:inline-flex;max-width:100%;overflow-x:auto;scrollbar-width:none;gap:var(--hairline-gap);padding:var(--hairline-gap);margin-bottom:var(--space-4);border-radius:var(--radius-field);background:var(--control)}
+.segmentedFilter::-webkit-scrollbar{display:none}
+.segment{flex:0 0 auto;min-height:var(--control-sm);padding:0 var(--space-4);border-radius:calc(var(--radius-field) - var(--hairline-gap));color:var(--text-2);font-size:var(--text-sm);font-weight:550;white-space:nowrap;transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease),transform var(--dur-feedback) var(--ease)}
+.segment:hover{color:var(--text)}
+.segment:active{transform:scale(var(--press-scale))}
+.segment[aria-pressed="true"]{background:var(--elevated);color:var(--text);box-shadow:var(--shadow-hover)}
+
+/* Factura y pagos */
+.badgeRow{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.invoiceRow{display:grid;gap:var(--space-3);align-items:center}
+.list .totalRow{border-top:1px solid var(--line-strong)}
+.payments{margin-top:var(--space-4);border-top:1px solid var(--line);padding-top:var(--space-3)}
+.payments .lineEnd{flex-wrap:wrap;justify-content:flex-end}
+.dropField{gap:var(--space-2)}
+.dropLabel{color:var(--text-2);font-size:var(--text-xs)}
+.dropzone{display:grid;justify-items:center;gap:var(--space-1);padding:var(--space-5) var(--space-4);border:1px dashed var(--line-strong);border-radius:var(--radius-field);background:var(--bg);color:var(--text);text-align:center;cursor:pointer;transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+.dropzone svg{width:var(--icon-lg);height:var(--icon-lg);fill:none;stroke:var(--link);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dropzone:hover,.dropzone.over{border-color:var(--focus);background:var(--info-soft)}
+.dropzone:focus-within{outline:var(--focus-ring) solid var(--focus);outline-offset:var(--hairline-gap)}
+.fileChip{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-2) var(--space-2) var(--space-2) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-field);background:var(--surface);font-size:var(--text-sm);overflow-wrap:anywhere}
+@media(min-width:640px){.invoiceRow{grid-template-columns:1fr auto}}
+@media(prefers-reduced-motion:reduce){.segment:active{transform:none}}

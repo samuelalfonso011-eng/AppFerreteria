@@ -45,9 +45,13 @@ async function api(path, {method = "GET", body} = {}, retry = true) {
   const options = {method, credentials:"same-origin", headers:{Accept:"application/json"}};
   if (method !== "GET") {
     if (!csrf) csrf = (await (await fetch("/api/auth/csrf", {credentials:"same-origin"})).json()).csrf;
-    options.headers["Content-Type"] = "application/json";
     options.headers["X-CSRF-Token"] = csrf;
-    options.body = JSON.stringify(body || {});
+    if (body instanceof FormData) {
+      options.body = body; // multipart: el navegador pone el Content-Type con su boundary
+    } else {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body || {});
+    }
   }
   let res;
   try { res = await fetch("/api" + path, options); }
@@ -357,7 +361,7 @@ async function renderDashboard(view) {
 }
 
 /* ---------- Pedidos ---------- */
-const orderFilter = {status:"", q:"", page:1};
+const orderFilter = {status:"", q:"", page:1, channel:""};
 function ordersTable(rows) {
   return '<table><thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Canal</th><th scope="col">Estado</th><th scope="col" class="right">Total</th></tr></thead><tbody>' +
     rows.map(o => {
@@ -378,6 +382,9 @@ async function renderOrders(view) {
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar pedidos</span><input type="search" id="orderSearch" placeholder="Buscar por número, cliente o correo" value="' + esc(orderFilter.q) + '"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por estado">' +
     chips.map(([code, label]) => '<button class="chip" data-order-status="' + code + '" aria-pressed="' + (code === orderFilter.status) + '">' + esc(label) + "</button>").join("") +
+    '</div><div class="segmentedFilter" role="group" aria-label="Filtrar por canal">' +
+    [["", "Todos los canales"], ...CHANNEL_CHOICES.map(c => [c.value, c.label])].map(([code, label]) =>
+      '<button class="segment" data-order-channel="' + code + '" aria-pressed="' + (code === orderFilter.channel) + '">' + esc(label) + "</button>").join("") +
     '</div><div class="card flush" id="ordersBox"></div>';
   $("#orderSearch").addEventListener("input", debounce(e => { orderFilter.q = e.target.value.trim(); orderFilter.page = 1; loadOrders(); }, 250));
   await loadOrders();
@@ -387,13 +394,15 @@ async function loadOrders() {
   if (!box) return;
   const params = new URLSearchParams({page:orderFilter.page});
   if (orderFilter.status) params.set("status", orderFilter.status);
+  if (orderFilter.channel) params.set("channel", orderFilter.channel);
   if (orderFilter.q) params.set("q", orderFilter.q);
   box.setAttribute("aria-busy", "true");
   const d = await api("/admin/orders?" + params);
   box.removeAttribute("aria-busy");
   if (!d.orders.length) {
-    box.innerHTML = emptyState(orderFilter.q || orderFilter.status ? "Ningún pedido coincide" : "Todavía no hay pedidos",
-      orderFilter.q || orderFilter.status ? "Prueba con otro estado o término de búsqueda." : "Los pedidos de la tienda aparecerán aquí al instante.");
+    const filtered = orderFilter.q || orderFilter.status || orderFilter.channel;
+    box.innerHTML = emptyState(filtered ? "Ningún pedido coincide" : "Todavía no hay pedidos",
+      filtered ? "Prueba con otro estado, canal o término de búsqueda." : "Los pedidos de la tienda aparecerán aquí al instante.");
     return;
   }
   box.innerHTML = '<div class="tableWrap">' + ordersTable(d.orders) + "</div>" +
@@ -704,14 +713,18 @@ $("#modalBody").addEventListener("change", e => {
 
 const statusLabel = code => (state.meta.statuses.find(s => s.code === code) || {label:code}).label;
 async function openOrder(id) {
-  const {order:o} = await api("/admin/orders/" + id);
+  const [{order:o}, billing] = await Promise.all([
+    api("/admin/orders/" + id),
+    api("/orders/" + id + "/invoice").catch(() => null) // sin permiso o sin red: el pedido igual se muestra
+  ]);
   const forward = o.allowed_transitions.filter(s => s !== "CANCELLED");
   const canCancel = o.allowed_transitions.includes("CANCELLED");
   const items = o.items.map(i => '<li><span><span class="cellMain">' + esc(i.name) + '</span><span class="cellSub">' + esc(i.sku) + " · " + i.quantity + " × " + money(i.unit_price) + '</span></span><span class="num">' + money(i.subtotal) + "</span></li>").join("");
   openModal(
     '<div class="sheetHead"><div><h2 id="modalTitle">' + esc(o.order_number) + '</h2><span class="muted">' + fmtDate(o.created_at) + "</span></div>" + closeButton + "</div>" +
     '<div class="sheetBody">' +
-      "<div>" + statusBadge(o.status, o.status_label) + "</div>" +
+      '<div class="badgeRow">' + statusBadge(o.status, o.status_label) + (o.channel ? channelBadge(o.channel) : "") + "</div>" +
+      invoiceSummary(o, billing) +
       '<section class="section"><h3>Cliente</h3><dl class="facts">' + fact("Nombre", o.customer.name) + fact("Correo", o.customer.email) + fact("Celular", o.customer.phone) + fact("Documento", o.customer.doc_type + " " + o.customer.doc_number) + "</dl></section>" +
       '<section class="section"><h3>Entrega</h3><dl class="facts">' + fact("Dirección", o.shipping.line) + (o.notes ? fact("Indicaciones", o.notes) : "") + "</dl></section>" +
       '<section class="section"><h3>Productos</h3><ul class="list">' + items +
@@ -730,6 +743,190 @@ async function openOrder(id) {
         : "") +
     "</div>");
 }
+/* ---------- Factura y pagos ----------
+   Contrato (backend de Codex):
+   GET  /api/orders/{id}/invoice  -> {invoice | null, payments: [...], balance: numero COP}
+   POST /api/orders/{id}/invoice  {discount_amount?: "1000.00"} -> {invoice, created} (idempotente)
+   POST /api/invoices/{id}/payments  JSON {payment_method, amount} o FormData con receipt (PDF/PNG/JPEG, 5 MiB)
+   balance solo descuenta pagos aprobados, pero al registrar el backend tambien cuenta los pendientes:
+   el monto disponible para un pago nuevo es balance menos pendientes. */
+const amountOf = v => Number(v) || 0; // los importes de factura llegan como "117810.00"
+const METHOD_LABEL = {efectivo:"Efectivo", tarjeta:"Tarjeta", transferencia:"Transferencia", pse:"PSE", nequi:"Nequi"};
+const METHOD_CHOICES = Object.entries(METHOD_LABEL).map(([value, label]) => ({value, label}));
+const PAYMENT_STATUS = {pendiente:["warn", ICON.clock, "Pendiente"], aprobado:["ok", ICON.check, "Aprobado"], rechazado:["bad", ICON.x, "Rechazado"], anulado:["", ICON.dot, "Anulado"]};
+const INVOICE_STATUS = {emitida:["ok", ICON.check, "Emitida"], anulada:["bad", ICON.x, "Anulada"]};
+const statusPill = (map, key) => { const [tone, icon, label] = map[key] || ["", ICON.dot, key]; return badge(tone, icon, label); };
+const RECEIPT_URL = /^\/api\/payments\/\d+\/receipt$/;
+const RECEIPT_TYPES = {"application/pdf":"PDF", "image/png":"PNG", "image/jpeg":"JPEG"};
+const RECEIPT_MAX = 5 * 1024 * 1024;
+const pendingOf = payments => payments.filter(p => p.status === "pendiente").reduce((sum, p) => sum + amountOf(p.amount), 0);
+const availableOf = billing => Math.max(0, amountOf(billing.balance) - pendingOf(billing.payments));
+const fileSize = bytes => bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + " KB" : (bytes / 1024 / 1024).toFixed(1).replace(".", ",") + " MB";
+
+function invoiceSummary(o, billing) {
+  if (!billing) return "";
+  const inv = billing.invoice;
+  if (inv) {
+    return '<section class="section"><h3>Factura</h3><div class="invoiceRow"><dl class="facts">' +
+      fact("Número", "N.º " + inv.invoice_number) + fact("Total", money(amountOf(inv.total_amount))) + fact("Saldo por cobrar", money(amountOf(billing.balance))) +
+      '</dl><button class="btn secondary" type="button" data-invoice-order="' + o.id + '">Ver factura</button></div></section>';
+  }
+  if (o.status === "CANCELLED") return '<section class="section"><h3>Factura</h3><p class="muted">Los pedidos cancelados no se facturan.</p></section>';
+  return '<section class="section"><h3>Factura</h3><div class="invoiceRow"><p class="muted">Este pedido aún no tiene factura.</p>' +
+    '<button class="btn secondary" type="button" data-invoice-order="' + o.id + '">Emitir factura</button></div></section>';
+}
+
+async function openInvoice(orderId) {
+  const [{order:o}, billing] = await Promise.all([api("/admin/orders/" + orderId), api("/orders/" + orderId + "/invoice")]);
+  if (!billing.invoice) return renderIssueForm(o);
+  renderInvoice(o, billing);
+}
+const backToOrder = id => '<button class="btn secondary" type="button" data-back-order="' + id + '">Volver al pedido</button>';
+
+function renderIssueForm(o) {
+  const subtotal = o.items.reduce((sum, i) => sum + amountOf(i.subtotal), 0);
+  openModal(
+    '<form data-form="invoice" data-order-id="' + o.id + '" novalidate>' +
+    '<div class="sheetHead"><div><h2 id="modalTitle">Emitir factura</h2><span class="muted">Pedido ' + esc(o.order_number) + "</span></div>" + closeButton + "</div>" +
+    '<div class="sheetBody">' +
+      '<section class="section"><h3>Resumen del pedido</h3><ul class="list">' +
+        o.items.map(i => '<li><span><span class="cellMain">' + esc(i.name) + '</span><span class="cellSub">' + i.quantity + " × " + money(amountOf(i.unit_price)) + '</span></span><span class="num">' + money(amountOf(i.subtotal)) + "</span></li>").join("") +
+        '<li><strong>Subtotal de productos</strong><strong class="num">' + money(subtotal) + "</strong></li></ul></section>" +
+      '<div class="formGrid">' + field("discount_amount", "Descuento en pesos (opcional)", "", 'inputmode="numeric" autocomplete="off" placeholder="0"') +
+      '<p class="hint full">El descuento se aplica al subtotal de productos. El impuesto lo calcula el servidor con la tarifa configurada y el envío se suma al final. La emisión confirma el pedido si estaba pendiente.</p></div>' +
+      '<p class="formError" role="alert"></p><div class="sheetActions">' + backToOrder(o.id) + '<button class="btn primary" type="submit">Emitir factura</button></div>' +
+    "</div></form>");
+}
+async function submitInvoice(form) {
+  const orderId = form.dataset.orderId;
+  const raw = numberValue(form.elements.discount_amount.value);
+  if (raw !== null && (typeof raw !== "number" || raw < 0)) { showFieldErrors(form, {discount_amount:"Escribe un valor en pesos, por ejemplo 5000."}); return; }
+  const body = raw ? {discount_amount:raw.toFixed(2)} : {};
+  const button = $("button[type=submit]", form);
+  setBusy(button, true, "Emitiendo…"); // el boton queda deshabilitado: no hay doble emision (y el backend es idempotente)
+  try {
+    const {invoice, created} = await api("/orders/" + orderId + "/invoice", {method:"POST", body});
+    toast(created ? "Factura N.º " + invoice.invoice_number + " emitida." : "Este pedido ya tenía la factura N.º " + invoice.invoice_number + ".");
+    await openInvoice(orderId);
+    if (currentView() === "pedidos") loadOrders();
+  } catch (err) {
+    setBusy(button, false);
+    const fields = err.data.error === "invalid_discount" ? {discount_amount:err.message} : err.data.fields;
+    showFieldErrors(form, fields, err.message);
+  }
+}
+
+function renderInvoice(o, billing) {
+  const inv = billing.invoice;
+  const available = availableOf(billing);
+  const pending = pendingOf(billing.payments);
+  const rows = [["Subtotal", amountOf(inv.subtotal)], ["Descuento", -amountOf(inv.discount_amount)], ["Impuestos", amountOf(inv.tax_amount)], ["Envío", amountOf(inv.shipping_cost)]];
+  const payments = billing.payments.length
+    ? '<ul class="list payments">' + billing.payments.map(p =>
+        '<li><span><span class="cellMain">' + esc(METHOD_LABEL[p.payment_method] || p.payment_method) + " · " + money(amountOf(p.amount)) + "</span>" +
+        '<span class="cellSub">' + fmtDate(p.paid_at || p.created_at) + "</span></span>" +
+        '<span class="lineEnd">' + statusPill(PAYMENT_STATUS, p.status) +
+        (p.receipt_url && RECEIPT_URL.test(p.receipt_url) ? '<a class="btn secondary small" href="' + esc(p.receipt_url) + '" download rel="noopener">Comprobante</a>' : "") +
+        "</span></li>").join("") + "</ul>"
+    : '<p class="muted">Aún no hay pagos registrados.</p>';
+  const canPay = inv.status === "emitida" && available > 0;
+  const payForm = canPay
+    ? '<form data-form="payment" data-invoice-id="' + inv.id + '" data-order-id="' + o.id + '" data-available="' + available + '" novalidate class="formGrid">' +
+        choices("payment_method", "Método de pago", METHOD_CHOICES, "efectivo") +
+        '<div class="full">' + field("amount", "Monto en pesos", String(Math.round(available * 100) / 100), 'required inputmode="decimal" autocomplete="off"') +
+        '<p class="hint">Disponible para registrar: ' + money(available) + ". Efectivo y tarjeta quedan aprobados; los demás métodos quedan pendientes de confirmar.</p></div>" +
+        '<div class="full field dropField"><span class="dropLabel" id="receiptLabel">Comprobante (opcional)</span>' +
+          '<label class="dropzone" id="dropzone" aria-labelledby="receiptLabel"><input type="file" name="receipt" accept="application/pdf,image/png,image/jpeg" class="sr">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>' +
+          '<span><strong>Arrastra el comprobante aquí</strong> o elige un archivo</span><span class="hint">PDF, PNG o JPEG de hasta 5 MB</span></label>' +
+          '<div class="fileChip" id="fileChip" hidden><span id="fileInfo"></span><button type="button" class="btn secondary small" data-clear-receipt>Quitar</button></div></div>' +
+        '<p class="formError full" role="alert"></p><div class="sheetActions full"><button class="btn primary" type="submit">Registrar pago</button></div></form>'
+    : '<p class="muted">' + (inv.status !== "emitida" ? "La factura está anulada: no admite pagos."
+        : pending > 0 ? "El saldo restante está en pagos pendientes de confirmar." : "La factura está pagada por completo.") + "</p>";
+  openModal(
+    '<div class="sheetHead"><div><h2 id="modalTitle">Factura N.º ' + esc(inv.invoice_number) + '</h2><span class="muted">' + fmtDate(inv.created_at) + " · Pedido " + esc(o.order_number) + "</span></div>" + closeButton + "</div>" +
+    '<div class="sheetBody">' +
+      '<div class="badgeRow">' + statusPill(INVOICE_STATUS, inv.status) + (o.channel ? channelBadge(o.channel) : "") + "</div>" +
+      '<section class="section"><h3>Cliente</h3><dl class="facts">' + fact("Nombre", o.customer.name) + fact("Documento", o.customer.doc_type + " " + o.customer.doc_number) +
+        (inv.employee_id ? fact("Emitió", staffName(inv.employee_id)) : "") + "</dl></section>" +
+      '<section class="section"><h3>Detalle</h3><ul class="list">' +
+        inv.items.map(i => '<li><span><span class="cellMain">' + esc(i.name) + '</span><span class="cellSub">' + esc(i.sku) + " · " + i.quantity + " × " + money(amountOf(i.unit_price)) + '</span></span><span class="num">' + money(amountOf(i.subtotal)) + "</span></li>").join("") +
+        rows.map(([label, value]) => "<li><span>" + label + '</span><span class="num">' + (value < 0 ? "− " + money(-value) : money(value)) + "</span></li>").join("") +
+        '<li class="totalRow"><strong>Total</strong><strong class="num">' + money(amountOf(inv.total_amount)) + "</strong></li></ul></section>" +
+      '<section class="section"><h3>Pagos</h3><dl class="facts">' + fact("Saldo por cobrar", money(amountOf(billing.balance))) +
+        (pending > 0 ? fact("Pendiente de confirmar", money(pending)) : "") + "</dl>" + payments + "</section>" +
+      (inv.status === "emitida" ? '<section class="section"><h3>Registrar pago</h3>' + payForm + "</section>" : "") +
+      '<div class="sheetActions">' + backToOrder(o.id) + "</div>" +
+    "</div>");
+  setupDropzone();
+}
+
+function receiptProblem(file) {
+  if (!RECEIPT_TYPES[file.type]) return "Adjunta un archivo PDF, PNG o JPEG.";
+  if (file.size > RECEIPT_MAX) return "El archivo pesa " + fileSize(file.size) + "; el máximo es 5 MB.";
+  return null;
+}
+function showReceipt(form) {
+  const file = form.elements.receipt.files[0];
+  $("#fileChip").hidden = !file;
+  $("#dropzone").hidden = Boolean(file);
+  $("#fileInfo").textContent = file ? file.name + " · " + (RECEIPT_TYPES[file.type] || "formato no admitido") + " · " + fileSize(file.size) : "";
+  $(".fieldError", form.querySelector(".dropField"))?.remove();
+  if (file) {
+    const problem = receiptProblem(file);
+    if (problem) showFieldErrors(form, {receipt:problem});
+  }
+}
+function setupDropzone() {
+  const zone = $("#dropzone");
+  if (!zone) return;
+  const form = zone.closest("form");
+  form.elements.receipt.addEventListener("change", () => showReceipt(form));
+  ["dragenter", "dragover"].forEach(type => zone.addEventListener(type, e => { e.preventDefault(); zone.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(type => zone.addEventListener(type, () => zone.classList.remove("over")));
+  zone.addEventListener("drop", e => {
+    e.preventDefault();
+    const files = e.dataTransfer?.files;
+    if (!files || !files.length) return;
+    const dt = new DataTransfer();
+    dt.items.add(files[0]); // un solo comprobante por pago
+    form.elements.receipt.files = dt.files;
+    showReceipt(form);
+  });
+}
+async function submitPayment(form) {
+  const f = form.elements;
+  const available = Number(form.dataset.available);
+  const value = numberValue(f.amount.value);
+  const file = f.receipt.files[0];
+  const errors = {};
+  if (typeof value !== "number" || value <= 0) errors.amount = "Escribe un monto mayor que cero.";
+  else if (value > available + 0.001) errors.amount = "El monto supera lo disponible (" + money(available) + ").";
+  if (file && receiptProblem(file)) errors.receipt = receiptProblem(file);
+  if (Object.keys(errors).length) { showFieldErrors(form, errors); return; }
+  let body = {payment_method:f.payment_method.value, amount:value.toFixed(2)};
+  if (file) {
+    const data = new FormData();
+    data.append("payment_method", body.payment_method);
+    data.append("amount", body.amount);
+    data.append("receipt", file);
+    body = data;
+  }
+  const button = $("button[type=submit]", form);
+  setBusy(button, true, "Registrando…");
+  try {
+    const {payment} = await api("/invoices/" + form.dataset.invoiceId + "/payments", {method:"POST", body});
+    toast("Pago de " + money(amountOf(payment.amount)) + " registrado: " + (PAYMENT_STATUS[payment.status] || [, , payment.status])[2].toLowerCase() + ".");
+    await openInvoice(form.dataset.orderId);
+  } catch (err) {
+    setBusy(button, false);
+    let fields = err.data.fields;
+    if (err.data.error === "payment_exceeds_balance") fields = {amount:err.message};
+    if (err.status === 413) fields = {receipt:"El archivo supera el máximo de 5 MB."};
+    showFieldErrors(form, fields, err.message);
+  }
+}
+
 async function changeStatus(orderId, status, button) {
   const comment = ($("#statusComment")?.value || "").trim();
   setBusy(button, true, "Actualizando…");
@@ -989,6 +1186,20 @@ document.addEventListener("click", async event => {
       await loadOrders();
     } else if ("page" in d) {
       orderFilter.page = Number(d.page); await loadOrders();
+    } else if ("invoiceOrder" in d) {
+      setBusy(el, true, "Abriendo…");
+      try { await openInvoice(d.invoiceOrder); } finally { if (el.isConnected) setBusy(el, false); }
+    } else if ("backOrder" in d) {
+      await openOrder(d.backOrder);
+    } else if ("clearReceipt" in d) {
+      const form = el.closest("form");
+      form.elements.receipt.value = "";
+      showReceipt(form);
+      $("#dropzone").focus?.();
+    } else if ("orderChannel" in d) {
+      orderFilter.channel = d.orderChannel; orderFilter.page = 1;
+      $$("[data-order-channel]").forEach(c => c.setAttribute("aria-pressed", String(c === el)));
+      await loadOrders();
     } else if ("newUser" in d) {
       openUserForm(null);
     } else if ("editUser" in d) {
@@ -1055,9 +1266,14 @@ document.addEventListener("submit", event => {
   const kind = form.dataset.form;
   if (!kind) return;
   event.preventDefault();
+  // Un formulario con una peticion en curso ignora nuevos envios (doble clic, Enter repetido).
+  // Deshabilitar el boton no basta: Enter y requestSubmit envian igual. Clave en pagos, que no son idempotentes.
+  if (form.dataset.busy) return;
+  form.dataset.busy = "1";
   clearFieldErrors(form);
-  ({product:submitProduct, category:submitCategory, adjust:submitAdjust, settings:submitSettings,
-    user:submitUser, userEdit:submitUserEdit, order:submitOrder})[kind](form);
+  const handler = ({product:submitProduct, category:submitCategory, adjust:submitAdjust, settings:submitSettings,
+    user:submitUser, userEdit:submitUserEdit, order:submitOrder, invoice:submitInvoice, payment:submitPayment})[kind];
+  Promise.resolve(handler(form)).catch(err => toast(err.message)).finally(() => { delete form.dataset.busy; });
 });
 
 /* ---------- Sesion ---------- */
