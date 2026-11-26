@@ -1,10 +1,10 @@
 import math
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 
 from app.api.admin import admin_bp
 from app.ml import data_pipeline as pipeline, inference_service as inference
-from app.ml.train_models import train
+from app.ml.train_models import start_training, train, training_state
 from app.utils.validation import ValidationError, Validator
 
 
@@ -20,12 +20,14 @@ def train_models():
     v = Validator(payload())
     seed = v.integer("seed", 0, 2_147_483_647, required=False, default=42)
     v.raise_if_errors()
+    if current_app.config["ML_TRAIN_ASYNC"]:
+        return jsonify(training=start_training(seed)), 202
     return jsonify(runs=train(seed)), 201
 
 
 @admin_bp.get("/ml/status")
 def model_status():
-    return jsonify(models=inference.status())
+    return jsonify(models=inference.status(), training=training_state())
 
 
 def transaction(raw):

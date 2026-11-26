@@ -181,6 +181,42 @@ Métodos admitidos: `efectivo`, `tarjeta`, `transferencia`, `pse`, `nequi`. Efec
 
 El éxito devuelve `201`. Sin adjunto, `receipt_url` es `null`. El archivo se descarga con `GET /api/payments/{id}/receipt` usando la sesión de Flask y el mismo alcance del pedido. Devuelve el archivo como adjunto y usa caché privada deshabilitada.
 
+## Resolver un pago pendiente | POST /api/admin/payments/{id}/status
+
+Solo admin. Transferencia, PSE y Nequi quedan `pendiente` hasta que un administrador confirma si el dinero llegó. Envía `{"status":"aprobado"}` o `{"status":"rechazado"}`.
+
+- `aprobado` fija `paid_at` y el pago empieza a restar del saldo (`balance`).
+- `rechazado` deja `paid_at` en `null` y libera el monto reservado: vuelve a estar disponible para cobrar.
+
+Cada cambio agrega un evento `adjustment` a la cadena de integridad en la misma transacción, así que `POST /api/admin/integrity/verify` sigue devolviendo `valid`. Antes de cambiar el estado, el servidor compara el pago con su último eslabón. Si alguien lo modificó directamente en la base, responde `409 integrity_conflict` y no lo resuelve, para que un cambio directo nunca quede legitimado. Repetir la misma decisión devuelve el pago con `"changed": false` y no crea otro evento.
+
+```json
+{
+  "changed": true,
+  "payment": {
+    "id": 13,
+    "invoice_id": 24,
+    "order_id": 42,
+    "payment_method": "transferencia",
+    "amount": "25000.00",
+    "status": "aprobado",
+    "receipt_url": "/api/payments/13/receipt",
+    "paid_at": "2026-11-25T16:20:00Z",
+    "created_at": "2026-11-25T15:05:00Z"
+  }
+}
+```
+
+| HTTP | Caso |
+|---|---|
+| `200` | Pago aprobado o rechazado (o la misma decisión repetida). |
+| `400` | `status` distinto de `aprobado` o `rechazado`. |
+| `401` / `403` | Sin sesión, o una cuenta de empleado o cliente. |
+| `404` | El pago no existe. |
+| `409` | `payment_not_pending` (ya fue resuelto en sentido contrario) o `integrity_conflict`. |
+
+En Supabase aplica `supabase/migrations/20261126080000_payment_review.sql`, que concede al rol del servidor `UPDATE` solo sobre `status` y `paid_at`. El monto, el método y el comprobante siguen siendo inmutables.
+
 ## Errores comunes
 
 ```json
@@ -189,4 +225,4 @@ El éxito devuelve `201`. Sin adjunto, `receipt_url` es `null`. El archivo se de
 
 `401` indica sesión ausente, `403` indica permiso, origen o CSRF inválido, `404` indica recurso ausente o fuera del alcance del empleado, `413` indica tamaño excedido y `415` indica un formato de petición no admitido.
 
-Ejecuta la prueba desde la raíz con `python -m pytest backend/tests/test_phase1.py -q`.
+Ejecuta las pruebas desde la raíz con `python -m pytest backend/tests/test_phase1.py backend/tests/test_audit_fixes.py -q`.

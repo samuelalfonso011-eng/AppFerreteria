@@ -75,6 +75,41 @@ def register_payment(invoice_id, actor, method, amount, receipt_type, receipt_da
     return payment
 
 
+PAYMENT_DECISIONS = ("aprobado", "rechazado")
+
+
+def review_payment(payment_id, actor, decision):
+    """Resuelve un pago pendiente (transferencia, PSE, Nequi). Registra un evento `adjustment`.
+
+    Aprobar fija `paid_at` y descuenta el saldo; rechazar libera el saldo reservado.
+    Reintentar la misma decisión devuelve el pago sin crear otro evento.
+    """
+    from app.models.integrity import LedgerEntry
+
+    if decision not in PAYMENT_DECISIONS:
+        raise BusinessError("Elige aprobar o rechazar.", code="validation", status=400)
+    payment = db.session.get(Payment, payment_id)
+    if payment is None:
+        raise BusinessError("Pago no encontrado.", code="not_found", status=404)
+    # El bloqueo del pedido serializa la decisión con nuevos pagos y con la anulación de la factura.
+    staff_order(payment.order_id, actor, lock=True)
+    db.session.refresh(payment)
+    if payment.status == decision:
+        return payment, False
+    if payment.status != "pendiente":
+        raise BusinessError("Solo se puede resolver un pago pendiente.", code="payment_not_pending")
+    integrity_service.lock_chain()
+    last = LedgerEntry.query.filter_by(entity_type="payment", entity_id=payment.id).order_by(
+        LedgerEntry.seq_no.desc()).first()
+    if last is None or last.canonical_payload != integrity_service.snapshot("payment", payment):
+        raise BusinessError("Verifica la integridad antes de resolver el pago.", code="integrity_conflict")
+    payment.status = decision
+    payment.paid_at = utcnow() if decision == "aprobado" else None
+    integrity_service.append_event("payment", payment, "adjustment")
+    db.session.commit()
+    return payment, True
+
+
 def void_invoice(invoice_id, actor):
     from app.models.integrity import LedgerEntry
 

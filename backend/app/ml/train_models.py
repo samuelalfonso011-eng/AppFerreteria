@@ -193,8 +193,102 @@ def regressor(seed, epochs):
 
 
 def train(seed=42):
+    """Entrenamiento síncrono (CLI y pruebas). La API usa start_training() en segundo plano."""
     if not TRAIN_LOCK.acquire(blocking=False):
         raise BusinessError("Ya hay un entrenamiento en curso.", code="training_busy")
+    try:
+        return _train_locked(seed)
+    finally:
+        TRAIN_LOCK.release()
+
+
+# ---------------------------------------------------------------------------
+# Entrenamiento en segundo plano. TensorFlow tarda más que el timeout de gunicorn (30 s),
+# así que la petición solo lo inicia (202) y el panel consulta GET /ml/status.
+# El estado vive en ML_ARTIFACT_DIR/training.json: el volumen ya es compartido entre workers.
+# ---------------------------------------------------------------------------
+STATE_FILE = "training.json"
+
+
+def _state_path():
+    return artifact_root() / STATE_FILE
+
+
+def _write_state(state):
+    path = _state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{STATE_FILE}.{uuid4().hex}.tmp")
+    temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(path)  # reemplazo atómico: nunca se lee un JSON a medias
+
+
+def training_state():
+    """Último trabajo de entrenamiento o None. Un trabajo colgado (proceso caído) se informa como fallido."""
+    from app.utils.timeutils import utcnow
+
+    try:
+        state = json.loads(_state_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if state.get("state") == "running":
+        from datetime import datetime
+
+        started = datetime.fromisoformat(state["started_at"].replace("Z", "+00:00"))
+        if (utcnow() - started).total_seconds() > current_app.config["ML_TRAIN_STALE_SECONDS"]:
+            state.update(state="failed", error="training_stalled",
+                         message="El entrenamiento no terminó. Vuelve a iniciarlo.")
+    return state
+
+
+def start_training(seed=42):
+    """Inicia el entrenamiento en un hilo y devuelve el estado inicial. 409 si ya hay uno en curso."""
+    import threading
+
+    from app.utils.timeutils import iso, utcnow
+
+    current = training_state()
+    if current and current.get("state") == "running":
+        raise BusinessError("Ya hay un entrenamiento en curso.", code="training_busy")
+    if not TRAIN_LOCK.acquire(blocking=False):
+        raise BusinessError("Ya hay un entrenamiento en curso.", code="training_busy")
+    app = current_app._get_current_object()
+    state = {"state": "running", "seed": seed, "started_at": iso(utcnow()), "finished_at": None,
+             "version": None, "error": None, "message": None}
+    try:
+        _write_state(state)
+    except OSError as exc:
+        TRAIN_LOCK.release()
+        raise BusinessError("No se pudo escribir en el directorio de artefactos.",
+                            code="artifact_unavailable", status=503) from exc
+
+    def job():
+        result = dict(state)
+        try:
+            with app.app_context():
+                try:
+                    runs = _train_locked(seed)
+                    result.update(state="succeeded", version=runs[0]["version"])
+                except BusinessError as exc:
+                    if exc.code == "training_busy":
+                        return  # otro worker tiene el trabajo y su estado: no sobrescribirlo
+                    result.update(state="failed", error=exc.code, message=exc.message)
+                except Exception:  # noqa: BLE001  (el hilo no tiene a quién propagar el error)
+                    app.logger.exception("Fallo el entrenamiento en segundo plano")
+                    result.update(state="failed", error="server_error",
+                                  message="El entrenamiento falló. Revisa los registros del servidor.")
+                finally:
+                    db.session.remove()
+                result["finished_at"] = iso(utcnow())
+                _write_state(result)
+        finally:
+            TRAIN_LOCK.release()
+
+    threading.Thread(target=job, name="ferrepro-ml-training", daemon=True).start()
+    return state
+
+
+def _train_locked(seed):
+    """Cuerpo del entrenamiento. El llamador ya tiene TRAIN_LOCK."""
     try:
         if db.session.get_bind().dialect.name == "postgresql":
             if not db.session.scalar(text("select pg_try_advisory_xact_lock(617203583)")):
@@ -246,5 +340,3 @@ def train(seed=42):
     except Exception:
         db.session.rollback()
         raise
-    finally:
-        TRAIN_LOCK.release()

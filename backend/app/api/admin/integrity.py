@@ -34,6 +34,18 @@ def integrity_chain():
                    per_page=rows.per_page, pages=rows.pages, total=rows.total)
 
 
+@admin_bp.post("/payments/<int:payment_id>/status")
+def review_payment(payment_id):
+    """Aprueba o rechaza un pago pendiente. Solo admin (guardia del blueprint)."""
+    from app.utils.validation import Validator
+
+    v = Validator(request.get_json(silent=True))
+    decision = v.choice("status", billing_service.PAYMENT_DECISIONS)
+    v.raise_if_errors()
+    payment, changed = billing_service.review_payment(payment_id, current_user(), decision)
+    return jsonify(payment=payment.to_dict(), changed=changed)
+
+
 @admin_bp.post("/invoices/<int:invoice_id>/void")
 def void_invoice(invoice_id):
     return jsonify(invoice=billing_service.void_invoice(invoice_id, current_user()).to_dict())

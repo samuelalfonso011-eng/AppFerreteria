@@ -776,6 +776,19 @@ function invoiceSummary(o, billing) {
     '<button class="btn secondary" type="button" data-invoice-order="' + o.id + '">Emitir factura</button></div></section>';
 }
 
+/* POST /api/admin/payments/{id}/status {status:"aprobado"|"rechazado"}: resuelve un pago pendiente */
+async function reviewPayment(paymentId, decision, orderId, button) {
+  setBusy(button, true, decision === "aprobado" ? "Aprobando…" : "Rechazando…");
+  try {
+    const {payment} = await api("/admin/payments/" + paymentId + "/status", {method:"POST", body:{status:decision}});
+    toast("Pago de " + money(amountOf(payment.amount)) + (decision === "aprobado" ? " aprobado." : " rechazado: el monto vuelve a estar disponible."));
+    await openInvoice(orderId);
+  } catch (err) {
+    if (err.status !== 401) toast(err.message || "No pudimos actualizar el pago.");
+  } finally {
+    if (button.isConnected) setBusy(button, false);
+  }
+}
 async function openInvoice(orderId) {
   const [{order:o}, billing] = await Promise.all([api("/admin/orders/" + orderId), api("/orders/" + orderId + "/invoice")]);
   if (!billing.invoice) return renderIssueForm(o);
@@ -827,6 +840,11 @@ function renderInvoice(o, billing) {
         '<span class="cellSub">' + fmtDate(p.paid_at || p.created_at) + "</span></span>" +
         '<span class="lineEnd">' + statusPill(PAYMENT_STATUS, p.status) +
         (p.receipt_url && RECEIPT_URL.test(p.receipt_url) ? '<a class="btn secondary small" href="' + esc(p.receipt_url) + '" download rel="noopener">Comprobante</a>' : "") +
+        // Transferencia, PSE y Nequi quedan pendientes hasta que un administrador confirma el dinero recibido
+        (p.status === "pendiente" && state.me?.role === "admin"
+          ? '<button type="button" class="btn secondary small" data-review-payment="' + p.id + '" data-decision="aprobado" data-order-id="' + o.id + '">Aprobar</button>' +
+            '<button type="button" class="btn dangerGhost small" data-review-payment="' + p.id + '" data-decision="rechazado" data-order-id="' + o.id + '" data-amount="' + esc(money(amountOf(p.amount))) + '">Rechazar</button>'
+          : "") +
         "</span></li>").join("") + "</ul>"
     : '<p class="muted">Aún no hay pagos registrados.</p>';
   const canPay = inv.status === "emitida" && available > 0;
@@ -1186,6 +1204,14 @@ document.addEventListener("click", async event => {
       await loadOrders();
     } else if ("page" in d) {
       orderFilter.page = Number(d.page); await loadOrders();
+    } else if ("reviewPayment" in d) {
+      if (d.decision === "rechazado") {
+        const ok = await confirmAction({title:"¿Rechazar el pago de " + d.amount + "?",
+          text:"Úsalo si el dinero no llegó. El monto vuelve a quedar disponible para cobrar y el rechazo queda registrado en la cadena de integridad.",
+          action:"Rechazar pago"});
+        if (!ok) return;
+      }
+      await reviewPayment(d.reviewPayment, d.decision, d.orderId, el);
     } else if ("invoiceOrder" in d) {
       setBusy(el, true, "Abriendo…");
       try { await openInvoice(d.invoiceOrder); } finally { if (el.isConnected) setBusy(el, false); }
@@ -2450,7 +2476,7 @@ const ML_SIGNAL = {
 };
 const ML_REF = [["order_id", "Pedido"], ["invoice_id", "Factura"], ["payment_id", "Pago"]];
 const ML_ERROR = {
-  model_not_trained:"Todavía no hay modelos entrenados.", training_busy:"Ya hay un entrenamiento en curso.",
+  model_not_trained:"Todavía no hay modelos entrenados.", training_busy:"Ya hay un entrenamiento en curso.", training_stalled:"El entrenamiento anterior no terminó. Vuelve a iniciarlo.",
   insufficient_test:"No hay suficientes datos en el tramo de prueba.", insufficient_history:"No hay historial suficiente para entrenar.",
   invalid_label_file:"El archivo de etiquetas adjudicadas no es válido.", artifact_unavailable:"Los archivos del modelo no están disponibles."
 };
@@ -2480,6 +2506,7 @@ async function loadModels() {
   try {
     ml.status = await api("/admin/ml/status");
     if (!body.isConnected) return;
+    if (ml.status.training?.state === "running") resumeTraining();
     const fraud = ml.status.models?.fraud_classifier, demand = ml.status.models?.demand_regressor;
     if (!fraud?.run && !demand?.run) {
       body.replaceChildren(dom("div", {className:"card emptyState mlEmpty"},
@@ -2509,20 +2536,55 @@ async function trainModels(button) {
   if (button.disabled) return;
   setBusy(button, true, "Entrenando…");
   const live = $("#mlLive");
-  if (live) live.textContent = "Entrenando los modelos. Puede tardar unos segundos.";
+  if (live) live.textContent = "Entrenando los modelos. Puede tardar unos minutos.";
   try {
     const res = await api("/admin/ml/train", {method:"POST", body:{}});
-    const version = res.runs?.[0]?.version;
-    const message = "Modelos entrenados" + (version ? ": versión " + version.slice(0, 8) : "") + ".";
-    toast(message);
-    if (live) live.textContent = message;
+    // 202: el servidor entrena en segundo plano (TensorFlow supera el timeout de gunicorn). 201: modo síncrono.
+    const version = res.training ? await waitForTraining() : res.runs?.[0]?.version;
+    finishTraining(version);
     await loadModels();
   } catch (err) {
     if (err.status === 401) return;
     toast(mlErr(err) || "No pudimos entrenar los modelos.");
     if (live) live.textContent = "";
   } finally {
-    if (button.isConnected) setBusy(button, false);
+    const current = $("#trainModels");
+    if (current) setBusy(current, false);
+  }
+}
+const ML_POLL_MS = 3000;
+const ML_POLL_LIMIT = 400; // unos 20 minutos; después se puede volver a consultar recargando la pestaña
+/* Consulta GET /ml/status hasta que el trabajo termine. Devuelve la versión o lanza el error del trabajo. */
+async function waitForTraining() {
+  for (let i = 0; i < ML_POLL_LIMIT; i++) {
+    await new Promise(resolve => setTimeout(resolve, ML_POLL_MS));
+    if (!$("#trainModels")) throw Object.assign(new Error(""), {status:401}); // salió de la pestaña: dejar de consultar
+    const job = (await api("/admin/ml/status")).training;
+    if (!job || job.state === "running") continue;
+    if (job.state === "succeeded") return job.version;
+    throw Object.assign(new Error(job.message || "El entrenamiento falló."), {status:409, data:{error:job.error}});
+  }
+  throw new Error("El entrenamiento sigue en curso. Vuelve a abrir la pestaña en unos minutos.");
+}
+function finishTraining(version) {
+  const message = "Modelos entrenados" + (version ? ": versión " + version.slice(0, 8) : "") + ".";
+  toast(message);
+  const live = $("#mlLive");
+  if (live) live.textContent = message;
+}
+/* Si se abre la pestaña con un entrenamiento en curso (otro administrador o una recarga), retoma la espera */
+async function resumeTraining() {
+  const button = $("#trainModels");
+  if (!button || button.disabled) return;
+  setBusy(button, true, "Entrenando…");
+  try {
+    finishTraining(await waitForTraining());
+    await loadModels();
+  } catch (err) {
+    if (err.status !== 401) toast(mlErr(err) || "No pudimos completar el entrenamiento.");
+  } finally {
+    const current = $("#trainModels");
+    if (current) setBusy(current, false);
   }
 }
 

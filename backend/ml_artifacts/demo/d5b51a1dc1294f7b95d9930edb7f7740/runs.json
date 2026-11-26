@@ -3,9 +3,9 @@
     {
       "id": 1,
       "model_name": "fraud_classifier",
-      "version": "ee244e56e1834f3aaa568b64413c976a",
-      "trained_at": "2026-11-26T04:51:23.469977Z",
-      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/fraud_classifier.keras",
+      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+      "trained_at": "2026-11-26T05:57:30.313043Z",
+      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/fraud_classifier.keras",
       "seed": 42,
       "dataset_summary": {
         "cutoff": "2025-01-01T00:00:00Z",
@@ -15,9 +15,9 @@
         "simulated_labels": true,
         "train": {
           "size": 256,
-          "fraud_fraction": 0.19921875,
-          "normal": 205,
-          "fraudulenta": 51,
+          "fraud_fraction": 0.1875,
+          "normal": 208,
+          "fraudulenta": 48,
           "label_sources": {
             "simulated": 256
           },
@@ -26,43 +26,43 @@
         },
         "test": {
           "size": 64,
-          "fraud_fraction": 0.203125,
-          "normal": 51,
-          "fraudulenta": 13,
+          "fraud_fraction": 0.234375,
+          "normal": 49,
+          "fraudulenta": 15,
           "label_sources": {
             "simulated": 64
           },
           "first": "2025-01-01T00:00:00Z",
           "last": "2025-01-03T15:00:00Z"
         },
-        "oversampled_train_rows": 154,
+        "oversampled_train_rows": 160,
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "380046c2f6eefb2e3b6cfc4c07151f74acba42bc082172a51ec1d0681c3faa12",
-        "metadata_sha256": "898062ec7290fe2a0aca8680401d695a7b3ab7cb30aea1308f490206272e9ef7"
+        "artifact_sha256": "6389da170a8970153847198eac23d60ae60ee4a1aaa75eb683c8f184b70676de",
+        "metadata_sha256": "699c186fd2c9a95ac209cd3552502afa55fea8a1cbc5ff6257c2664442d85c1d"
       },
       "metrics": {
-        "precision": 0.8888888888888888,
-        "recall": 0.6153846153846154,
-        "f1": 0.7272727272727273,
+        "precision": 0.7058823529411765,
+        "recall": 0.8,
+        "f1": 0.75,
         "confusion_matrix": {
-          "tp": 8,
-          "fp": 1,
-          "tn": 50,
-          "fn": 5
+          "tp": 12,
+          "fp": 5,
+          "tn": 44,
+          "fn": 3
         },
         "by_label_source": {
           "real": null,
           "simulated": {
-            "precision": 0.8888888888888888,
-            "recall": 0.6153846153846154,
-            "f1": 0.7272727272727273,
+            "precision": 0.7058823529411765,
+            "recall": 0.8,
+            "f1": 0.75,
             "confusion_matrix": {
-              "tp": 8,
-              "fp": 1,
-              "tn": 50,
-              "fn": 5
+              "tp": 12,
+              "fp": 5,
+              "tn": 44,
+              "fn": 3
             }
           }
         }
@@ -71,9 +71,9 @@
     {
       "id": 2,
       "model_name": "demand_regressor",
-      "version": "ee244e56e1834f3aaa568b64413c976a",
-      "trained_at": "2026-11-26T04:51:27.863966Z",
-      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/demand_regressor.keras",
+      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+      "trained_at": "2026-11-26T05:57:33.727740Z",
+      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/demand_regressor.keras",
       "seed": 42,
       "dataset_summary": {
         "source": "simulated",
@@ -87,7 +87,7 @@
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "67e0c9ee7cf179b29cad66c651f045024db3c12fe14fa0de6604f2a6eae5922d",
+        "artifact_sha256": "33b1ee24f6463ff441ac4ebdce6fd7964378f63f2205eba67500ea97823ce0b3",
         "metadata_sha256": "ae98ca35509cc677e171945727fe3b61f413f7ba6cdc03a862d73889a37f9595"
       },
       "metrics": {

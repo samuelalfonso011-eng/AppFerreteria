@@ -146,6 +146,29 @@ def operation(kind, entity_id):
     )
 
 
+# Probabilidad de una divergencia de integridad (hash_valid = 0) entre las operaciones auditadas.
+# Ambas clases pueden tenerla: es más frecuente en fraude, pero nunca la delata por sí sola.
+SIMULATED_HASH_DIVERGENCE = {False: 0.04, True: 0.25}
+SIMULATED_HASH_UNKNOWN = 1 / 3
+# Distribuciones con el mismo soporte en ambas clases (clave: suspicious). El fraude es más
+# probable en valores altos, pero cualquier valor puede aparecer en una operación normal.
+SIMULATED_FREQUENCY_MEAN = {False: 9, True: 22}          # pedidos previos, exponencial, tope 200
+SIMULATED_DISCOUNT_MAX = 65                               # %
+SIMULATED_DISCOUNT_SHAPE = {False: (1.2, 6.0), True: (2.2, 4.0)}      # Beta en [0, 1]
+SIMULATED_CANCELLATION_SHAPE = {False: (1.2, 6.0), True: (2.0, 4.0)}  # Beta en [0, 1]
+
+
+def simulated_hash_state(rng, suspicious):
+    """Estado de integridad simulado con distribuciones superpuestas entre clases.
+
+    Antes `rng.choice([None, 1, int(not suspicious)])` solo producía 0 en fraude: la característica
+    hash_invalid revelaba la etiqueta (fuga dentro del simulador) e inflaba la precisión.
+    """
+    if rng.random() < SIMULATED_HASH_UNKNOWN:
+        return None
+    return 0 if rng.random() < SIMULATED_HASH_DIVERGENCE[suspicious] else 1
+
+
 def simulated_transactions(seed, cutoff):
     rng = random.Random(seed)
     rows = []
@@ -157,10 +180,13 @@ def simulated_transactions(seed, cutoff):
             amount=rng.lognormvariate(12 + suspicious, 0.9),
             payment_method=rng.choice(PAYMENT_METHODS),
             channel=rng.choice(ORDER_CHANNELS),
-            hash_valid=rng.choice([None, 1, int(not suspicious)]),
-            prior_frequency=rng.randrange(80 if suspicious else 25),
-            discount_pct=rng.uniform(0, 65 if suspicious else 30),
-            cancellation_rate=rng.uniform(0, 0.7 if suspicious else 0.35),
+            hash_valid=simulated_hash_state(rng, suspicious),
+            # Mismo soporte para ambas clases; solo cambia la forma de la distribución.
+            # Con rangos anidados (normal 0-30 %, fraude 0-65 %) todo valor por encima del techo
+            # normal delataba el fraude con certeza: la misma fuga parcial que tenía el hash.
+            prior_frequency=min(int(rng.expovariate(1 / SIMULATED_FREQUENCY_MEAN[suspicious])), 200),
+            discount_pct=SIMULATED_DISCOUNT_MAX * rng.betavariate(*SIMULATED_DISCOUNT_SHAPE[suspicious]),
+            cancellation_rate=rng.betavariate(*SIMULATED_CANCELLATION_SHAPE[suspicious]),
         )
         rows.append((at, fraud_vector(snapshot), int(suspicious), "simulated"))
     return rows

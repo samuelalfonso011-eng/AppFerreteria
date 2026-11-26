@@ -35,6 +35,9 @@ class Config:
     ML_ARTIFACT_DIR = os.getenv("ML_ARTIFACT_DIR") or os.path.join(BACKEND_DIR, "ml_artifacts")
     ML_LABEL_FILE = os.getenv("ML_LABEL_FILE")
     ML_EPOCHS = 16
+    # La API entrena en segundo plano (202 + GET /ml/status): TensorFlow supera el timeout de gunicorn.
+    ML_TRAIN_ASYNC = os.getenv("ML_TRAIN_ASYNC", "1") != "0"
+    ML_TRAIN_STALE_SECONDS = int(os.getenv("ML_TRAIN_STALE_SECONDS", "3600"))
     SECRET_KEY = os.getenv("SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = normalize_db_url(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = _engine_options(SQLALCHEMY_DATABASE_URI)
@@ -92,6 +95,7 @@ class TestingConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {}
     AUTO_CREATE_DB = True
     ORDER_PENDING_EXPIRY_MINUTES = 0
+    ML_TRAIN_ASYNC = False  # las pruebas esperan el 201 síncrono; el modo 202 tiene su propia prueba
 
 
 class ProductionConfig(Config):

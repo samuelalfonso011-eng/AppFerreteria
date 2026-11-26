@@ -78,6 +78,7 @@ revoke all on sequence public.integrity_ledger_id_seq, public.integrity_verifica
     from public, anon, authenticated, service_role, ferrepro_backend;
 grant usage on sequence public.integrity_ledger_id_seq, public.integrity_verifications_id_seq to ferrepro_backend;
 grant update(status) on public.invoices to ferrepro_backend;
+grant update(status, paid_at) on public.payments to ferrepro_backend;
 drop policy if exists server_append on public.integrity_ledger;
 create policy server_append on public.integrity_ledger for insert to ferrepro_backend with check (true);
 drop policy if exists server_read on public.integrity_ledger;

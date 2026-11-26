@@ -4,7 +4,23 @@ Los cuatro endpoints usan sesión de administrador y `Cache-Control: no-store`. 
 
 ## POST /api/admin/ml/train
 
-Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La petición es síncrona. Un éxito devuelve 201 con dos corridas que comparten `version`. Cada modelo tiene su propio ID. `dataset_summary` y `metrics` difieren por modelo; `by_label_source.real: null` indica que no hubo casos reales etiquetados en prueba. La matriz usa el umbral 0,5. Las métricas de demanda están agregadas por producto y día del tramo reservado.
+Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. TensorFlow tarda más que el timeout de 30 s de gunicorn, así que la petición **inicia el entrenamiento en segundo plano** y devuelve `202` con el estado del trabajo. El panel consulta `GET /api/admin/ml/status` (campo `training`) hasta que `state` pase a `succeeded` o `failed`. Solo corre un entrenamiento a la vez: un segundo POST mientras hay uno en curso devuelve `409 training_busy`, también desde otro worker, porque el estado se guarda en `ML_ARTIFACT_DIR/training.json`, en el volumen compartido.
+
+```json
+{
+  "training": {
+    "state": "running",
+    "seed": 42,
+    "started_at": "2026-11-26T08:10:02.114233Z",
+    "finished_at": null,
+    "version": null,
+    "error": null,
+    "message": null
+  }
+}
+```
+
+Con `ML_TRAIN_ASYNC=0` (modo de las pruebas) y en el CLI el entrenamiento es síncrono y devuelve `201` con las dos corridas. Las corridas comparten `version`. Cada modelo tiene su propio ID. `dataset_summary` y `metrics` difieren por modelo; `by_label_source.real: null` indica que no hubo casos reales etiquetados en prueba. La matriz usa el umbral 0,5. Las métricas de demanda están agregadas por producto y día del tramo reservado. Este es el resultado de la demostración `--demo --seed 42`, el mismo objeto que después aparece en `run` de `GET /status`:
 
 ```json
 {
@@ -12,9 +28,9 @@ Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La pet
     {
       "id": 1,
       "model_name": "fraud_classifier",
-      "version": "ee244e56e1834f3aaa568b64413c976a",
-      "trained_at": "2026-11-26T04:51:23.469977Z",
-      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/fraud_classifier.keras",
+      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+      "trained_at": "2026-11-26T05:57:30.313043Z",
+      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/fraud_classifier.keras",
       "seed": 42,
       "dataset_summary": {
         "cutoff": "2025-01-01T00:00:00Z",
@@ -24,9 +40,9 @@ Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La pet
         "simulated_labels": true,
         "train": {
           "size": 256,
-          "fraud_fraction": 0.19921875,
-          "normal": 205,
-          "fraudulenta": 51,
+          "fraud_fraction": 0.1875,
+          "normal": 208,
+          "fraudulenta": 48,
           "label_sources": {
             "simulated": 256
           },
@@ -35,43 +51,43 @@ Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La pet
         },
         "test": {
           "size": 64,
-          "fraud_fraction": 0.203125,
-          "normal": 51,
-          "fraudulenta": 13,
+          "fraud_fraction": 0.234375,
+          "normal": 49,
+          "fraudulenta": 15,
           "label_sources": {
             "simulated": 64
           },
           "first": "2025-01-01T00:00:00Z",
           "last": "2025-01-03T15:00:00Z"
         },
-        "oversampled_train_rows": 154,
+        "oversampled_train_rows": 160,
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "380046c2f6eefb2e3b6cfc4c07151f74acba42bc082172a51ec1d0681c3faa12",
-        "metadata_sha256": "898062ec7290fe2a0aca8680401d695a7b3ab7cb30aea1308f490206272e9ef7"
+        "artifact_sha256": "6389da170a8970153847198eac23d60ae60ee4a1aaa75eb683c8f184b70676de",
+        "metadata_sha256": "699c186fd2c9a95ac209cd3552502afa55fea8a1cbc5ff6257c2664442d85c1d"
       },
       "metrics": {
-        "precision": 0.8888888888888888,
-        "recall": 0.6153846153846154,
-        "f1": 0.7272727272727273,
+        "precision": 0.7058823529411765,
+        "recall": 0.8,
+        "f1": 0.75,
         "confusion_matrix": {
-          "tp": 8,
-          "fp": 1,
-          "tn": 50,
-          "fn": 5
+          "tp": 12,
+          "fp": 5,
+          "tn": 44,
+          "fn": 3
         },
         "by_label_source": {
           "real": null,
           "simulated": {
-            "precision": 0.8888888888888888,
-            "recall": 0.6153846153846154,
-            "f1": 0.7272727272727273,
+            "precision": 0.7058823529411765,
+            "recall": 0.8,
+            "f1": 0.75,
             "confusion_matrix": {
-              "tp": 8,
-              "fp": 1,
-              "tn": 50,
-              "fn": 5
+              "tp": 12,
+              "fp": 5,
+              "tn": 44,
+              "fn": 3
             }
           }
         }
@@ -80,9 +96,9 @@ Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La pet
     {
       "id": 2,
       "model_name": "demand_regressor",
-      "version": "ee244e56e1834f3aaa568b64413c976a",
-      "trained_at": "2026-11-26T04:51:27.863966Z",
-      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/demand_regressor.keras",
+      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+      "trained_at": "2026-11-26T05:57:33.727740Z",
+      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/demand_regressor.keras",
       "seed": 42,
       "dataset_summary": {
         "source": "simulated",
@@ -96,7 +112,7 @@ Cuerpo `{}` o `{"seed":42}`. La semilla acepta enteros de 0 a 2147483647. La pet
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "67e0c9ee7cf179b29cad66c651f045024db3c12fe14fa0de6604f2a6eae5922d",
+        "artifact_sha256": "33b1ee24f6463ff441ac4ebdce6fd7964378f63f2205eba67500ea97823ce0b3",
         "metadata_sha256": "ae98ca35509cc677e171945727fe3b61f413f7ba6cdc03a862d73889a37f9595"
       },
       "metrics": {
@@ -139,6 +155,23 @@ Devuelve 200. Antes del primer entrenamiento, la respuesta es:
 
 Tras entrenar, cada `run` contiene exactamente el objeto correspondiente de `runs` mostrado arriba. `on_disk` indica si están presentes el archivo .keras y el JSON asociado. `loaded` indica si esa versión se encuentra en memoria en el proceso Flask que respondió. En la primera inferencia se verifican ambos SHA-256 y se carga el modelo. Un reinicio conserva versiones y archivos si la base y el volumen son persistentes.
 
+`training` describe el último entrenamiento iniciado desde la API, o es `null` si nunca hubo uno. `state` vale `running`, `succeeded` (con `version`) o `failed` (con `error` y `message`, por ejemplo `insufficient_test`). Si un trabajo queda en `running` más de `ML_TRAIN_STALE_SECONDS` (3600 por defecto), por ejemplo porque el proceso se reinició, se informa como `failed` con `error: "training_stalled"` y se puede volver a entrenar.
+
+```json
+{
+  "models": { "...": "igual que arriba" },
+  "training": {
+    "state": "succeeded",
+    "seed": 42,
+    "started_at": "2026-11-26T08:10:02.114233Z",
+    "finished_at": "2026-11-26T08:10:51.902114Z",
+    "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+    "error": null,
+    "message": null
+  }
+}
+```
+
 ## POST /api/admin/ml/predict/fraud
 
 Elige una sola forma de entrada: `{"order_id":42}`, `{"invoice_id":24}`, `{"payment_id":13}` o el objeto `transaction` del ejemplo. Los IDs existen en la base del backend. La referencia de pedido usa los datos del pedido en su creación, la de factura sus datos de emisión y la de pago incluye método y factura asociada. El snapshot de BD se construye en el servidor. Los IDs de cuenta y documento sirven para trazabilidad, quedan excluidos del vector numérico.
@@ -162,25 +195,25 @@ Devuelve 201 y guarda una predicción por POST exitoso. `delta_probability` es e
 
 ```json
 {
-  "fraud_probability": 1.7668083955868497e-06,
+  "fraud_probability": 1.7539792951382083e-09,
   "id": 1,
   "model_run_id": 1,
   "predicted_label": "normal",
   "signals": [
     {
-      "delta_probability": -3.888339199420443e-05,
-      "feature": "log_amount"
-    },
-    {
-      "delta_probability": -1.5347631801887474e-05,
+      "delta_probability": -2.1378941539307306e-07,
       "feature": "discount_fraction"
     },
     {
-      "delta_probability": -5.028743657931045e-06,
-      "feature": "log_prior_frequency"
+      "delta_probability": -7.819362479732916e-08,
+      "feature": "cancellation_rate"
+    },
+    {
+      "delta_probability": -4.234215722487278e-08,
+      "feature": "log_amount"
     }
   ],
-  "version": "ee244e56e1834f3aaa568b64413c976a"
+  "version": "d5b51a1dc1294f7b95d9930edb7f7740"
 }
 ```
 
@@ -337,7 +370,7 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
     }
   ],
   "source": "simulated",
-  "version": "ee244e56e1834f3aaa568b64413c976a"
+  "version": "d5b51a1dc1294f7b95d9930edb7f7740"
 }
 ```
 
@@ -348,7 +381,8 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
 | 400 | Validación de campos o JSON. |
 | 401 / 403 | Sesión, rol u origen/CSRF según el guardia del panel. |
 | 404 | Referencia de operación inexistente o producto ausente del modelo. |
-| 409 | `model_not_trained`, `training_busy`, `insufficient_test` o `insufficient_history`. |
+| 202 | Entrenamiento iniciado en segundo plano (consultar `GET /status`). |
+| 409 | `model_not_trained`, `training_busy`, `insufficient_test` o `insufficient_history`. Los dos últimos llegan en `training.error` cuando el entrenamiento corre en segundo plano. |
 | 422 | `invalid_label_file` por archivo de adjudicaciones inválido. |
 | 503 | `artifact_unavailable` por archivos ausentes, dañados o directorio no escribible. |
 
@@ -358,7 +392,7 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
 
 Las etiquetas reales requieren revisión externa. `ML_LABEL_FILE` apunta a un CSV UTF-8 gestionado por el operador, con columnas `payment_id,label,adjudicated_at`; ejemplo de formato: `13,fraudulenta,2026-11-25T18:00:00Z`. Una fila por pago, etiqueta `normal` o `fraudulenta`, adjudicación desde la operación hasta el instante actual. Para pagos anteriores al corte, las etiquetas disponibles a partir del corte se excluyen. Una alerta de Fase 4, una factura anulada o un comprobante ausente por sí solos nunca constituyen una etiqueta de fraude.
 
-Si train contiene menos de ocho casos adjudicados de alguna clase, se incorpora un corpus determinístico con etiquetas `simulated`. El simulador elige una clase latente y genera distribuciones superpuestas de montos, frecuencia, descuentos y otras características. Incluye un tramo de evaluación sintético separado cronológicamente. Los recuentos y las métricas distinguen los dos orígenes. Sin adjudicaciones, las métricas solo describen el simulador. La normalización se adapta a train original y se serializa dentro del .keras; después se sobremuestrea únicamente la clase minoritaria de train. El tramo de prueba conserva su distribución.
+Si train contiene menos de ocho casos adjudicados de alguna clase, se incorpora un corpus determinístico con etiquetas `simulated`. El simulador elige una clase latente y genera distribuciones superpuestas de montos, frecuencia, descuentos y otras características: **ambas clases comparten el mismo soporte** (descuento de 0 a 65 % con Beta, cancelaciones de 0 a 1 con Beta, frecuencia exponencial con tope 200, divergencia de hash posible en las dos clases, 25 % en fraude y 4 % en normales). Ningún valor delata la etiqueta por sí solo. La versión anterior usaba rangos anidados (por ejemplo, descuento normal hasta 30 % y fraudulento hasta 65 %) y producía `hash_valid = 0` solo en fraude: esos valores identificaban la clase con certeza e inflaban la precisión. `backend/tests/test_audit_fixes.py` comprueba que no vuelva a ocurrir. Incluye un tramo de evaluación sintético separado cronológicamente. Los recuentos y las métricas distinguen los dos orígenes. Sin adjudicaciones, las métricas solo describen el simulador. La normalización se adapta a train original y se serializa dentro del .keras; después se sobremuestrea únicamente la clase minoritaria de train. El tramo de prueba conserva su distribución.
 
 **Demanda.** La variable objetivo son unidades brutas de ítems facturados por producto y día de emisión en Bogotá. Se omite el día actual incompleto. Esta definición evita reclasificar retrospectivamente ventas según una anulación posterior. Desde la primera venta de cada producto se rellenan huecos con cero hasta el último día observado del conjunto. Si el calendario disponible cubre menos de catorce días se usa una serie sintética identificada. Un único corte temporal separa todos los productos. Un producto necesita al menos tres períodos previos para entrar en la comparación.
 
@@ -368,6 +402,6 @@ Keras usa último valor conocido, media móvil de hasta siete días, índice de 
 
 1. En una base existente aplica las migraciones de facturación, integridad y `supabase/migrations/20261126044431_ml_models.sql` antes de habilitar estas rutas. Las claves públicas de Supabase carecen de acceso a las tablas ML.
 2. Instala `backend/requirements.txt`. Desde la raíz ejecuta `python backend/scripts/train_ml_models.py --seed 42`. Usa la misma conexión Flask y publica los dos archivos y sus metadatos antes de confirmar las dos filas de versión. Una ejecución concurrente devuelve conflicto.
-3. `ML_ARTIFACT_DIR` apunta por defecto a `backend/ml_artifacts/`. En contenedor monta un volumen persistente escribible por Flask, compartido entre workers. Dimensiona memoria y timeout para TensorFlow o ejecuta el entrenamiento con el CLI. Las rutas de inferencia requieren el registro de la corrida y el par de archivos de esa versión.
+3. `ML_ARTIFACT_DIR` apunta por defecto a `backend/ml_artifacts/`. En contenedor monta un volumen persistente escribible por Flask, compartido entre workers. Dimensiona la memoria para TensorFlow. El entrenamiento desde la API corre en un hilo del worker, así que no depende del timeout de gunicorn; el CLI sigue siendo síncrono. Las rutas de inferencia requieren el registro de la corrida y el par de archivos de esa versión.
 4. Para reproducir el ejemplo aislado, ejecuta `python backend/scripts/train_ml_models.py --demo --seed 42`. Usa SQLite en memoria y conserva los .keras, metadatos y `runs.json` bajo `backend/ml_artifacts/demo/<version>/`. Las versiones operativas se guardan fuera de Git. TensorFlow y Keras, la semilla y las épocas quedan registrados; entre arquitecturas y runtimes puede haber diferencias de redondeo.
-5. Ejecuta `python -m pytest backend/tests/test_phase5.py -q` para comprobar separación cronológica, adjudicaciones, normalización, recarga, inferencia y permisos.
+5. Ejecuta `python -m pytest backend/tests/test_phase5.py backend/tests/test_audit_fixes.py -q` para comprobar separación cronológica, adjudicaciones, normalización, recarga, inferencia, permisos, entrenamiento en segundo plano y que el simulador no filtre la etiqueta.
