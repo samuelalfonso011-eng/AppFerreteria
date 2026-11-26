@@ -188,3 +188,114 @@ def test_concurrent_and_stale_jobs(app, admin_api, async_training):
         (root / train_models.STATE_FILE).write_text(json.dumps({"state": "running", "started_at": fresh}), encoding="utf-8")
     # Otro worker tiene un trabajo en curso (archivo compartido): no se inicia otro
     assert admin_api.post("/api/admin/ml/train", {}).status_code == 409
+
+
+# ============================================================ hallazgos bajos
+
+from decimal import Decimal  # noqa: E402
+
+from app.models import Category, User  # noqa: E402
+from app.models.analytics import AnomalyAlert, QualityIssue  # noqa: E402
+from app.services.data_quality_service import category_case  # noqa: E402
+from tests.test_phase4 import sample_order  # noqa: E402
+
+
+def test_amount_outliers_use_only_previous_history(admin_api):
+    customer = User.query.filter_by(role="customer").one()
+    product = Product.query.first()
+    # Una compra grande al inicio no tiene historial previo: antes se marcaba con cercas que usaban el futuro
+    for i, amount in enumerate([5000, 100, 110, 90, 105, 95]):
+        sample_order(customer.id, product, i, 1, amount)
+    db.session.commit()
+    alerts = admin_api.get("/api/admin/analytics/users").get_json()["alerts"]
+    assert not [a for a in alerts if a["alert_type"] == "high_amount_outlier"]
+    late = sample_order(customer.id, product, 10, 1, 4000)  # ahora sí supera su historial previo
+    db.session.commit()
+    alerts = admin_api.get("/api/admin/analytics/users").get_json()["alerts"]
+    high = next(a for a in alerts if a["alert_type"] == "high_amount_outlier")
+    assert high["source_record_ids"] == {"order_ids": [late.id]} and high["threshold_info"]["n"] == 6
+    assert AnomalyAlert.query.count() == 0  # GET no escribe
+
+
+def test_profiles_expose_rates_for_frequency(admin_api):
+    data = admin_api.get("/api/admin/analytics/users").get_json()
+    roles = {p["user_role"] for p in data["profiles"]}
+    assert "customer" in roles
+    for profile in data["profiles"]:
+        assert ("orders_per_day" if profile["user_role"] == "customer" else "invoices_per_day") in profile
+
+
+def test_category_case_respects_mixed_case_and_acronyms():
+    assert category_case("ELÉCTRICAS DE MANO") == "Eléctricas de mano"
+    assert category_case("pinturas") == "Pinturas"
+    assert category_case("Bombillas LED") == "Bombillas LED"
+    assert category_case("Tubería PVC") == "Tubería PVC"
+    assert category_case("123") == "123"
+
+
+def test_duplicate_categories_and_resolving_issues(app, api, admin_api):
+    first, second = Category.query.order_by(Category.id).limit(2).all()
+    first.name, second.name = "Tubería PVC", "tubería pvc"
+    db.session.commit()
+    report = admin_api.post("/api/admin/data-quality/audit").get_json()
+    names = [i for i in report["issues"] if i["module"] == "categories" and i["details"].get("field") == "name"
+             and i["entity_id"] in (first.id, second.id)]
+    dup = [i for i in names if i["issue_type"] == "duplicate_candidate"]
+    assert {i["entity_id"] for i in dup} == {first.id, second.id}
+    assert not [i for i in names if i["issue_type"] == "inconsistent_category"]  # reservado a categorías huérfanas
+    # "tubería pvc" (todo minúsculas) recibe una propuesta de mayúscula, pero queda en revisión por ser ambiguo
+    assert all(i["status"] == "pending_review" for i in names)
+    assert db.session.get(Category, first.id).name == "Tubería PVC"  # la sigla se conserva
+    pending = dup[0]
+    resolved = admin_api.post(f"/api/admin/data-quality/issues/{pending['id']}/resolve")
+    assert resolved.status_code == 200 and resolved.get_json()["issue"]["status"] == "resolved"
+    assert resolved.get_json()["changed"] is True
+    assert admin_api.post(f"/api/admin/data-quality/issues/{pending['id']}/resolve").get_json()["changed"] is False
+    latest = admin_api.get("/api/admin/data-quality/latest").get_json()
+    assert next(i for i in latest["issues"] if i["id"] == pending["id"])["status"] == "resolved"
+    fixed = QualityIssue.query.filter_by(status="auto_fixed").first()
+    if fixed:
+        conflict = admin_api.post(f"/api/admin/data-quality/issues/{fixed.id}/resolve")
+        assert conflict.status_code == 409 and conflict.get_json()["error"] == "issue_not_pending"
+    assert admin_api.post("/api/admin/data-quality/issues/999999/resolve").status_code == 404
+    employee, _ = employee_login(app, admin_api)
+    for client, code in ((api, 401), (employee, 403)):
+        assert client.post(f"/api/admin/data-quality/issues/{pending['id']}/resolve").status_code == code
+        assert client.post("/api/admin/analytics/users").status_code == code
+
+
+def test_https_redirect_keeps_method(app):
+    app.testing = False
+    try:
+        response = app.test_client().post("http://tienda.example/api/orders", json={})
+        assert response.status_code == 308
+        assert response.headers["Location"].startswith("https://tienda.example/api/orders")
+    finally:
+        app.testing = True
+
+
+def test_demand_trains_every_evaluated_lead():
+    assert list(train_models.DEMAND_LEADS) == list(range(1, 31))
+
+
+def test_failed_commit_removes_published_artifacts(app, tmp_path, monkeypatch):
+    app.config.update(ML_ARTIFACT_DIR=str(tmp_path / "models"), ML_EPOCHS=1)
+
+    class FakeModel:
+        def save(self, path):
+            path.write_bytes(b"modelo")
+
+    def fake(seed, epochs):
+        return FakeModel(), {}, {}, {"features": []}
+
+    monkeypatch.setattr(train_models, "classifier", fake)
+    monkeypatch.setattr(train_models, "regressor", fake)
+
+    def broken_commit():
+        raise RuntimeError("la base no confirmó")
+
+    monkeypatch.setattr(db.session, "commit", broken_commit)
+    with pytest.raises(RuntimeError):
+        train_models.train(42)
+    root = tmp_path / "models"
+    assert [p.name for p in root.iterdir() if not p.name.startswith(".")] == []  # sin versiones huérfanas

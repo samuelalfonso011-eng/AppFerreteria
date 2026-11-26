@@ -73,14 +73,24 @@ def predict_fraud(snapshot):
 
     run, model, meta = load(FRAUD)
     x = np.asarray(pipeline.fraud_vector(snapshot), dtype="float32")
-    # Sensibilidad local: sustituir una característica cada vez por su media de entrenamiento.
-    batch = np.tile(x, (len(x) + 1, 1))
-    for i, mean in enumerate(meta["training_mean"]):
-        batch[i + 1, i] = mean
+    # Sensibilidad local por bloques: cada señal se sustituye por su media de entrenamiento. Las variables
+    # que solo tienen sentido juntas (hora en seno y coseno, one-hot de método y canal, estado del hash)
+    # se reemplazan como un bloque y se informan con un único nombre.
+    from app.ml.train_models import SIGNAL_GROUPS
+
+    features, means = meta["features"], meta["training_mean"]
+    grouped = {f for members in SIGNAL_GROUPS.values() for f in members}
+    blocks = [(name, [features.index(f) for f in members if f in features]) for name, members in SIGNAL_GROUPS.items()]
+    blocks = [(name, idx) for name, idx in blocks if idx]
+    blocks += [(f, [i]) for i, f in enumerate(features) if f not in grouped]
+    batch = np.tile(x, (len(blocks) + 1, 1))
+    for row, (_, indices) in enumerate(blocks, 1):
+        for i in indices:
+            batch[row, i] = means[i]
     probabilities = model(batch, training=False).numpy().ravel()
     probability = float(probabilities[0])
     effects = sorted(
-        ((name, probability - float(p)) for name, p in zip(meta["features"], probabilities[1:])),
+        ((name, probability - float(p)) for (name, _), p in zip(blocks, probabilities[1:])),
         key=lambda pair: abs(pair[1]),
         reverse=True,
     )

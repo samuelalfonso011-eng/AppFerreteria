@@ -3,9 +3,9 @@
     {
       "id": 1,
       "model_name": "fraud_classifier",
-      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
-      "trained_at": "2026-11-26T05:57:30.313043Z",
-      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/fraud_classifier.keras",
+      "version": "2d8cd986aea147ada5810f202612cf99",
+      "trained_at": "2026-11-26T13:33:05.431553Z",
+      "artifact_path": "2d8cd986aea147ada5810f202612cf99/fraud_classifier.keras",
       "seed": 42,
       "dataset_summary": {
         "cutoff": "2025-01-01T00:00:00Z",
@@ -39,7 +39,7 @@
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "6389da170a8970153847198eac23d60ae60ee4a1aaa75eb683c8f184b70676de",
+        "artifact_sha256": "530c6cea76c70ffee64b7fd24928cd1303806dbeaf0577d6816317af3fca6644",
         "metadata_sha256": "699c186fd2c9a95ac209cd3552502afa55fea8a1cbc5ff6257c2664442d85c1d"
       },
       "metrics": {
@@ -71,9 +71,9 @@
     {
       "id": 2,
       "model_name": "demand_regressor",
-      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
-      "trained_at": "2026-11-26T05:57:33.727740Z",
-      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/demand_regressor.keras",
+      "version": "2d8cd986aea147ada5810f202612cf99",
+      "trained_at": "2026-11-26T13:33:12.628370Z",
+      "artifact_path": "2d8cd986aea147ada5810f202612cf99/demand_regressor.keras",
       "seed": 42,
       "dataset_summary": {
         "source": "simulated",
@@ -81,20 +81,20 @@
         "excluded_products": 0,
         "cutoff": "2025-03-14",
         "train_size": 142,
-        "training_examples": 612,
+        "training_examples": 3390,
         "test_size": 36,
         "products": 2,
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "33b1ee24f6463ff441ac4ebdce6fd7964378f63f2205eba67500ea97823ce0b3",
-        "metadata_sha256": "ae98ca35509cc677e171945727fe3b61f413f7ba6cdc03a862d73889a37f9595"
+        "artifact_sha256": "5a3e5ce917ee91b960200278aefbe17416e8775b240c37a69897af3e039687eb",
+        "metadata_sha256": "3d72066034e2378f87cc92576e1da5fd3b6db3ab49fcc600c528c558af03ff45"
       },
       "metrics": {
         "keras": {
-          "mae": 1.4894946946038141,
-          "rmse": 1.7827734681749046,
-          "r2": 0.6415721819072766
+          "mae": 2.123488108317057,
+          "rmse": 2.5941339938484496,
+          "r2": 0.24108315291159244
         },
         "linear_phase4": {
           "mae": 2.3995354887655034,

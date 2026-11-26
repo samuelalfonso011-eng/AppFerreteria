@@ -8,7 +8,7 @@ Envía `{}`. Devuelve 200 con el informe final. Una ejecución recorre los seis 
 
 El informe cuenta incidencias por campo. Para el puntaje cuenta entidades distintas con incidencias pendientes después de las correcciones: 100 × (registros escaneados menos entidades pendientes) / registros escaneados. Un conjunto vacío obtiene 100. Cada módulo informa sus propios contadores.
 
-La auditoría normaliza texto NFC, espacios, nombres de categorías y casing de correo y SKU. Compara productos por nombre o SKU sin separadores, usuarios por correo y clientes por teléfono compartido en pedidos vinculados a cuentas distintas. Los invitados quedan fuera de la comparación de identidades. Los candidatos, categorías huérfanas, precios inválidos y campos obligatorios ausentes requieren revisión. Los importes de facturas y pagos y sus documentos de integridad se conservan. Un total de factura cero puede corresponder a un descuento completo.
+La auditoría normaliza texto NFC, espacios y casing de correo y SKU. En nombres de categoría solo corrige el casing cuando el nombre está escrito todo en mayúsculas o todo en minúsculas; un nombre con mayúsculas y minúsculas mezcladas (por ejemplo `Bombillas LED` o `Tubería PVC`) se respeta para no destruir siglas ni marcas. Compara productos por nombre o SKU sin separadores, usuarios por correo y clientes por teléfono compartido en pedidos vinculados a cuentas distintas. Los invitados quedan fuera de la comparación de identidades. Los candidatos, categorías huérfanas, precios inválidos y campos obligatorios ausentes requieren revisión. Dos categorías con el mismo nombre se informan como `duplicate_candidate`; `inconsistent_category` queda reservado para productos que apuntan a una categoría inexistente. Los importes de facturas y pagos y sus documentos de integridad se conservan. Un total de factura cero puede corresponder a un descuento completo.
 
 ```json
 {
@@ -73,15 +73,21 @@ La auditoría normaliza texto NFC, espacios, nombres de categorías y casing de 
 
 ## GET /api/admin/data-quality/latest
 
-Sin parámetros. Devuelve 200 con el mismo objeto del POST anterior, incluidas sus incidencias, o el literal JSON `null` antes de la primera auditoría.
+Sin parámetros. Devuelve 200 con el mismo objeto del POST anterior, incluidas sus incidencias, o el literal JSON `null` antes de la primera auditoría. Los contadores (`pending_review_count`, `summary_by_module`, `quality_score`) describen la ejecución tal como ocurrió; el `status` de cada incidencia es el vigente.
 
-## GET /api/admin/analytics/users
+## POST /api/admin/data-quality/issues/{id}/resolve
 
-Sin parámetros. Devuelve 200 con perfiles de cuentas con rol actual customer o employee, incluidas las que no tienen actividad. `operations[].id` referencia pedidos para clientes y facturas para empleados. Montos en COP, porcentajes de descuentos de 0 a 100 y tasas de anulación de 0 a 1. La frecuencia del cliente divide su número de pedidos por los días calendario del intervalo común de pedidos vinculados. En empate de canal se usa el primer nombre en orden alfabético.
+Envía `{}`. Marca como `resolved` una incidencia `pending_review` después de corregirla a mano. Devuelve 200 con `{"issue": {...}, "changed": true}`; repetir devuelve `"changed": false`. Una incidencia `auto_fixed` responde `409 issue_not_pending` y un ID inexistente `404`. Requiere `supabase/migrations/20261126090000_quality_resolve.sql`, que concede `UPDATE` solo sobre `status`.
 
-Los boxplots usan interpolación lineal con posición (n - 1) × p y cercas de Tukey a 1,5 IQR. Los bigotes son los valores observados extremos dentro de las cercas. Sin observaciones se devuelve null. Las alertas usan la cerca superior y requieren al menos cuatro observaciones. Un monto o descuento individual se compara con el historial de la cuenta. La frecuencia y proporción de cancelaciones se comparan entre cuentas activas del mismo rol. También se compara el porcentaje medio de descuento entre empleados. Si dos reglas de descuento se disparan, se devuelve la de mayor puntaje.
+## GET y POST /api/admin/analytics/users
 
-Las alertas persistidas son el conjunto vigente, con una fila por usuario, rol y tipo. Reconsultar actualiza sus evidencias, conserva su ID mientras la alerta exista y retira las que dejan de aplicar. El puntaje es 100 × exceso / (exceso + escala), donde exceso es la distancia positiva a la cerca superior y escala es IQR. Cuando IQR es cero se usa el máximo entre 1 y el valor absoluto de la cerca. El puntaje describe magnitud relativa, no probabilidad de fraude.
+`GET` es una lectura pura: calcula perfiles y alertas sin escribir en la base. Cada alerta trae el `id` y la fecha de su fila guardada, o `null` si todavía no se ha persistido. `POST` (cuerpo `{}`) recalcula, sincroniza `anomaly_alerts` y devuelve el mismo cuerpo con los IDs definitivos.
+
+Sin parámetros. Devuelve 200 con perfiles de cuentas con rol actual customer o employee, incluidas las que no tienen actividad. `operations[].id` referencia pedidos para clientes y facturas para empleados. Montos en COP, porcentajes de descuentos de 0 a 100 y tasas de anulación de 0 a 1. La frecuencia del cliente (`orders_per_day`) divide su número de pedidos por los días calendario del intervalo común de pedidos vinculados; la del empleado (`invoices_per_day`) divide sus facturas por el intervalo común de facturas. En empate de canal se usa el primer nombre en orden alfabético.
+
+Los boxplots usan interpolación lineal con posición (n - 1) × p y cercas de Tukey a 1,5 IQR. Los bigotes son los valores observados extremos dentro de las cercas. Sin observaciones se devuelve null. Las alertas usan la cerca superior. Un monto o descuento individual se compara **solo con las operaciones anteriores** de la misma cuenta y requiere al menos cuatro previas: una cerca calculada con todo el historial juzgaría una compra con datos posteriores a ella. `threshold_info` es la cerca vigente en el caso de mayor puntaje (su `n` cuenta las operaciones previas) y `source_record_ids` lista todas las operaciones que superaron su propia cerca. `amount_boxplot` sigue resumiendo todo el historial como dato descriptivo. La frecuencia diaria y la proporción de cancelaciones se comparan entre cuentas activas del mismo rol (al menos cuatro cuentas). También se compara el porcentaje medio de descuento entre empleados. Si dos reglas de descuento se disparan, se devuelve la de mayor puntaje.
+
+Las alertas persistidas son el conjunto vigente, con una fila por usuario, rol y tipo. Cada `POST` actualiza sus evidencias, conserva su ID mientras la alerta exista y retira las que dejan de aplicar. El puntaje es 100 × exceso / (exceso + escala), donde exceso es la distancia positiva a la cerca superior y escala es IQR. Cuando IQR es cero se usa el máximo entre 1 y el valor absoluto de la cerca. El puntaje describe magnitud relativa, no probabilidad de fraude.
 
 ```json
 {
@@ -187,7 +193,7 @@ Ejemplo de un elemento de `alerts` tras incorporar más pedidos. Los IDs identif
   "alert_type": "high_amount_outlier",
   "anomaly_score": 80.0,
   "created_at": "2026-11-26T03:55:06.763160Z",
-  "explanation": "Monto superior al habitual de la cuenta (COP). Valor máximo 1500.00, límite 700.00.",
+  "explanation": "Monto superior al historial previo de la cuenta (COP). Valor 1500.00, límite 700.00 según las 5 operaciones anteriores.",
   "id": 1,
   "source_record_ids": {
     "order_ids": [

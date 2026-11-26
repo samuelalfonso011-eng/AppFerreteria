@@ -28,9 +28,9 @@ Con `ML_TRAIN_ASYNC=0` (modo de las pruebas) y en el CLI el entrenamiento es sí
     {
       "id": 1,
       "model_name": "fraud_classifier",
-      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
-      "trained_at": "2026-11-26T05:57:30.313043Z",
-      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/fraud_classifier.keras",
+      "version": "2d8cd986aea147ada5810f202612cf99",
+      "trained_at": "2026-11-26T13:33:05.431553Z",
+      "artifact_path": "2d8cd986aea147ada5810f202612cf99/fraud_classifier.keras",
       "seed": 42,
       "dataset_summary": {
         "cutoff": "2025-01-01T00:00:00Z",
@@ -64,7 +64,7 @@ Con `ML_TRAIN_ASYNC=0` (modo de las pruebas) y en el CLI el entrenamiento es sí
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "6389da170a8970153847198eac23d60ae60ee4a1aaa75eb683c8f184b70676de",
+        "artifact_sha256": "530c6cea76c70ffee64b7fd24928cd1303806dbeaf0577d6816317af3fca6644",
         "metadata_sha256": "699c186fd2c9a95ac209cd3552502afa55fea8a1cbc5ff6257c2664442d85c1d"
       },
       "metrics": {
@@ -96,9 +96,9 @@ Con `ML_TRAIN_ASYNC=0` (modo de las pruebas) y en el CLI el entrenamiento es sí
     {
       "id": 2,
       "model_name": "demand_regressor",
-      "version": "d5b51a1dc1294f7b95d9930edb7f7740",
-      "trained_at": "2026-11-26T05:57:33.727740Z",
-      "artifact_path": "d5b51a1dc1294f7b95d9930edb7f7740/demand_regressor.keras",
+      "version": "2d8cd986aea147ada5810f202612cf99",
+      "trained_at": "2026-11-26T13:33:12.628370Z",
+      "artifact_path": "2d8cd986aea147ada5810f202612cf99/demand_regressor.keras",
       "seed": 42,
       "dataset_summary": {
         "source": "simulated",
@@ -106,20 +106,20 @@ Con `ML_TRAIN_ASYNC=0` (modo de las pruebas) y en el CLI el entrenamiento es sí
         "excluded_products": 0,
         "cutoff": "2025-03-14",
         "train_size": 142,
-        "training_examples": 612,
+        "training_examples": 3390,
         "test_size": 36,
         "products": 2,
         "epochs": 16,
         "tensorflow": "2.21.0",
         "keras": "3.15.1",
-        "artifact_sha256": "33b1ee24f6463ff441ac4ebdce6fd7964378f63f2205eba67500ea97823ce0b3",
-        "metadata_sha256": "ae98ca35509cc677e171945727fe3b61f413f7ba6cdc03a862d73889a37f9595"
+        "artifact_sha256": "5a3e5ce917ee91b960200278aefbe17416e8775b240c37a69897af3e039687eb",
+        "metadata_sha256": "3d72066034e2378f87cc92576e1da5fd3b6db3ab49fcc600c528c558af03ff45"
       },
       "metrics": {
         "keras": {
-          "mae": 1.4894946946038141,
-          "rmse": 1.7827734681749046,
-          "r2": 0.6415721819072766
+          "mae": 2.123488108317057,
+          "rmse": 2.5941339938484496,
+          "r2": 0.24108315291159244
         },
         "linear_phase4": {
           "mae": 2.3995354887655034,
@@ -165,7 +165,7 @@ Tras entrenar, cada `run` contiene exactamente el objeto correspondiente de `run
     "seed": 42,
     "started_at": "2026-11-26T08:10:02.114233Z",
     "finished_at": "2026-11-26T08:10:51.902114Z",
-    "version": "d5b51a1dc1294f7b95d9930edb7f7740",
+    "version": "2d8cd986aea147ada5810f202612cf99",
     "error": null,
     "message": null
   }
@@ -191,7 +191,7 @@ Para una transacción libre son obligatorios `occurred_at` (ISO con zona), `amou
 }
 ```
 
-Devuelve 201 y guarda una predicción por POST exitoso. `delta_probability` es el cambio local de la salida respecto a sustituir esa característica por su media de entrenamiento. Las tres señales con mayor valor absoluto son descriptivas. El campo de probabilidad es la salida sigmoide del modelo. La app no la utiliza para rechazar pagos.
+Devuelve 201 y guarda una predicción por POST exitoso. `delta_probability` es el cambio local de la salida respecto a sustituir esa señal por su media de entrenamiento. Las variables que solo tienen sentido juntas se sustituyen como un bloque y se informan con un único nombre: `hour` (seno y coseno de la hora), `hash_state` (divergencia o auditoría desconocida), `payment_method` y `channel` (one-hot). Las demás señales son `log_amount`, `log_prior_frequency`, `discount_fraction` y `cancellation_rate`. Las tres señales con mayor valor absoluto son descriptivas. El campo de probabilidad es la salida sigmoide del modelo. La app no la utiliza para rechazar pagos.
 
 ```json
 {
@@ -205,7 +205,7 @@ Devuelve 201 y guarda una predicción por POST exitoso. `delta_probability` es e
       "feature": "discount_fraction"
     },
     {
-      "delta_probability": -7.819362479732916e-08,
+      "delta_probability": -7.819363190275652e-08,
       "feature": "cancellation_rate"
     },
     {
@@ -213,7 +213,7 @@ Devuelve 201 y guarda una predicción por POST exitoso. `delta_probability` es e
       "feature": "log_amount"
     }
   ],
-  "version": "d5b51a1dc1294f7b95d9930edb7f7740"
+  "version": "2d8cd986aea147ada5810f202612cf99"
 }
 ```
 
@@ -228,9 +228,9 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
   "cutoff": "2025-03-14",
   "metrics": {
     "keras": {
-      "mae": 1.4894946946038141,
-      "r2": 0.6415721819072766,
-      "rmse": 1.7827734681749046
+      "mae": 2.123488108317057,
+      "r2": 0.24108315291159244,
+      "rmse": 2.5941339938484496
     },
     "linear_phase4": {
       "mae": 2.3995354887655034,
@@ -243,13 +243,13 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
     {
       "forecast": [
         {
-          "keras": 20.23063850402832,
+          "keras": 24.370203018188477,
           "linear_phase4": 23.002695778935408,
           "observed": null,
           "period": "2025-04-01"
         },
         {
-          "keras": 24.769283294677734,
+          "keras": 26.957809448242188,
           "linear_phase4": 23.125324243788455,
           "observed": null,
           "period": "2025-04-02"
@@ -259,109 +259,109 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
       "product_id": -1,
       "test": [
         {
-          "keras": 23.67229461669922,
+          "keras": 22.179534912109375,
           "linear_phase4": 20.795383411580595,
           "observed": 24,
           "period": "2025-03-14"
         },
         {
-          "keras": 21.333221435546875,
+          "keras": 20.383100509643555,
           "linear_phase4": 20.91801187643364,
           "observed": 21,
           "period": "2025-03-15"
         },
         {
-          "keras": 20.62007713317871,
+          "keras": 19.731220245361328,
           "linear_phase4": 21.040640341286682,
           "observed": 19,
           "period": "2025-03-16"
         },
         {
-          "keras": 18.715877532958984,
+          "keras": 18.725547790527344,
           "linear_phase4": 21.16326880613973,
           "observed": 17,
           "period": "2025-03-17"
         },
         {
-          "keras": 19.38286590576172,
+          "keras": 20.916709899902344,
           "linear_phase4": 21.285897270992777,
           "observed": 20,
           "period": "2025-03-18"
         },
         {
-          "keras": 22.631040573120117,
+          "keras": 23.64235496520996,
           "linear_phase4": 21.40852573584582,
           "observed": 21,
           "period": "2025-03-19"
         },
         {
-          "keras": 25.686817169189453,
+          "keras": 27.312040328979492,
           "linear_phase4": 21.531154200698865,
           "observed": 24,
           "period": "2025-03-20"
         },
         {
-          "keras": 24.185832977294922,
+          "keras": 24.526473999023438,
           "linear_phase4": 21.65378266555191,
           "observed": 25,
           "period": "2025-03-21"
         },
         {
-          "keras": 22.20762825012207,
+          "keras": 21.16225814819336,
           "linear_phase4": 21.776411130404956,
           "observed": 22,
           "period": "2025-03-22"
         },
         {
-          "keras": 21.709321975708008,
+          "keras": 20.546621322631836,
           "linear_phase4": 21.899039595258003,
           "observed": 20,
           "period": "2025-03-23"
         },
         {
-          "keras": 20.784143447875977,
+          "keras": 20.53034210205078,
           "linear_phase4": 22.021668060111047,
           "observed": 17,
           "period": "2025-03-24"
         },
         {
-          "keras": 21.245849609375,
+          "keras": 23.73086166381836,
           "linear_phase4": 22.14429652496409,
           "observed": 18,
           "period": "2025-03-25"
         },
         {
-          "keras": 23.83988380432129,
+          "keras": 25.851078033447266,
           "linear_phase4": 22.266924989817134,
           "observed": 21,
           "period": "2025-03-26"
         },
         {
-          "keras": 26.706911087036133,
+          "keras": 28.879886627197266,
           "linear_phase4": 22.38955345467018,
           "observed": 25,
           "period": "2025-03-27"
         },
         {
-          "keras": 24.699874877929688,
+          "keras": 26.284059524536133,
           "linear_phase4": 22.51218191952323,
           "observed": 27,
           "period": "2025-03-28"
         },
         {
-          "keras": 22.723440170288086,
+          "keras": 21.82632827758789,
           "linear_phase4": 22.634810384376273,
           "observed": 24,
           "period": "2025-03-29"
         },
         {
-          "keras": 22.283451080322266,
+          "keras": 20.56024742126465,
           "linear_phase4": 22.757438849229317,
           "observed": 22,
           "period": "2025-03-30"
         },
         {
-          "keras": 22.075246810913086,
+          "keras": 21.660261154174805,
           "linear_phase4": 22.88006731408236,
           "observed": 20,
           "period": "2025-03-31"
@@ -370,7 +370,7 @@ Ejemplo 200 para `?product_id=-1&horizon=2`.
     }
   ],
   "source": "simulated",
-  "version": "d5b51a1dc1294f7b95d9930edb7f7740"
+  "version": "2d8cd986aea147ada5810f202612cf99"
 }
 ```
 
@@ -396,7 +396,7 @@ Si train contiene menos de ocho casos adjudicados de alguna clase, se incorpora 
 
 **Demanda.** La variable objetivo son unidades brutas de ítems facturados por producto y día de emisión en Bogotá. Se omite el día actual incompleto. Esta definición evita reclasificar retrospectivamente ventas según una anulación posterior. Desde la primera venta de cada producto se rellenan huecos con cero hasta el último día observado del conjunto. Si el calendario disponible cubre menos de catorce días se usa una serie sintética identificada. Un único corte temporal separa todos los productos. Un producto necesita al menos tres períodos previos para entrar en la comparación.
 
-Keras usa último valor conocido, media móvil de hasta siete días, índice de período, día de semana cíclico y horizonte. Se crean ejemplos directos de varios horizontes solo dentro de train. Se ajustan en train tanto la normalización de entradas como la escala de salida. Para **todo** el tramo de test, el origen de rezagos queda congelado en el corte; ningún valor observado de test entra en su propia evaluación ni en la de los días posteriores. La regresión usa la función de mínimos cuadrados de Fase 4 sobre el historial anterior de cada producto. Los dos modelos se evalúan exactamente en las mismas fechas. R² es null si el objetivo de prueba tiene varianza cero. No se exige que Keras supere al modelo lineal.
+Keras usa último valor conocido, media móvil de hasta siete días, índice de período, día de semana cíclico y horizonte. Se crean ejemplos directos para **cada** anticipación de 1 a 30 días (el horizonte máximo de la API), solo dentro de train: el tramo de prueba y el pronóstico no piden anticipaciones que el modelo no haya visto. La versión anterior entrenaba solo 1, 2, 7, 14 y 30 días; su MAE de prueba (1,49) correspondía a una evaluación con anticipaciones no entrenadas. Con todas las anticipaciones el resultado de la demostración es MAE 2,12 y R² 0,24, frente a 2,40 y 0,15 de la regresión lineal. Se ajustan en train tanto la normalización de entradas como la escala de salida. Para **todo** el tramo de test, el origen de rezagos queda congelado en el corte; ningún valor observado de test entra en su propia evaluación ni en la de los días posteriores. La regresión usa la función de mínimos cuadrados de Fase 4 sobre el historial anterior de cada producto. Los dos modelos se evalúan exactamente en las mismas fechas. R² es null si el objetivo de prueba tiene varianza cero. No se exige que Keras supere al modelo lineal.
 
 ## Operación y reproducción
 

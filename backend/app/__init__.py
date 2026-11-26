@@ -134,7 +134,7 @@ def _register_security(app):
             return None
         if request.scheme == "http" and request.host.split(":")[0] not in ("127.0.0.1", "localhost"):
             from flask import redirect
-            return redirect(request.url.replace("http://", "https://", 1), code=301)
+            return redirect(request.url.replace("http://", "https://", 1), code=308)  # 308 conserva método y cuerpo
         return None
 
     @app.after_request

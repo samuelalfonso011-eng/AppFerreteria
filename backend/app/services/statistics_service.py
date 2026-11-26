@@ -33,8 +33,12 @@ def local_day(timestamp):
     return as_utc(timestamp).astimezone(BOGOTA).date()
 
 
-def user_analytics():
-    if db.session.get_bind().dialect.name == "postgresql":
+MIN_HISTORY = 4  # observaciones previas mínimas antes de juzgar una operación
+
+
+def user_analytics(persist=False):
+    """Perfiles, boxplots y alertas. GET calcula sin escribir; persist=True (POST) sincroniza anomaly_alerts."""
+    if persist and db.session.get_bind().dialect.name == "postgresql":
         db.session.execute(text("SELECT pg_advisory_xact_lock(617203582)"))
     users = db.session.execute(select(User.id, User.role, User.full_name).where(
         User.role.in_(("customer", "employee"))).order_by(User.id)).all()
@@ -51,6 +55,8 @@ def user_analytics():
         employee_invoices[invoice.employee_id].append(invoice)
     days = [local_day(row.created_at) for row in orders]
     window = (max(days) - min(days)).days + 1 if days else 0
+    invoice_days = [local_day(row.created_at) for row in invoices]
+    invoice_window = (max(invoice_days) - min(invoice_days)).days + 1 if invoice_days else 0
     profiles, findings = [], {}
     totals = defaultdict(list)
 
@@ -72,6 +78,38 @@ def user_analytics():
         findings[key] = dict(anomaly_score=score, threshold_info=distribution,
                              explanation=f"{explanation}. Valor máximo {high + excess:.2f}, límite {high:.2f}.",
                              source_record_ids={source: record_ids})
+
+    def flag_history(profile, kind, samples, explanation):
+        """Cada operación se compara solo con las anteriores de la misma cuenta (orden cronológico).
+
+        Una cerca calculada con todo el historial usaría compras posteriores para juzgar una anterior.
+        Se necesitan MIN_HISTORY observaciones previas; la alerta conserva la cerca vigente en el caso
+        de mayor puntaje y lista todas las operaciones que superaron su propia cerca.
+        """
+        best, record_ids = None, []
+        for i in range(MIN_HISTORY, len(samples)):
+            value, record_id = samples[i]
+            distribution = boxplot([v for v, _ in samples[:i]])
+            high = distribution["upper"]
+            if value <= high:
+                continue
+            excess = value - high
+            scale = distribution["iqr"] or max(abs(high), 1)
+            score = round(100 * excess / (excess + scale), 2)
+            record_ids.append(record_id)
+            if best is None or score > best[0]:
+                best = (score, distribution, value)
+        if best is None:
+            return
+        score, distribution, value = best
+        key = (profile["user_id"], profile["user_role"], kind)
+        if key in findings and score <= findings[key]["anomaly_score"]:
+            return
+        source = "order_ids" if profile["user_role"] == "customer" else "invoice_ids"
+        findings[key] = dict(anomaly_score=score, threshold_info=distribution,
+                             explanation=f"{explanation}. Valor {value:.2f}, límite {distribution['upper']:.2f} "
+                                         f"según las {distribution['n']} operaciones anteriores.",
+                             source_record_ids={source: sorted(set(record_ids))})
 
     for user in users:
         role = user.role
@@ -95,18 +133,22 @@ def user_analytics():
             discounts = [dict(invoice_id=row.id, amount=float(row.discount_amount),
                               percent=float(100*row.discount_amount/row.subtotal) if row.subtotal else None)
                          for row in rows]
-            profile.update(invoices_issued=count, discounts=discounts)
-            samples = [(d["percent"], [d["invoice_id"]]) for d in discounts if d["percent"] is not None]
-            flag(profile, "abusive_discounts", boxplot([v for v, _ in samples]), samples,
-                 "Descuento superior al habitual del empleado (%)")
-        flag(profile, "high_amount_outlier", profile["amount_boxplot"],
-             [(op["amount"], [op["id"]]) for op in operations], "Monto superior al habitual de la cuenta (COP)")
+            profile.update(invoices_issued=count, discounts=discounts,
+                           invoices_per_day=count / invoice_window if invoice_window else None)
+            flag_history(profile, "abusive_discounts",
+                         [(d["percent"], d["invoice_id"]) for d in discounts if d["percent"] is not None],
+                         "Descuento superior al historial previo del empleado (%)")
+        flag_history(profile, "high_amount_outlier", [(op["amount"], op["id"]) for op in operations],
+                     "Monto superior al historial previo de la cuenta (COP)")
         profiles.append(profile)
 
     for role in ("customer", "employee"):
         active = [p for p in profiles if p["user_role"] == role and p["operations_count"]]
+        # Frecuencia como tasa diaria sobre la misma ventana: el total de operaciones favorecería
+        # a las cuentas más antiguas.
+        frequency = "orders_per_day" if role == "customer" else "invoices_per_day"
         for field, kind, label in (
-            ("operations_count", "unusual_frequency", "Frecuencia superior a otras cuentas activas del rol"),
+            (frequency, "unusual_frequency", "Frecuencia diaria superior a otras cuentas activas del rol"),
             ("cancellation_rate", "excessive_cancellations", "Proporción de anulaciones superior al grupo"),
         ):
             distribution = boxplot([p[field] for p in active])
@@ -131,20 +173,32 @@ def user_analytics():
              "Porcentaje medio de descuento superior al de otros empleados")
 
     current = {(a.user_id, a.user_role, a.alert_type): a for a in AnomalyAlert.query.all()}
-    alerts = []
-    for key, attrs in findings.items():
-        alert = current.pop(key, None)
-        if alert is None:
-            alert = AnomalyAlert(user_id=key[0], user_role=key[1], alert_type=key[2])
-            db.session.add(alert)
-        for field, value in attrs.items():
-            setattr(alert, field, value)
-        alerts.append(alert)
-    for stale in current.values():
-        db.session.delete(stale)
-    db.session.commit()
+    if persist:
+        alerts = []
+        for key, attrs in findings.items():
+            alert = current.pop(key, None)
+            if alert is None:
+                alert = AnomalyAlert(user_id=key[0], user_role=key[1], alert_type=key[2])
+                db.session.add(alert)
+            for field, value in attrs.items():
+                setattr(alert, field, value)
+            alerts.append(alert)
+        for stale in current.values():
+            db.session.delete(stale)
+        db.session.commit()
+        reports = [a.report() for a in alerts]
+    else:
+        # Lectura pura: mismas alertas calculadas, con el ID y la fecha de la fila guardada si ya existe.
+        reports = []
+        for key, attrs in findings.items():
+            saved = current.get(key)
+            reports.append(dict(id=saved.id if saved else None, user_id=key[0], user_role=key[1], alert_type=key[2],
+                                threshold_info=attrs["threshold_info"], explanation=attrs["explanation"],
+                                source_record_ids=attrs["source_record_ids"],
+                                anomaly_score=float(attrs["anomaly_score"]),
+                                created_at=saved.report()["created_at"] if saved else None))
     return dict(profiles=profiles, global_boxplots={role: boxplot(totals[role]) for role in ("customer","employee")},
-                customer_window_days=window, alerts=[a.report() for a in alerts])
+                customer_window_days=window, alerts=reports)
 
 
 def fit(values):

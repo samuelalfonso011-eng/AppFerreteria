@@ -13,6 +13,38 @@ from app.models.analytics import QualityIssue, QualityRun
 from app.utils.validation import CONTROL_CHARS, clean_text, valid_email
 
 
+def category_case(name):
+    """Corrige solo nombres escritos todo en mayúsculas o todo en minúsculas.
+
+    Un nombre con mayúsculas y minúsculas mezcladas ("Bombillas LED", "Tubería PVC") se respeta:
+    `capitalize()` destruía siglas y marcas al marcarlo como corrección segura.
+    """
+    letters = [c for c in name if c.isalpha()]
+    if not letters:
+        return name
+    if all(c.isupper() for c in letters):
+        return name.capitalize()
+    if all(c.islower() for c in letters):
+        return name[0].upper() + name[1:]
+    return name
+
+
+def resolve_issue(issue_id):
+    """Marca una incidencia pendiente como resuelta. Las auto-corregidas no cambian de estado."""
+    from app.services.errors import BusinessError
+
+    item = db.session.get(QualityIssue, issue_id, with_for_update=True, populate_existing=True)
+    if item is None:
+        raise BusinessError("Incidencia no encontrada.", code="not_found", status=404)
+    if item.status == "resolved":
+        return item, False
+    if item.status != "pending_review":
+        raise BusinessError("Solo una incidencia pendiente de revisión se puede resolver.", code="issue_not_pending")
+    item.status = "resolved"
+    db.session.commit()
+    return item, True
+
+
 def audit(actor_id):
     if db.session.get_bind().dialect.name == "postgresql":
         # Impide que una edición concurrente se pierda entre la comparación y la corrección.
@@ -60,8 +92,10 @@ def audit(actor_id):
             continue
         for entity_id in sorted(ids):
             ambiguous.add((module, entity_id, field))
-            issue(module, entity_id, field, "inconsistent_category" if module == "categories" else
-                  "duplicate_candidate", originals[module, field, value, entity_id], value, related_entity_ids=sorted(ids - {entity_id}))
+            # Dos categorías con el mismo nombre también son un posible duplicado; inconsistent_category
+            # queda reservado para productos que apuntan a una categoría inexistente.
+            issue(module, entity_id, field, "duplicate_candidate", originals[module, field, value, entity_id], value,
+                  related_entity_ids=sorted(ids - {entity_id}))
 
     def normalize(module, obj, field, optional=False, multiline=False):
         raw = getattr(obj, field)
@@ -81,7 +115,7 @@ def audit(actor_id):
                 issue(module, obj.id, field, "malformed_string", raw, normalized)
                 return
         if module == "categories" and field == "name":
-            normalized = normalized.capitalize()
+            normalized = category_case(normalized)
         if raw != normalized:
             safe = (module, obj.id, field) not in ambiguous and not CONTROL_CHARS.search(raw)
             limit = getattr(obj.__table__.c[field].type, "length", None)

@@ -34,6 +34,16 @@ FEATURES = [
     *pipeline.ORDER_CHANNELS,
 ]
 DEMAND_FEATURES = ["lag_1", "rolling_mean_7", "period_index", "weekday_sin", "weekday_cos", "log_lead_days"]
+# Anticipaciones de entrenamiento: todas las que se evalúan y se pronostican (horizonte máximo de la API: 30).
+# Antes solo 1, 2, 7, 14 y 30: el tramo de prueba pedía anticipaciones que el modelo nunca vio.
+DEMAND_LEADS = range(1, 31)
+# Señales agrupadas para la explicación: una variable categórica o cíclica se mueve como bloque.
+SIGNAL_GROUPS = {
+    "hour": ("hour_sin", "hour_cos"),
+    "hash_state": ("hash_invalid", "hash_unknown"),
+    "payment_method": tuple(pipeline.PAYMENT_METHODS),
+    "channel": tuple(pipeline.ORDER_CHANNELS),
+}
 
 
 def artifact_root():
@@ -159,7 +169,7 @@ def regressor(seed, epochs):
         split = (cutoff - start).days
         product["split"] = split
         for i in range(1, split):
-            for lead in (1, 2, 7, 14, 30):
+            for lead in DEMAND_LEADS:
                 known = i - lead + 1
                 if known > 0:
                     x.append(pipeline.demand_vector(start + timedelta(days=i), history, lead, known))
@@ -328,7 +338,14 @@ def _train_locked(seed):
                 db.session.add(run)
                 runs.append(run)
             folder.rename(root / version)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            # Sin la fila de versión los archivos publicados quedarían huérfanos: se retiran.
+            import shutil
+
+            shutil.rmtree(root / version, ignore_errors=True)
+            raise
         return [run.summary() for run in runs]
     except OSError as exc:
         db.session.rollback()

@@ -82,6 +82,10 @@ def test_train_reload_and_persist(tmp_path, monkeypatch):
     assert pred.status_code == 201
     data = pred.get_json()
     assert 0 <= data["fraud_probability"] <= 1 and data["predicted_label"] in ("normal", "fraudulenta")
+    # Señales agrupadas: la hora, el método, el canal y el estado del hash se explican como un bloque
+    from app.ml.train_models import SIGNAL_GROUPS
+    allowed = set(SIGNAL_GROUPS) | {"log_amount", "log_prior_frequency", "discount_fraction", "cancellation_rate"}
+    assert {s["feature"] for s in data["signals"]} <= allowed and len(data["signals"]) == 3
     forecast = api.get(ROOT + "/predict/demand?horizon=2&product_id=-1").get_json()
     assert len(forecast["products"][0]["forecast"]) == 2
     assert set(forecast["metrics"]) == {"keras", "linear_phase4"}

@@ -66,14 +66,20 @@ def test_quartiles_profiles_and_source_ids(admin_api):
     assert boxplot([10, 20, 30, 40, 1000]) == {
         "n":5, "q1":20, "median":30, "q3":40, "iqr":20, "lower":-10, "upper":70,
         "whisker_min":10, "whisker_max":40, "outliers":[1000]}
-    data = admin_api.get(BASE + "/analytics/users").get_json()
+    # GET es lectura pura: calcula las alertas sin escribirlas
+    preview = admin_api.get(BASE + "/analytics/users").get_json()
+    assert AnomalyAlert.query.count() == 0 and all(a["id"] is None for a in preview["alerts"])
+    data = admin_api.post(BASE + "/analytics/users").get_json()  # POST recalcula y persiste
     alerts = {(a["user_role"],a["alert_type"]):a for a in data["alerts"]}
     high = alerts["customer","high_amount_outlier"]
     assert high["source_record_ids"] == {"order_ids":[order.id]}
-    assert high["threshold_info"]["upper"] == 70 and 0 < high["anomaly_score"] <= 100
+    # La cerca sale solo de las cuatro operaciones anteriores [10, 20, 30, 40]: Q1 17,5, Q3 32,5, superior 55
+    assert high["threshold_info"]["n"] == 4 and high["threshold_info"]["upper"] == 55
+    assert 0 < high["anomaly_score"] <= 100
     assert alerts["employee","abusive_discounts"]["source_record_ids"] == {"invoice_ids":[invoice.id]}
-    assert admin_api.get(BASE + "/analytics/users").get_json()["alerts"] == data["alerts"]
     assert AnomalyAlert.query.count() == len(data["alerts"])
+    again = admin_api.get(BASE + "/analytics/users").get_json()["alerts"]
+    assert again == data["alerts"]  # tras persistir, GET devuelve los mismos IDs y fechas
 
 
 def test_temporal_regression_holdout_and_demand(admin_api):
