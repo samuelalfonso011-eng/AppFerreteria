@@ -27,6 +27,8 @@
     <button role="tab" id="tab-productos" data-view="productos" aria-controls="view">Productos</button>
     <button role="tab" id="tab-categorias" data-view="categorias" aria-controls="view">Categorías</button>
     <button role="tab" id="tab-inventario" data-view="inventario" aria-controls="view">Inventario</button>
+    <button role="tab" id="tab-benchmarks" data-view="benchmarks" aria-controls="view">Benchmarks</button>
+    <button role="tab" id="tab-integridad" data-view="integridad" aria-controls="view">Integridad</button>
     <button role="tab" id="tab-ajustes" data-view="ajustes" aria-controls="view">Ajustes</button>
   </nav>
 </header>
@@ -47,6 +49,25 @@
   <section id="view" class="view" role="tabpanel" tabindex="-1" hidden></section>
 </main>
 
+<template id="bench-template">
+  <article class="bench">
+    <header class="viewHead"><h1>Benchmarks</h1><p>Compara cómo cambia el tiempo de ejecución al aumentar el volumen de pedidos.</p></header>
+    <form class="benchControls">
+      <fieldset><legend>Fuente de datos</legend><div class="benchSegments">
+        <label><input type="radio" name="source" value="real">Datos reales (Supabase)</label>
+        <label><input type="radio" name="source" value="synthetic" checked>Datos sintéticos (Escala)</label>
+      </div></fieldset>
+      <fieldset class="benchSizes"><legend>Volumen máximo</legend><div class="benchSegments">
+        <label><input type="radio" name="volume" value="500" checked>500</label>
+        <label><input type="radio" name="volume" value="1000">1.000</label>
+        <label><input type="radio" name="volume" value="5000">5.000</label>
+      </div></fieldset>
+      <button class="btn primary" type="submit">Ejecutar Benchmark</button>
+    </form>
+    <p class="benchStatus" role="status"></p>
+    <div class="benchReport"></div>
+  </article>
+</template>
 <dialog id="modal" class="sheet" aria-labelledby="modalTitle"><div id="modalBody"></div></dialog>
 <dialog id="confirm" class="sheet small" aria-labelledby="confirmTitle">
   <h2 id="confirmTitle"></h2>

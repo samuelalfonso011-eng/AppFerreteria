@@ -41,10 +41,10 @@ const badge = (tone, icon, text) => '<span class="badge ' + tone + '">' + icon +
 /* ---------- API ---------- */
 let csrf = null;
 const state = {me:null, meta:null};
-async function api(path, {method = "GET", body} = {}, retry = true) {
-  const options = {method, credentials:"same-origin", headers:{Accept:"application/json"}};
+async function api(path, {method = "GET", body, signal} = {}, retry = true) {
+  const options = {method, signal, credentials:"same-origin", headers:{Accept:"application/json"}};
   if (method !== "GET") {
-    if (!csrf) csrf = (await (await fetch("/api/auth/csrf", {credentials:"same-origin"})).json()).csrf;
+    if (!csrf) csrf = (await (await fetch("/api/auth/csrf", {signal, credentials:"same-origin"})).json()).csrf;
     options.headers["X-CSRF-Token"] = csrf;
     if (body instanceof FormData) {
       options.body = body; // multipart: el navegador pone el Content-Type con su boundary
@@ -55,11 +55,11 @@ async function api(path, {method = "GET", body} = {}, retry = true) {
   }
   let res;
   try { res = await fetch("/api" + path, options); }
-  catch { throw Object.assign(new Error("Sin conexión con el servidor."), {status:0, data:{}}); }
+  catch { throw Object.assign(new Error(signal?.aborted ? "El servidor tardó demasiado. Vuelve a consultar la pestaña para ver el último resultado." : "Sin conexión con el servidor."), {status:0, data:{}}); }
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.error === "csrf" && retry) {
     csrf = null;
-    return api(path, {method, body}, false);
+    return api(path, {method, body, signal}, false);
   }
   if (!res.ok) {
     const err = Object.assign(new Error(data.message || "No pudimos completar la operación."), {status:res.status, data});
@@ -265,7 +265,7 @@ const numberValue = raw => {
 
 /* ---------- Router por pestañas ---------- */
 const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, usuarios:renderUsers, productos:renderProducts,
-  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings};
+  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings, benchmarks:renderBenchmarks, integridad:renderIntegrity};
 
 /* Tablas que se apilan en el telefono: cada celda recibe la etiqueta de su columna (data-label),
    la primera es la principal (cellLead) y la de botones va aparte (cellActions). El CSS de
@@ -1341,3 +1341,486 @@ async function boot() {
   }
 }
 boot();
+
+/* Benchmarks del panel administrativo */
+function benchNode(parent, tag, text, className) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  parent.append(node);
+  return node;
+}
+const benchFormat = new Intl.NumberFormat("es-CO", {maximumFractionDigits:4});
+const benchNum = value => value == null ? "Sin dato" : benchFormat.format(value);
+
+function benchChart(parent, report) {
+  const lines = [
+    ["sum_sales", "Suma de ventas · O(n)", "var(--success-text)", ""],
+    ["insertion_sort", "Insertion Sort · O(n²)", "var(--warning-text)", "5 3"],
+    ["merge_sort", "Merge Sort · O(n log n)", "var(--link)", "2 2"]
+  ];
+  benchNode(parent, "h2", "Tiempo por volumen");
+  const legend = benchNode(parent, "div", null, "benchLegend");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  parent.append(svg);
+  const hint = benchNode(parent, "p", "Selecciona un punto para consultar sus tiempos.", "benchHint");
+  function shape(tag, attrs, label) {
+    const element = document.createElementNS(svg.namespaceURI, tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
+    if (label != null) element.textContent = label;
+    svg.append(element);
+    return element;
+  }
+  const points = report.measurements.filter(p => lines.some(([id]) => id === p.algorithm));
+  if (!points.length) { hint.textContent = "Sin mediciones para graficar."; return; }
+  const sizes = report.series.labels;
+  const minN = Math.min(...sizes), maxN = Math.max(...sizes);
+  const maxMs = Math.max(...points.map(p => p.median_ms), 0.0001);
+  const width = Math.max(270, Math.min(850, parent.clientWidth - 48));
+  svg.setAttribute("viewBox", "0 0 " + width + " 236");
+  svg.setAttribute("aria-label", "Mediana en milisegundos por número de pedidos");
+  const x = n => minN === maxN ? width / 2 : 52 + (width - 80) * (n - minN) / (maxN - minN);
+  const minMs = Math.min(...points.map(p => p.median_ms));
+  const logScale = minMs > 0 && maxMs / minMs >= 10;
+  const low = logScale ? Math.floor(Math.log10(minMs)) : 0;
+  const high = logScale ? Math.ceil(Math.log10(maxMs)) : maxMs;
+  const y = ms => 184 - 155 * ((logScale ? Math.log10(ms) : ms) - low) / (high - low);
+  shape("text", {x:4,y:15}, logScale ? "ms · escala logarítmica" : "ms");
+  const ticks = logScale ? Array.from({length:high-low+1}, (_, i) => 10 ** (low+i)) : [0,maxMs/2,maxMs];
+  for (const tick of ticks) {
+    const height = y(tick);
+    shape("line", {x1:51,x2:width-24,y1:height,y2:height,stroke:"var(--line)"});
+    shape("text", {x:46,y:height+4,"text-anchor":"end"}, benchNum(Number(tick.toPrecision(3))));
+  }
+  let lastLabel = -Infinity;
+  for (const n of sizes) {
+    if (n !== maxN && (x(n)-lastLabel < 37 || x(maxN)-x(n)<37)) continue;
+    shape("text", {x:x(n),y:206,"text-anchor":"middle"}, benchNum(n));
+    lastLabel = x(n);
+  }
+  shape("text", {x:width/2,y:232,"text-anchor":"middle"}, "Volumen (N)");
+  for (const [id, label, color, dash] of lines) {
+    benchNode(legend, "span", label).style.color = color;
+    const rows = points.filter(p => p.algorithm === id).sort((a,b) => a.n-b.n);
+    shape("polyline", {points:rows.map(p => x(p.n)+","+y(p.median_ms)).join(" "), fill:"none",stroke:color,"stroke-width":2,"stroke-dasharray":dash});
+    for (const p of rows) {
+      const caption = label+" · N "+benchNum(p.n)+" · Media "+benchNum(p.avg_ms)+" ms · Mediana "+benchNum(p.median_ms)+" ms";
+      const dot = shape("circle", {cx:x(p.n),cy:y(p.median_ms),r:5,fill:color,tabindex:0,"aria-label":caption});
+      for (const event of ["pointerenter","focus","click"]) dot.addEventListener(event, () => { hint.textContent = caption; });
+      const title = document.createElementNS(svg.namespaceURI,"title");
+      title.textContent = caption;
+      dot.append(title);
+    }
+  }
+}
+
+function benchReport(root, data) {
+  root.replaceChildren();
+  const {meta,timing,comparison,equivalence,results} = data;
+  const largest = comparison.filter(row => row.before.algorithm === "insertion_sort").sort((a,b) => b.n-a.n)[0];
+  benchNode(root,"p",(meta.source === "real" ? "Datos reales" : "Datos sintéticos")+" · "+fmtDate(meta.run_at),"muted");
+  const kpis = benchNode(root,"div",null,"benchKpis");
+  const metric = (label, value, note) => {
+    const card = benchNode(kpis,"section",null,"benchCard");
+    benchNode(card,"h2",label);
+    benchNode(card,"strong",value);
+    benchNode(card,"p",note);
+    return card;
+  };
+  metric("Factor de mejora", largest?.speedup == null ? "Sin dato" : benchNum(largest.speedup)+"×",
+    largest ? "Merge Sort frente a Insertion Sort con N = "+benchNum(largest.n) : "Sin comparación");
+  metric("Tiempo de cómputo",benchNum(timing.compute_ms)+" ms",
+    timing.db_fetch_ms == null ? "Lectura de BD sin medir" : "Lectura de BD por separado: "+benchNum(timing.db_fetch_ms)+" ms");
+  const verified = metric("Equivalencia",equivalence.sort_by_date ? "Orden idéntico" : "Sin verificar","Insertion Sort y Merge Sort");
+  if (equivalence.sort_by_date) verified.classList.add("benchVerified");
+  const chart = benchNode(root,"section",null,"benchCard");
+  benchChart(chart,data);
+  let chartWidth = chart.clientWidth;
+  const chartObserver = new ResizeObserver(() => {
+    if (chart.isConnected && chart.clientWidth !== chartWidth) {
+      chartWidth = chart.clientWidth;
+      chart.replaceChildren();
+      benchChart(chart,data);
+    }
+  });
+  chartObserver.observe(chart);
+  const section = benchNode(root,"section",null,"benchCard");
+  benchNode(section,"h2","Antes y después");
+  for (const operation of new Set(comparison.map(row => row.operation))) {
+    benchNode(section,"h3",operation);
+    const table = benchNode(section,"table");
+    table.setAttribute("aria-label",operation);
+    const heading = benchNode(benchNode(table,"thead"),"tr");
+    for (const title of ["Tamaño (N)","Antes: O(n²) (ms)","Después: O(n log n) (ms)","Mejora"]) benchNode(heading,"th",title);
+    const body = benchNode(table,"tbody");
+    for (const row of comparison.filter(item => item.operation === operation)) {
+      const tr = benchNode(body,"tr");
+      for (const value of [row.n,row.before.median_ms,row.after.median_ms]) benchNode(tr,"td",benchNum(value));
+      benchNode(benchNode(tr,"td"),"span",benchNum(row.speedup)+"× / "+benchNum(row.improvement_pct)+" %","benchBadge");
+    }
+  }
+  const business = benchNode(root,"section",null,"benchCard");
+  benchNode(business,"h2","Resultados de pedidos reales");
+  if (results) {
+    benchNode(business,"strong",money(results.total_sales));
+    benchNode(business,"p","Ventas confirmadas · "+benchNum(results.orders_count)+" pedidos analizados");
+    for (const [title,items] of [
+      ["Productos más vendidos",results.top_products.map(p => p.name+" · "+benchNum(p.units)+" unidades")],
+      ["Pedidos por cliente",results.orders_by_customer.map(c => c.customer+" · "+benchNum(c.orders)+" pedidos")]
+    ]) {
+      benchNode(business,"h3",title);
+      const list = benchNode(business,"ul");
+      for (const item of items.length ? items : ["Sin registros"]) benchNode(list,"li",item);
+    }
+  } else benchNode(business,"p","La lectura de datos reales no estuvo disponible.");
+  benchNode(root,"footer","Python "+meta.python+" · "+meta.os+" · Semilla "+meta.seed+" · "+meta.repetitions+" repeticiones","muted");
+  for (const note of meta.notes || []) benchNode(root,"p",note,"muted");
+}
+
+async function renderBenchmarks(view) {
+  if (state.me?.role !== "admin") return;
+  view.replaceChildren($("#bench-template").content.cloneNode(true));
+  const form = $(".benchControls",view), run = $("button",form);
+  const report = $(".benchReport",view), status = $(".benchStatus",view);
+  form.onchange = () => { $(".benchSizes",form).hidden = form.elements.source.value === "real"; };
+  async function load(execute) {
+    run.disabled = true;
+    run.setAttribute("aria-busy","true");
+    status.textContent = execute ? "Midiendo algoritmos. La ejecución puede tardar unos segundos." : "Consultando la última ejecución…";
+    try {
+      const source = form.elements.source.value;
+      const body = {source};
+      if (source === "synthetic") body.sizes = [100,500,1000,2500,5000].filter(n => n <= Number(form.elements.volume.value));
+      const signal = AbortSignal.timeout(45000);
+      const result = execute ? await api("/admin/benchmarks/run",{method:"POST",body,signal}) : await api("/admin/benchmarks/latest",{signal});
+      if (report.isConnected) benchReport(report,result);
+      status.textContent = "";
+    } catch (error) {
+      status.textContent = error.data?.error === "no_benchmark" ? "Todavía no hay mediciones. Ejecuta el primer benchmark para comparar los algoritmos." : error.data?.fields?.sizes || error.message;
+    } finally {
+      run.disabled = false;
+      run.removeAttribute("aria-busy");
+    }
+  }
+  form.onsubmit = event => { event.preventDefault(); if (!run.disabled) load(true); };
+  await load(false);
+}
+
+/* ---------- Integridad: cadena SHA-256 de facturas y pagos (contrato en backend/PHASE3_API.md) ----------
+   GET /admin/integrity/status, POST /admin/integrity/verify {}, GET /admin/integrity/chain?page&per_page.
+   Todo valor que llega del servidor se escribe con textContent: aqui no se arma HTML con datos. */
+const INTEGRITY_PAGE_SIZE = 10;
+const INTEGRITY_STATUS = {
+  valid:["ok", "check", "Cadena íntegra", "Cada eslabón coincide con su hash y con el documento que protege."],
+  compromised:["bad", "alert", "Alteración detectada", "Un documento o un eslabón cambió después de registrarse."],
+  unverified:["warn", "clock", "Sin verificar", "La cadena tiene eslabones que aún no se han auditado."]
+};
+const INTEGRITY_REASON = {
+  payload_mismatch:"El documento cambió después de registrarse en la cadena.",
+  hash_mismatch:"El hash SHA-256 recalculado no coincide con el almacenado.",
+  prev_hash_broken:"El eslabón apunta a un hash anterior incorrecto: la cadena está rota.",
+  missing_entity:"El documento que protegía este eslabón ya no existe.",
+  missing_event:"Existe un documento que nunca se registró en la cadena.",
+  sequence_gap:"Falta una posición en la secuencia o la cadena se acortó.",
+  checkpoint_mismatch:"Cambió el hash de una posición que ya se había auditado."
+};
+const INTEGRITY_EVENT = {issued:"Emisión", voided:"Anulación", payment_recorded:"Pago registrado", adjustment:"Ajuste"};
+const INTEGRITY_FIELD = {
+  created_at:"Fecha de registro", discount_amount:"Descuento", employee_id:"Empleado", invoice_number:"Número de factura",
+  items_sha256:"Resumen de ítems (SHA-256)", order_id:"Pedido", shipping_cost:"Envío", status:"Estado", subtotal:"Subtotal",
+  tax_amount:"Impuesto", total_amount:"Total", invoice_id:"Factura", amount:"Monto", payment_method:"Método de pago",
+  paid_at:"Fecha de pago", receipt_path:"Comprobante", receipt_type:"Tipo de comprobante", receipt_sha256:"SHA-256 del comprobante",
+  value:"Valor"
+};
+const INTEGRITY_MONEY = new Set(["discount_amount", "shipping_cost", "subtotal", "tax_amount", "total_amount", "amount"]);
+const moneyExact = new Intl.NumberFormat("es-CO", {style:"currency", currency:"COP", minimumFractionDigits:2, maximumFractionDigits:2});
+const INTEGRITY_ICON = {
+  copy:'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.8A1.3 1.3 0 0 0 9.2 2.5H3.8a1.3 1.3 0 0 0-1.3 1.3v5.4a1.3 1.3 0 0 0 1.3 1.3h1.7"/></svg>',
+  link:'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-.8.8"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l.8-.8"/></svg>'
+};
+
+/* Crea un nodo: las cadenas hijas se vuelven nodos de texto, nunca HTML */
+function dom(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value == null || value === false) continue;
+    if (key === "className") el.className = value;
+    else if (key === "text") el.textContent = value;
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat()) if (child != null && child !== false) el.append(child);
+  return el;
+}
+/* Iconos: solo constantes del propio archivo (sin datos del servidor) */
+function svgIcon(markup) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = markup;
+  return tpl.content.firstElementChild;
+}
+const iconOf = name => svgIcon(INTEGRITY_ICON[name] || ICON[name]);
+const pillBadge = (tone, icon, text) => dom("span", {className:"badge " + tone}, iconOf(icon), text);
+const shortHash = hash => hash.length > 16 ? hash.slice(0, 6) + "…" + hash.slice(-6) : hash;
+const documentLabel = (type, id) => id == null ? "Sin referencia" : (type === "payment" ? "Pago" : type === "invoice" ? "Factura" : "Documento") + " #" + id;
+
+const integrity = {status:null, page:1, pages:1, total:0, broken:null, view:null};
+
+function checkedByLabel(value) {
+  if (!value) return "Sin registro";
+  if (value === "system") return "Tarea programada del sistema";
+  const id = Number(String(value).split(":")[1]);
+  if (state.me && state.me.id === id) return (state.me.name || state.me.full_name || "Tú") + " (tú)";
+  const user = (usersCache || []).find(u => u.id === id);
+  return user ? user.name : "Administrador #" + id;
+}
+
+/* Botón para copiar el hash completo, con confirmación breve en el propio botón */
+function copyButton(hash, label) {
+  const button = dom("button", {type:"button", className:"copyHash", "aria-label":"Copiar " + label, title:"Copiar hash completo"}, iconOf("copy"));
+  button.dataset.hash = hash;
+  button.dataset.label = label;
+  return button;
+}
+/* API del portapapeles y, si el navegador la niega (sin foco o sin HTTPS), el método clásico con un textarea temporal */
+async function writeClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  const area = dom("textarea", {className:"sr", readonly:true, "aria-hidden":"true"});
+  area.value = text;
+  document.body.append(area);
+  area.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch {}
+  area.remove();
+  return ok;
+}
+async function copyHash(button) {
+  if (!(await writeClipboard(button.dataset.hash))) {
+    toast("No se pudo copiar. Selecciona el hash y cópialo manualmente.");
+    return;
+  }
+  clearTimeout(button._copyTimer);
+  button.replaceChildren(iconOf("check"));
+  button.dataset.copied = "true";
+  button.setAttribute("aria-label", "Copiado: " + button.dataset.label);
+  toast("Hash copiado al portapapeles.");
+  button._copyTimer = setTimeout(() => {
+    button.replaceChildren(iconOf("copy"));
+    delete button.dataset.copied;
+    button.setAttribute("aria-label", "Copiar " + button.dataset.label);
+  }, 1600);
+}
+function hashCell(hash, label) {
+  if (!hash) return dom("span", {className:"muted", text:"Sin hash"});
+  if (hash === "GENESIS") return pillBadge("", "dot", "Génesis");
+  return dom("span", {className:"hashCell"}, dom("code", {className:"hash", title:hash, text:shortHash(hash)}), copyButton(hash, label));
+}
+
+/* ---------- 1. Estado de la cadena ---------- */
+function renderIntegrityHero(box, data) {
+  const status = INTEGRITY_STATUS[data.status] ? data.status : "unverified";
+  const [tone, icon, label, text] = INTEGRITY_STATUS[status];
+  const last = data.last_verification;
+  const checked = last ? last.total_records_checked : 0;
+  let note = text;
+  if (status === "unverified") note = last ? "La cadena creció desde la última auditoría. Verifícala para incluir los eslabones nuevos." : "Todavía no se ha ejecutado ninguna verificación.";
+  const headHash = last?.details?.head_hash;
+  box.dataset.status = status;
+  box.replaceChildren(
+    dom("div", {className:"integrityLead"},
+      pillBadge(tone, icon, label),
+      dom("p", {className:"integrityFigure"},
+        dom("strong", {text:new Intl.NumberFormat("es-CO").format(checked)}),
+        dom("span", {text:status === "compromised"
+          ? (checked === 1 ? "eslabón revisado hasta la divergencia" : "eslabones revisados hasta la divergencia")
+          : (checked === 1 ? "eslabón verificado" : "eslabones verificados")})),
+      dom("p", {className:"muted", text:note})),
+    dom("dl", {className:"integrityFacts"},
+      dom("div", {}, dom("dt", {text:"Eslabones en la cadena"}), dom("dd", {text:new Intl.NumberFormat("es-CO").format(data.total_records)})),
+      dom("div", {}, dom("dt", {text:"Última verificación"}), dom("dd", {text:last ? fmtDate(last.checked_at) : "Nunca"})),
+      dom("div", {}, dom("dt", {text:"Ejecutada por"}), dom("dd", {text:last ? checkedByLabel(last.checked_by) : "Sin registro"})),
+      headHash ? dom("div", {}, dom("dt", {text:"Hash de cabeza"}), dom("dd", {}, hashCell(headHash, "hash de cabeza de la cadena"))) : null));
+}
+
+/* ---------- 2. Alerta del primer eslabón comprometido ---------- */
+function parseDetail(value) {
+  if (typeof value !== "string") return value;
+  try { const parsed = JSON.parse(value); return parsed; } catch { return value; }
+}
+function formatFieldValue(key, value) {
+  if (value == null || value === "") return dom("span", {className:"muted", text:"Sin valor"});
+  if (typeof value === "object") return dom("code", {className:"hash", text:JSON.stringify(value)});
+  const text = String(value);
+  if (/^[0-9a-f]{64}$/i.test(text)) return dom("span", {className:"hashCell"}, dom("code", {className:"hash", title:text, text:shortHash(text)}), copyButton(text, INTEGRITY_FIELD[key] || key));
+  if (INTEGRITY_MONEY.has(key) && !Number.isNaN(Number(text))) return dom("span", {className:"num", text:moneyExact.format(Number(text))});
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return dom("span", {text:fmtDate(text)});
+  return dom("span", {text});
+}
+function changedFields(expected, actual) {
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  if (!isObj(expected) || !isObj(actual)) return [["value", expected, actual]];
+  const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])];
+  return keys.filter(k => JSON.stringify(expected[k]) !== JSON.stringify(actual[k])).map(k => [k, expected[k], actual[k]]);
+}
+function renderIntegrityAlert(box, last) {
+  box.replaceChildren();
+  box.hidden = !last || last.status !== "compromised";
+  if (box.hidden) return;
+  const reason = last.failure_reason;
+  const details = last.details || {};
+  const facts = dom("dl", {className:"alertFacts"},
+    dom("div", {}, dom("dt", {text:"Secuencia"}), dom("dd", {className:"num", text:last.first_broken_seq_no == null ? "Desconocida" : "#" + last.first_broken_seq_no})),
+    dom("div", {}, dom("dt", {text:"Documento"}), dom("dd", {text:documentLabel(last.first_broken_entity_type, last.first_broken_entity_id)})),
+    dom("div", {}, dom("dt", {text:"Motivo"}), dom("dd", {}, dom("code", {className:"reasonCode", text:reason || "desconocido"}))));
+  const actions = dom("div", {className:"alertActions"});
+  if (last.first_broken_seq_no != null) {
+    actions.append(dom("button", {type:"button", className:"btn secondary small", "data-goto-broken":""}, iconOf("link"), "Ver eslabón en la cadena"));
+  }
+  box.append(
+    dom("div", {className:"alertHead"},
+      dom("span", {className:"alertIcon"}, iconOf("alert")),
+      dom("div", {},
+        dom("h2", {id:"integrityAlertTitle", text:"Primer eslabón comprometido"}),
+        dom("p", {text:INTEGRITY_REASON[reason] || "La verificación encontró una divergencia en la cadena."}))),
+    facts);
+  if ("expected" in details || "actual" in details) {
+    const rows = changedFields(parseDetail(details.expected), parseDetail(details.actual));
+    if (rows.length) {
+      const table = dom("table", {className:"diffTable", "aria-label":"Campos alterados"},
+        dom("thead", {}, dom("tr", {},
+          dom("th", {scope:"col", text:"Campo"}),
+          dom("th", {scope:"col", text:"Valor registrado en la cadena"}),
+          dom("th", {scope:"col", text:"Valor actual en la base de datos"}))),
+        dom("tbody", {}, rows.map(([key, before, after]) => dom("tr", {},
+          dom("td", {}, dom("span", {className:"cellMain", text:INTEGRITY_FIELD[key] || key})),
+          dom("td", {className:"diffBefore"}, formatFieldValue(key, before)),
+          dom("td", {className:"diffAfter"}, formatFieldValue(key, after))))));
+      box.append(dom("h3", {className:"diffTitle", text:rows.length === 1 ? "1 campo no coincide" : rows.length + " campos no coinciden"}), table);
+    }
+  }
+  if (actions.childElementCount) box.append(actions);
+}
+
+/* ---------- 3. Explorador de la cadena ---------- */
+function renderChainTable(box, data) {
+  integrity.page = data.page;
+  integrity.pages = Math.max(1, data.pages);
+  integrity.total = data.total;
+  if (!data.entries.length) {
+    box.replaceChildren(dom("div", {className:"emptyState compact"},
+      dom("h2", {text:data.total ? "Esta página está vacía" : "La cadena está vacía"}),
+      dom("p", {className:"muted", text:data.total ? "Vuelve a la primera página." : "Cada factura emitida y cada pago registrado agregan un eslabón."})));
+    return;
+  }
+  const brokenSeq = integrity.broken;
+  const table = dom("table", {className:"ledger"},
+    dom("caption", {className:"sr", text:"Eslabones de la cadena de hashes, del más reciente al más antiguo"}),
+    dom("thead", {}, dom("tr", {}, ["# Secuencia", "Documento", "Evento", "Fecha", "Hash anterior", "Hash actual"].map(t => dom("th", {scope:"col", text:t})))),
+    dom("tbody", {}, data.entries.map(entry => {
+      const broken = brokenSeq != null && entry.seq_no === brokenSeq;
+      return dom("tr", {className:broken ? "rowBroken" : null, id:"seq-" + entry.seq_no, "aria-current":broken ? "true" : null},
+        dom("td", {}, dom("span", {className:"seqNo", text:"#" + entry.seq_no}), broken ? pillBadge("bad", "alert", "Comprometido") : null),
+        dom("td", {}, dom("span", {className:"cellMain", text:documentLabel(entry.entity_type, entry.entity_id)})),
+        dom("td", {text:INTEGRITY_EVENT[entry.event_type] || entry.event_type}),
+        dom("td", {}, dom("time", {datetime:entry.created_at, text:fmtDate(entry.created_at)})),
+        dom("td", {}, hashCell(entry.prev_hash, "hash anterior de la secuencia " + entry.seq_no)),
+        dom("td", {}, hashCell(entry.current_hash, "hash actual de la secuencia " + entry.seq_no)));
+    })));
+  const fmt = new Intl.NumberFormat("es-CO");
+  box.replaceChildren(dom("div", {className:"tableWrap"}, table),
+    dom("div", {className:"pager"},
+      dom("span", {text:fmt.format(data.total) + (data.total === 1 ? " eslabón" : " eslabones") + " · página " + data.page + " de " + integrity.pages}),
+      dom("span", {className:"pagerButtons"},
+        dom("button", {type:"button", className:"btn secondary small", "data-chain-page":data.page - 1, disabled:data.page <= 1, text:"Anterior"}),
+        dom("button", {type:"button", className:"btn secondary small", "data-chain-page":data.page + 1, disabled:data.page >= integrity.pages, text:"Siguiente"}))));
+}
+async function loadChain(page, focusSeq) {
+  const box = $("#chainBox");
+  if (!box) return;
+  box.setAttribute("aria-busy", "true");
+  try {
+    const data = await api("/admin/integrity/chain?page=" + page + "&per_page=" + INTEGRITY_PAGE_SIZE);
+    if (!box.isConnected) return;
+    renderChainTable(box, data);
+    if (focusSeq != null) {
+      const row = $("#seq-" + focusSeq, box);
+      if (row) { row.scrollIntoView({block:"center", behavior:matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"}); row.tabIndex = -1; row.focus({preventScroll:true}); }
+    }
+  } catch (err) {
+    if (!box.isConnected || err.status === 401) return;
+    box.replaceChildren(dom("div", {className:"emptyState compact"},
+      dom("h2", {text:"No pudimos cargar la cadena"}),
+      dom("p", {className:"muted", text:err.message}),
+      dom("button", {type:"button", className:"btn secondary", "data-chain-page":page, text:"Reintentar"})));
+  } finally {
+    box.removeAttribute("aria-busy");
+  }
+}
+
+/* ---------- Pantalla y verificación ---------- */
+function applyIntegrityStatus(data) {
+  integrity.status = data;
+  const last = data.last_verification;
+  integrity.broken = last && last.status === "compromised" ? last.first_broken_seq_no : null;
+  renderIntegrityHero($("#integrityHero"), data);
+  renderIntegrityAlert($("#integrityAlert"), last);
+}
+async function verifyIntegrity(button) {
+  if (button.disabled) return;
+  setBusy(button, true, "Verificando…");
+  const live = $("#integrityLive");
+  live.textContent = "Verificando la cadena de hashes.";
+  try {
+    const result = await api("/admin/integrity/verify", {method:"POST", body:{}});
+    let status;
+    try { status = await api("/admin/integrity/status"); }
+    catch { status = {...integrity.status, status:result.status, last_verification:result}; }
+    if (!$("#integrityHero")) return;
+    applyIntegrityStatus(status);
+    const message = result.status === "valid"
+      ? "Cadena íntegra: " + result.total_records_checked + " eslabones verificados."
+      : "Alteración detectada en " + documentLabel(result.first_broken_entity_type, result.first_broken_entity_id) + ".";
+    live.textContent = message;
+    toast(message);
+    await loadChain(1);
+    if (result.status === "compromised") $("#integrityAlert")?.focus({preventScroll:false});
+  } catch (err) {
+    if (err.status === 401) return;
+    live.textContent = "";
+    toast(err.message || "No pudimos completar la verificación.");
+  } finally {
+    setBusy(button, false);
+  }
+}
+async function renderIntegrity(view) {
+  if (state.me?.role !== "admin") return;
+  const [status] = await Promise.all([api("/admin/integrity/status"), loadUsersCache().catch(() => null)]);
+  const verify = dom("button", {type:"button", className:"btn primary", id:"verifyIntegrity"}, "Verificar integridad ahora");
+  view.replaceChildren(dom("div", {className:"integrity"},
+    dom("div", {className:"viewHead"},
+      dom("div", {},
+        dom("h1", {text:"Integridad"}),
+        dom("p", {text:"Cada factura y cada pago se encadenan con SHA-256. Si alguien cambia un documento o un eslabón, la verificación lo señala."})),
+      dom("div", {}, verify)),
+    dom("p", {id:"integrityLive", className:"sr", role:"status", "aria-live":"polite"}),
+    dom("section", {className:"card integrityHero", id:"integrityHero", "aria-label":"Estado de la cadena"}),
+    dom("section", {className:"integrityAlert", id:"integrityAlert", tabindex:"-1", "aria-labelledby":"integrityAlertTitle", hidden:true}),
+    dom("section", {className:"card flush", "aria-labelledby":"chainTitle"},
+      dom("div", {className:"cardHead chainHead"},
+        dom("h2", {id:"chainTitle", text:"Cadena de hashes"}),
+        dom("span", {className:"muted", text:"Del más reciente al más antiguo"})),
+      dom("div", {id:"chainBox"}))));
+  applyIntegrityStatus(status);
+  verify.addEventListener("click", () => verifyIntegrity(verify));
+  const root = $(".integrity", view);
+  root.addEventListener("click", event => {
+    const copy = event.target.closest(".copyHash");
+    if (copy) { copyHash(copy); return; }
+    const pageBtn = event.target.closest("[data-chain-page]");
+    if (pageBtn && !pageBtn.disabled) { loadChain(Number(pageBtn.dataset.chainPage)); return; }
+    if (event.target.closest("[data-goto-broken]") && integrity.broken != null) {
+      const total = integrity.status?.total_records || integrity.total;
+      const page = Math.max(1, Math.ceil((total - integrity.broken + 1) / INTEGRITY_PAGE_SIZE));
+      loadChain(page, integrity.broken);
+    }
+  });
+  await loadChain(1);
+}
