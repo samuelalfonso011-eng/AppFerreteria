@@ -57,6 +57,8 @@
   --dot-sm:7px;--dot-md:8px;--hairline-gap:2px;--chat-input-max:120px;--chat-input-pad:11px 16px;
   --chat-art-w:48px;--chat-art-h:36px;--radius-mini:14px;--typing-h:22px;--typing-gap:5px;--typing-lift:3px;
   --dur-typing:1.2s;--glass:saturate(180%) blur(20px);
+  /* Graficas: dos series validadas (CVD y contraste) contra cada superficie */
+  --chart-1:#0066cc;--chart-2:#c2570c;--chart-h:280px;--meter-h:6px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -75,6 +77,7 @@
   --bubble-bot:#2c2c2e;--on-bubble-bot:#f5f5f7;
   --shadow-hover:0 5px 16px rgba(0,0,0,.6);
   --shadow-sheet:0 24px 60px rgba(0,0,0,.6);
+  --chart-1:#2997ff;--chart-2:#de6a22;
 }
 html{background:var(--bg)}
 body{background:var(--bg);color:var(--text)}

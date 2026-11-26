@@ -265,7 +265,7 @@ const numberValue = raw => {
 
 /* ---------- Router por pestañas ---------- */
 const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, usuarios:renderUsers, productos:renderProducts,
-  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings, benchmarks:renderBenchmarks, integridad:renderIntegrity};
+  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings, benchmarks:renderBenchmarks, integridad:renderIntegrity, analitica:renderAnalytics};
 
 /* Tablas que se apilan en el telefono: cada celda recibe la etiqueta de su columna (data-label),
    la primera es la principal (cellLead) y la de botones va aparte (cellActions). El CSS de
@@ -1165,7 +1165,7 @@ document.addEventListener("click", async event => {
   if (!el || el.disabled) return;
   const d = el.dataset;
   try {
-    if (el.getAttribute("role") === "tab") {
+    if (el.getAttribute("role") === "tab" && d.view) { // solo pestañas principales; las sub-pestañas no tienen data-view
       if (location.hash.slice(1) === d.view) route(); else location.hash = d.view;
     } else if ("close" in d) {
       el.closest("dialog").close();
@@ -1823,4 +1823,618 @@ async function renderIntegrity(view) {
     }
   });
   await loadChain(1);
+}
+
+/* ---------- Analitica: calidad de datos, perfiles con boxplot y demanda (contrato en backend/PHASE4_API.md) ----------
+   POST /admin/data-quality/audit {}, GET /admin/data-quality/latest (null antes de la primera),
+   GET /admin/analytics/users, GET /admin/analytics/demand?period&horizon.
+   Reutiliza dom(), iconOf() y pillBadge() de Integridad: todo dato del servidor entra con textContent. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ANALYTICS_VIEWS = [["calidad", "Calidad de datos"], ["perfiles", "Perfiles y anomalías"], ["demanda", "Demanda"]];
+const QUALITY_MODULES = [["users", "Usuarios"], ["categories", "Categorías"], ["products", "Productos"], ["orders", "Pedidos"], ["invoices", "Facturas"], ["payments", "Pagos"]];
+const QUALITY_STATUS = {auto_fixed:["ok", "check", "Auto-corregida"], pending_review:["warn", "clock", "Pendiente de revisión"], resolved:["info", "check", "Resuelta"]};
+const QUALITY_SEVERITY = {low:["", "dot", "Baja"], medium:["warn", "alert", "Media"], high:["bad", "alert", "Alta"]};
+const QUALITY_ISSUE = {
+  malformed_string:"Texto con formato irregular", missing_field:"Campo obligatorio vacío", duplicate_candidate:"Posible duplicado",
+  inconsistent_category:"Categoría inexistente", invalid_price:"Precio inválido"
+};
+const ALERT_TYPE = {
+  high_amount_outlier:"Monto atípico", excessive_cancellations:"Cancelaciones excesivas",
+  abusive_discounts:"Descuentos fuera de lo habitual", unusual_frequency:"Frecuencia inusual"
+};
+const SOURCE_LABEL = {order_ids:"Pedido", invoice_ids:"Factura", payment_ids:"Pago"};
+const CHANNEL_NAME = {web:"Web", presencial:"Presencial", app:"App", domicilio:"Domicilio"};
+const fmtInt = new Intl.NumberFormat("es-CO");
+const fmtDec = new Intl.NumberFormat("es-CO", {maximumFractionDigits:2});
+const fmtPct = v => v == null ? "Sin dato" : fmtDec.format(v) + " %";
+const analytics = {sub:"calidad", role:"customer", focusUser:null, quality:null, qModule:"all", qStatus:"all", qShown:20,
+  users:null, demand:null, period:"daily", product:"global"};
+try { const saved = localStorage.getItem("ferrepro.analytics"); if (ANALYTICS_VIEWS.some(([k]) => k === saved)) analytics.sub = saved; } catch {}
+
+function svgEl(tag, attrs = {}, text) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) el.setAttribute(k, v);
+  if (text != null) el.textContent = text;
+  return el;
+}
+/* Control segmentado: botones con aria-pressed, como el filtro de canal de Pedidos */
+function segmented(label, options, value, onPick) {
+  const group = dom("div", {className:"segmentedFilter", role:"group", "aria-label":label});
+  for (const [key, text] of options) {
+    const b = dom("button", {type:"button", className:"segment", "aria-pressed":String(key === value), text});
+    b.addEventListener("click", () => {
+      $$(".segment", group).forEach(s => s.setAttribute("aria-pressed", String(s === b)));
+      onPick(key);
+    });
+    group.append(b);
+  }
+  return group;
+}
+/* Tooltip flotante compartido por las graficas; se posiciona en px dentro de su contenedor */
+function chartTip(wrap) {
+  const tip = dom("div", {className:"chartTip", role:"status", "aria-live":"polite", hidden:true});
+  wrap.append(tip);
+  return {
+    show(x, y, title, lines) {
+      tip.replaceChildren(dom("strong", {text:title}), ...lines.map(([k, v, swatch]) =>
+        dom("span", {className:"tipRow"}, swatch ? dom("i", {className:"tipSwatch " + swatch, "aria-hidden":"true"}) : null, dom("span", {text:k}), dom("b", {text:v}))));
+      tip.hidden = false;
+      const w = wrap.clientWidth, tw = tip.offsetWidth;
+      tip.style.left = Math.max(0, Math.min(w - tw, x - tw / 2)) + "px";
+      const above = y - tip.offsetHeight - 12;
+      tip.style.top = (above >= 0 ? above : y + 16) + "px"; // sin espacio arriba, va debajo y no tapa el punto
+    },
+    hide() { tip.hidden = true; }
+  };
+}
+/* Redibuja una grafica cuando cambia el ancho de su tarjeta (sin re-pedir datos) */
+function responsiveChart(box, draw) {
+  let width = 0;
+  const run = () => { if (!box.isConnected) { if (width) ro.disconnect(); return; } if (box.clientWidth && box.clientWidth !== width) { width = box.clientWidth; draw(width); } };
+  const ro = new ResizeObserver(run);
+  ro.observe(box);
+  run();
+}
+const niceTicks = (min, max, count = 4) => {
+  if (min === max) { const pad = Math.abs(min) || 1; min -= pad; max += pad; }
+  const raw = (max - min) / count, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= raw);
+  const start = Math.floor(min / step) * step, ticks = [];
+  for (let v = start; v <= max + step * 0.001; v += step) ticks.push(Number(v.toFixed(10)));
+  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+};
+
+/* ======================= Pantalla y sub-vistas ======================= */
+async function renderAnalytics(view) {
+  if (state.me?.role !== "admin") return;
+  const tabs = dom("div", {className:"segmentedFilter analyticsTabs", role:"tablist", "aria-label":"Secciones de analítica"});
+  const panel = dom("section", {className:"analyticsPanel", id:"analyticsPanel", role:"tabpanel", tabindex:"-1"});
+  ANALYTICS_VIEWS.forEach(([key, text]) => {
+    const tab = dom("button", {type:"button", role:"tab", className:"segment", id:"atab-" + key, "aria-controls":"analyticsPanel",
+      "aria-selected":String(key === analytics.sub), tabindex:key === analytics.sub ? "0" : "-1", text});
+    tab.addEventListener("click", () => showAnalytics(key));
+    tabs.append(tab);
+  });
+  tabs.addEventListener("keydown", e => {
+    const list = $$("[role=tab]", tabs), i = list.indexOf(document.activeElement);
+    const next = {ArrowRight:i + 1, ArrowLeft:i - 1, Home:0, End:list.length - 1}[e.key];
+    if (i < 0 || next === undefined) return;
+    e.preventDefault();
+    const tab = list[(next + list.length) % list.length];
+    tab.focus();
+    showAnalytics(tab.id.slice(5));
+  });
+  view.replaceChildren(dom("div", {className:"analytics"},
+    dom("div", {className:"viewHead"}, dom("div", {},
+      dom("h1", {text:"Analítica"}),
+      dom("p", {text:"Calidad de los datos, comportamiento de clientes y empleados, y demanda estimada con regresión lineal."}))),
+    tabs, panel));
+  try { await loadUsersCache(); } catch {}
+  await showAnalytics(analytics.sub);
+}
+async function showAnalytics(key) {
+  analytics.sub = key;
+  try { localStorage.setItem("ferrepro.analytics", key); } catch {}
+  $$(".analyticsTabs [role=tab]").forEach(t => {
+    const on = t.id === "atab-" + key;
+    t.setAttribute("aria-selected", String(on));
+    t.tabIndex = on ? 0 : -1;
+  });
+  const panel = $("#analyticsPanel");
+  if (!panel) return;
+  panel.setAttribute("aria-labelledby", "atab-" + key);
+  panel.setAttribute("aria-busy", "true");
+  panel.replaceChildren(dom("div", {className:"grid"}, dom("div", {className:"skeleton"}), dom("div", {className:"skeleton"})));
+  try {
+    if (key === "calidad") await renderQuality(panel);
+    else if (key === "perfiles") await renderProfiles(panel);
+    else await renderDemand(panel);
+  } catch (err) {
+    if (err.status === 401 || analytics.sub !== key) return;
+    const retry = dom("button", {type:"button", className:"btn secondary", text:"Reintentar"});
+    retry.addEventListener("click", () => showAnalytics(key));
+    panel.replaceChildren(dom("div", {className:"emptyState compact"},
+      dom("h2", {text:"No pudimos cargar esta sección"}), dom("p", {className:"muted", text:err.message}), retry));
+  } finally {
+    panel.removeAttribute("aria-busy");
+  }
+}
+const stale = (panel, key) => !panel.isConnected || analytics.sub !== key;
+
+/* ======================= 1. Calidad de datos ======================= */
+async function renderQuality(panel) {
+  const data = analytics.quality = await api("/admin/data-quality/latest");
+  if (stale(panel, "calidad")) return;
+  const run = dom("button", {type:"button", className:"btn primary", id:"runAudit", text:"Ejecutar auditoría"});
+  run.addEventListener("click", () => runAudit(run));
+  const bar = dom("div", {className:"panelBar"},
+    dom("p", {className:"muted", text:data ? "Última auditoría: " + fmtDate(data.executed_at) + " · " + staffLabel(data.executed_by) : "Revisa usuarios, categorías, productos, pedidos, facturas y pagos."}),
+    run);
+  if (!data) {
+    panel.replaceChildren(bar, dom("div", {className:"card emptyState compact"},
+      dom("h2", {text:"Todavía no hay auditorías"}),
+      dom("p", {className:"muted", text:"Ejecuta la primera para medir la calidad de los datos y corregir lo que sea seguro corregir."})));
+    return;
+  }
+  panel.replaceChildren(bar, qualityKpis(data), qualityModules(data), dom("section", {className:"card flush", id:"issuesCard", "aria-labelledby":"issuesTitle"}));
+  drawIssues();
+}
+const staffLabel = id => {
+  if (id == null) return "Sistema";
+  const user = (usersCache || []).find(u => u.id === id);
+  return user ? user.name : "Administrador #" + id;
+};
+function scoreTone(score) {
+  if (score >= 90) return ["ok", "check", "Excelente"];
+  if (score >= 70) return ["warn", "alert", "Aceptable"];
+  return ["bad", "alert", "Requiere atención"];
+}
+function qualityKpis(d) {
+  const score = Math.max(0, Math.min(100, Number(d.quality_score) || 0));
+  const [tone, icon, label] = scoreTone(score);
+  const r = 52, c = 2 * Math.PI * r;
+  const ring = svgEl("svg", {viewBox:"0 0 120 120", class:"scoreRing " + tone, "aria-hidden":"true"});
+  ring.append(svgEl("circle", {cx:60, cy:60, r, class:"ringTrack"}),
+    svgEl("circle", {cx:60, cy:60, r, class:"ringValue", "stroke-dasharray":c, "stroke-dashoffset":c * (1 - score / 100), transform:"rotate(-90 60 60)"}));
+  const lead = dom("section", {className:"card qualityScore", "aria-label":"Puntaje de calidad"},
+    dom("div", {className:"scoreVisual"}, ring, dom("strong", {className:"scoreValue", text:new Intl.NumberFormat("es-CO", {maximumFractionDigits:1}).format(score)})),
+    dom("div", {className:"scoreText"},
+      pillBadge(tone, icon, label),
+      dom("h2", {text:"Quality Score"}),
+      dom("p", {className:"muted", text:"Porcentaje de registros sin incidencias pendientes después de las correcciones automáticas (de 0 a 100)."})));
+  const kpi = (labelText, value, note) => dom("div", {className:"card kpiCard"},
+    dom("span", {className:"kpiLabel", text:labelText}), dom("strong", {text:fmtInt.format(value)}), dom("span", {className:"muted", text:note}));
+  return dom("div", {className:"qualityKpis"}, lead,
+    dom("div", {className:"kpiStack"},
+      kpi("Registros escaneados", d.total_records_scanned, "en seis módulos"),
+      kpi("Auto-corregidas", d.auto_fixed_count, "normalizadas sin alterar importes"),
+      kpi("Pendientes de revisión", d.pending_review_count, "requieren decisión humana")));
+}
+function qualityModules(d) {
+  // Mosaicos compactos: seis módulos caben en dos columnas en el teléfono sin una tabla larga
+  const tiles = QUALITY_MODULES.map(([key, label]) => {
+    const m = d.summary_by_module?.[key] || {scanned:0, auto_fixed:0, pending_review:0};
+    return dom("li", {className:"moduleTile"},
+      dom("span", {className:"moduleName", text:label}),
+      dom("strong", {className:"num", text:fmtInt.format(m.scanned)}),
+      dom("span", {className:"muted moduleUnit", text:m.scanned === 1 ? "registro escaneado" : "registros escaneados"}),
+      dom("span", {className:"moduleBadges"},
+        m.auto_fixed ? pillBadge("ok", "check", fmtInt.format(m.auto_fixed) + (m.auto_fixed === 1 ? " corregida" : " corregidas")) : null,
+        m.pending_review ? pillBadge("warn", "clock", fmtInt.format(m.pending_review) + (m.pending_review === 1 ? " pendiente" : " pendientes")) : null,
+        !m.auto_fixed && !m.pending_review ? pillBadge("", "dot", "Sin incidencias") : null));
+  });
+  return dom("section", {className:"card", "aria-labelledby":"modulesTitle"},
+    dom("div", {className:"cardHead"}, dom("h2", {id:"modulesTitle", text:"Resumen por módulo"})),
+    dom("ul", {className:"moduleGrid"}, tiles));
+}
+function issueValue(text) {
+  return text == null || text === "" ? dom("span", {className:"muted", text:"Vacío"}) : dom("code", {className:"valueCode", text:String(text)});
+}
+function drawIssues() {
+  const card = $("#issuesCard"), d = analytics.quality;
+  if (!card || !d) return;
+  const list = (d.issues || []).filter(i => (analytics.qModule === "all" || i.module === analytics.qModule) && (analytics.qStatus === "all" || i.status === analytics.qStatus));
+  const moduleName = key => (QUALITY_MODULES.find(([k]) => k === key) || [key, key])[1];
+  const filters = dom("div", {className:"issueFilters"},
+    segmented("Filtrar por módulo", [["all", "Todos los módulos"], ...QUALITY_MODULES], analytics.qModule, key => { analytics.qModule = key; analytics.qShown = 20; drawIssues(); }),
+    segmented("Filtrar por estado", [["all", "Todos los estados"], ["auto_fixed", "Auto-corregidas"], ["pending_review", "Pendientes"], ["resolved", "Resueltas"]], analytics.qStatus,
+      key => { analytics.qStatus = key; analytics.qShown = 20; drawIssues(); }));
+  const head = dom("div", {className:"cardHead"}, dom("h2", {id:"issuesTitle", text:"Incidencias"}),
+    dom("span", {className:"muted", text:fmtInt.format(list.length) + " de " + fmtInt.format(d.issues_found ?? (d.issues || []).length)}));
+  let body;
+  if (!list.length) {
+    body = dom("div", {className:"emptyState compact"}, dom("h2", {text:(d.issues || []).length ? "Ninguna incidencia coincide" : "Sin incidencias"}),
+      dom("p", {className:"muted", text:(d.issues || []).length ? "Prueba con otro módulo o estado." : "La última auditoría no encontró problemas."}));
+  } else {
+    const rows = list.slice(0, analytics.qShown).map(i => {
+      const [st, sti, stl] = QUALITY_STATUS[i.status] || ["", "dot", i.status];
+      const [sv, svi, svl] = QUALITY_SEVERITY[i.severity] || ["", "dot", i.severity];
+      const related = i.details?.related_entity_ids;
+      return dom("tr", {},
+        dom("td", {}, dom("span", {className:"cellMain", text:moduleName(i.module)}), dom("span", {className:"cellSub", text:"Registro #" + i.entity_id + (i.details?.field ? " · " + i.details.field : "")})),
+        dom("td", {}, dom("span", {text:QUALITY_ISSUE[i.issue_type] || i.issue_type}),
+          related?.length ? dom("span", {className:"cellSub", text:"Relacionado con #" + related.join(", #")}) : null),
+        dom("td", {}, pillBadge(sv, svi, svl)),
+        dom("td", {className:"cellWide"}, dom("span", {className:"beforeAfter"},
+          dom("span", {}, dom("span", {className:"baLabel", text:"Original"}), issueValue(i.original_value)),
+          dom("span", {}, dom("span", {className:"baLabel", text:"Normalizado"}), i.normalized_value == null ? dom("span", {className:"muted", text:"Sin propuesta"}) : issueValue(i.normalized_value)))),
+        dom("td", {}, pillBadge(st, sti, stl)));
+    });
+    body = dom("div", {className:"tableWrap"}, dom("table", {className:"issuesTable"},
+      dom("thead", {}, dom("tr", {}, ["Módulo y origen", "Problema", "Severidad", "Valor original y normalizado", "Estado"].map(t => dom("th", {scope:"col", text:t})))),
+      dom("tbody", {}, rows)));
+  }
+  const more = list.length > analytics.qShown
+    ? dom("div", {className:"pager"}, dom("span", {text:"Mostrando " + analytics.qShown + " de " + list.length}),
+        dom("button", {type:"button", className:"btn secondary small", "data-more-issues":"", text:"Mostrar más"}))
+    : null;
+  card.replaceChildren(...[head, dom("div", {className:"cardPad"}, filters), body, more].filter(Boolean));
+  more?.querySelector("button").addEventListener("click", () => { analytics.qShown += 20; drawIssues(); });
+}
+async function runAudit(button) {
+  if (button.disabled) return;
+  setBusy(button, true, "Auditando…");
+  try {
+    const report = await api("/admin/data-quality/audit", {method:"POST", body:{}});
+    analytics.qModule = "all"; analytics.qStatus = "all"; analytics.qShown = 20;
+    toast("Auditoría lista: puntaje " + fmtDec.format(report.quality_score) + ", " + report.auto_fixed_count + " corregidas, " + report.pending_review_count + " pendientes.");
+    const panel = $("#analyticsPanel");
+    if (panel && analytics.sub === "calidad") await renderQuality(panel);
+    $("#runAudit")?.focus();
+  } catch (err) {
+    if (err.status !== 401) toast(err.message || "No pudimos ejecutar la auditoría.");
+  } finally {
+    if (button.isConnected) setBusy(button, false);
+  }
+}
+
+/* ======================= 2. Perfiles y anomalias ======================= */
+async function renderProfiles(panel) {
+  const data = analytics.users = await api("/admin/analytics/users");
+  if (stale(panel, "perfiles")) return;
+  panel.replaceChildren(
+    dom("div", {className:"panelBar"},
+      segmented("Rol", [["customer", "Clientes"], ["employee", "Empleados"]], analytics.role, role => { analytics.role = role; analytics.focusUser = null; drawProfiles(); }),
+      dom("p", {className:"muted", text:"Cercas de Tukey a 1,5 × IQR. El puntaje describe magnitud relativa, no probabilidad de fraude."})),
+    dom("div", {id:"profilesBody", className:"profilesBody"}));
+  drawProfiles();
+}
+function drawProfiles() {
+  const box = $("#profilesBody"), data = analytics.users;
+  if (!box || !data) return;
+  const role = analytics.role;
+  const profiles = (data.profiles || []).filter(p => p.user_role === role);
+  const focus = profiles.find(p => p.user_id === analytics.focusUser) || null;
+  const plot = focus ? focus.amount_boxplot : data.global_boxplots?.[role];
+  const who = focus ? focus.name : (role === "customer" ? "Todos los clientes" : "Todos los empleados");
+  const alerts = (data.alerts || []).filter(a => a.user_role === role);
+  // Orden por puntaje sin mutar la respuesta (merge sort del navegador es estable)
+  const ranked = [...alerts].sort((a, b) => b.anomaly_score - a.anomaly_score || a.id - b.id);
+  const chartCard = dom("section", {className:"card boxCard", "aria-labelledby":"boxTitle"},
+    dom("div", {className:"cardHead"},
+      dom("div", {}, dom("h2", {id:"boxTitle", text:"Distribución de montos"}), dom("p", {className:"muted", text:who + " · COP por operación"})),
+      focus ? dom("button", {type:"button", className:"btn secondary small", "data-box-reset":"", text:"Ver todo el rol"}) : null));
+  const plotBox = dom("div", {className:"plotBox"});
+  chartCard.append(plotBox);
+  if (plot) {
+    responsiveChart(plotBox, w => drawBoxplot(plotBox, plot, w));
+    chartCard.append(boxStats(plot));
+  } else {
+    plotBox.append(dom("p", {className:"muted chartEmpty", text:"Sin operaciones para graficar."}));
+  }
+  box.replaceChildren(
+    dom("div", {className:"profilesGrid"}, chartCard, alertsPanel(ranked, data.profiles || [])),
+    profilesTable(profiles, role));
+  $("[data-box-reset]", box)?.addEventListener("click", () => { analytics.focusUser = null; drawProfiles(); $("#boxTitle")?.scrollIntoView({block:"nearest"}); });
+}
+function boxStats(p) {
+  const min = Math.min(p.whisker_min, ...(p.outliers || []));
+  const max = Math.max(p.whisker_max, ...(p.outliers || []));
+  const items = [["Mínimo", money(min)], ["Q1", money(p.q1)], ["Mediana (Q2)", money(p.median)], ["Q3", money(p.q3)], ["Máximo", money(max)],
+    ["IQR", money(p.iqr)], ["Cerca inferior", money(p.lower)], ["Cerca superior", money(p.upper)], ["Observaciones", fmtInt.format(p.n)], ["Atípicos", fmtInt.format((p.outliers || []).length)]];
+  return dom("dl", {className:"boxStats"}, items.map(([k, v]) => dom("div", {}, dom("dt", {text:k}), dom("dd", {text:v}))));
+}
+function drawBoxplot(wrap, p, width) {
+  wrap.replaceChildren();
+  const outliers = p.outliers || [];
+  const lo = Math.min(p.lower, p.whisker_min, ...outliers), hi = Math.max(p.upper, p.whisker_max, ...outliers);
+  const ticks = niceTicks(lo, hi, width < 480 ? 3 : 5);
+  const t0 = ticks[0], t1 = ticks[ticks.length - 1];
+  const H = 168, padL = 16, padR = 16, top = 34, mid = 84, boxH = 40;
+  const x = v => padL + (width - padL - padR) * (v - t0) / (t1 - t0 || 1);
+  const svg = svgEl("svg", {viewBox:`0 0 ${width} ${H}`, width, height:H, class:"boxplot", role:"group",
+    "aria-label":`Boxplot: mínimo ${money(Math.min(p.whisker_min, ...outliers))}, Q1 ${money(p.q1)}, mediana ${money(p.median)}, Q3 ${money(p.q3)}, máximo ${money(Math.max(p.whisker_max, ...outliers))}, ${outliers.length} atípicos`});
+  for (const t of ticks) {
+    svg.append(svgEl("line", {x1:x(t), x2:x(t), y1:top - 8, y2:H - 30, class:"gridLine"}),
+      svgEl("text", {x:x(t), y:H - 10, "text-anchor":t === t0 ? "start" : t === t1 ? "end" : "middle", class:"axisText"}, compactMoney(t)));
+  }
+  for (const [v, label] of [[p.lower, "Cerca inf."], [p.upper, "Cerca sup."]]) {
+    svg.append(svgEl("line", {x1:x(v), x2:x(v), y1:top - 6, y2:mid + boxH / 2 + 10, class:"fenceLine"}),
+      svgEl("text", {x:x(v), y:top - 14, "text-anchor":x(v) < 60 ? "start" : x(v) > width - 60 ? "end" : "middle", class:"axisText"}, label));
+  }
+  svg.append(svgEl("line", {x1:x(p.whisker_min), x2:x(p.q1), y1:mid, y2:mid, class:"whisker"}),
+    svgEl("line", {x1:x(p.q3), x2:x(p.whisker_max), y1:mid, y2:mid, class:"whisker"}),
+    svgEl("line", {x1:x(p.whisker_min), x2:x(p.whisker_min), y1:mid - 10, y2:mid + 10, class:"whisker"}),
+    svgEl("line", {x1:x(p.whisker_max), x2:x(p.whisker_max), y1:mid - 10, y2:mid + 10, class:"whisker"}),
+    svgEl("rect", {x:x(p.q1), y:mid - boxH / 2, width:Math.max(2, x(p.q3) - x(p.q1)), height:boxH, rx:4, class:"boxBody"}),
+    svgEl("line", {x1:x(p.median), x2:x(p.median), y1:mid - boxH / 2, y2:mid + boxH / 2, class:"medianLine"}));
+  const tip = chartTip(wrap);
+  const hit = svgEl("rect", {x:x(p.whisker_min) - 6, y:mid - boxH / 2 - 6, width:Math.max(12, x(p.whisker_max) - x(p.whisker_min) + 12), height:boxH + 12,
+    class:"hitArea", tabindex:"0", role:"img", "aria-label":"Caja: Q1 " + money(p.q1) + ", mediana " + money(p.median) + ", Q3 " + money(p.q3)});
+  const boxTip = () => tip.show(x(p.median), mid - boxH / 2, "Caja y bigotes", [["Mínimo", money(p.whisker_min)], ["Q1", money(p.q1)], ["Mediana", money(p.median)], ["Q3", money(p.q3)], ["Máximo", money(p.whisker_max)]]);
+  hit.addEventListener("pointerenter", boxTip); hit.addEventListener("focus", boxTip);
+  hit.addEventListener("pointerleave", tip.hide); hit.addEventListener("blur", tip.hide);
+  svg.append(hit);
+  outliers.forEach((v, i) => {
+    const jitter = (i % 3 - 1) * 8;
+    const dot = svgEl("circle", {cx:x(v), cy:mid + jitter, r:6, class:"outlierDot", tabindex:"0", role:"img", "aria-label":"Atípico " + money(v)});
+    const show = () => tip.show(x(v), mid + jitter - 6, "Valor atípico", [["Monto", money(v)], ["Cerca superior", money(p.upper)], ["Exceso", money(Math.max(0, v - p.upper))]]);
+    dot.addEventListener("pointerenter", show); dot.addEventListener("focus", show);
+    dot.addEventListener("pointerleave", tip.hide); dot.addEventListener("blur", tip.hide);
+    svg.append(dot);
+  });
+  wrap.prepend(svg);
+}
+const compactMoney = v => {
+  const a = Math.abs(v), sign = v < 0 ? "-" : "";
+  if (a >= 1e6) return sign + "$" + fmtDec.format(a / 1e6) + " M";
+  if (a >= 1e3) return sign + "$" + fmtDec.format(a / 1e3) + " mil";
+  return sign + "$" + fmtDec.format(a);
+};
+function alertsPanel(ranked, profiles) {
+  const nameOf = a => profiles.find(p => p.user_id === a.user_id && p.user_role === a.user_role)?.name || "Usuario #" + a.user_id;
+  const card = dom("section", {className:"card alertsCard", "aria-labelledby":"alertsTitle"},
+    dom("div", {className:"cardHead"}, dom("h2", {id:"alertsTitle", text:"Alertas explicadas"}),
+      ranked.length ? pillBadge("warn", "alert", fmtInt.format(ranked.length)) : pillBadge("ok", "check", "Sin alertas")));
+  if (!ranked.length) {
+    card.append(dom("p", {className:"muted", text:"Ninguna cuenta de este rol supera su cerca superior. Las alertas necesitan al menos cuatro observaciones."}));
+    return card;
+  }
+  const list = dom("ol", {className:"alertList"});
+  for (const a of ranked) {
+    const t = a.threshold_info || {};
+    const score = Math.max(0, Math.min(100, Number(a.anomaly_score) || 0));
+    const meter = dom("div", {className:"scoreMeter", role:"meter", "aria-valuemin":"0", "aria-valuemax":"100", "aria-valuenow":String(score), "aria-label":"Puntaje de anomalía"},
+      dom("span", {className:"meterFill " + (score >= 70 ? "bad" : score >= 40 ? "warn" : "info")}));
+    meter.firstChild.style.width = score + "%";
+    const sources = Object.entries(a.source_record_ids || {}).flatMap(([key, ids]) =>
+      (ids || []).map(id => dom("span", {className:"sourceChip", text:(SOURCE_LABEL[key] || key) + " #" + id})));
+    const isMoney = a.alert_type === "high_amount_outlier";
+    const fmtT = v => v == null ? "Sin dato" : isMoney ? money(v) : fmtDec.format(v);
+    list.append(dom("li", {className:"alertItem"},
+      dom("div", {className:"alertTop"},
+        dom("div", {}, dom("span", {className:"cellMain", text:nameOf(a)}), dom("span", {className:"cellSub", text:ALERT_TYPE[a.alert_type] || a.alert_type})),
+        dom("div", {className:"alertScore"}, dom("strong", {className:"num", text:fmtDec.format(score)}), dom("span", {className:"muted", text:"/ 100"}))),
+      meter,
+      dom("p", {className:"alertWhy", text:a.explanation}),
+      dom("dl", {className:"alertThresholds"},
+        [["Q1", fmtT(t.q1)], ["Q3", fmtT(t.q3)], ["IQR", fmtT(t.iqr)], ["Cerca sup.", fmtT(t.upper)]].map(([k, v]) => dom("div", {}, dom("dt", {text:k}), dom("dd", {text:v})))),
+      sources.length ? dom("div", {className:"sourceRow"}, dom("span", {className:"baLabel", text:"Registros de origen"}), dom("span", {className:"sourceChips"}, sources)) : null));
+  }
+  card.append(list);
+  return card;
+}
+/* Solo cuentan las facturas con descuento real; la media se calcula sobre ellas */
+function discountSummary(list) {
+  const applied = list.filter(d => Number(d.amount) > 0);
+  if (!applied.length) return "Ninguno";
+  const avg = applied.reduce((s, d) => s + (Number(d.percent) || 0), 0) / applied.length;
+  return fmtInt.format(applied.length) + " de " + fmtInt.format(list.length) + " · media " + fmtPct(avg);
+}
+function profilesTable(profiles, role) {
+  const card = dom("section", {className:"card flush", "aria-labelledby":"profilesTitle"},
+    dom("div", {className:"cardHead"}, dom("h2", {id:"profilesTitle", text:role === "customer" ? "Perfiles de clientes" : "Perfiles de empleados"}),
+      dom("span", {className:"muted", text:fmtInt.format(profiles.length) + " cuentas"})));
+  if (!profiles.length) {
+    card.append(dom("div", {className:"emptyState compact"}, dom("h2", {text:"Sin cuentas con este rol"}), dom("p", {className:"muted", text:"Los perfiles aparecen cuando existen cuentas activas."})));
+    return card;
+  }
+  const sum = list => list.reduce((s, v) => s + (Number(v) || 0), 0);
+  const heads = role === "customer"
+    ? ["Cliente", "Pedidos", "Pedidos por día", "Monto mediano", "Total", "Canal", "Cancelaciones", "Distribución"]
+    : ["Empleado", "Facturas", "Monto mediano", "Total facturado", "Anulaciones", "Descuentos", "Distribución"];
+  const rows = profiles.map(p => {
+    const ops = p.operations || [];
+    const median = p.amount_boxplot ? money(p.amount_boxplot.median) : "Sin dato";
+    const view = dom("button", {type:"button", className:"btn secondary small", "data-focus-user":p.user_id, "aria-pressed":String(analytics.focusUser === p.user_id),
+      disabled:!p.amount_boxplot, text:analytics.focusUser === p.user_id ? "En la gráfica" : "Ver"});
+    const cells = role === "customer"
+      ? [fmtInt.format(p.operations_count), p.orders_per_day == null ? "Sin dato" : fmtDec.format(p.orders_per_day), median, money(sum(ops.map(o => o.amount))),
+         CHANNEL_NAME[p.predominant_channel] || p.predominant_channel || "Sin dato", fmtPct((p.cancellation_rate ?? 0) * 100)]
+      : [fmtInt.format(p.invoices_issued ?? p.operations_count), median, money(sum(ops.map(o => o.amount))), fmtPct((p.cancellation_rate ?? 0) * 100),
+         discountSummary(p.discounts || [])];
+    return dom("tr", {className:analytics.focusUser === p.user_id ? "rowFocus" : null},
+      dom("td", {}, dom("span", {className:"cellMain", text:p.name}), dom("span", {className:"cellSub", text:"Cuenta #" + p.user_id})),
+      ...cells.map(v => dom("td", {className:"num", text:v})),
+      dom("td", {}, dom("div", {className:"rowActions"}, view)));
+  });
+  card.append(dom("div", {className:"tableWrap"}, dom("table", {className:"profilesTable"},
+    dom("thead", {}, dom("tr", {}, heads.map(h => dom("th", {scope:"col", text:h})))), dom("tbody", {}, rows))));
+  card.addEventListener("click", e => {
+    const b = e.target.closest("[data-focus-user]");
+    if (!b || b.disabled) return;
+    analytics.focusUser = Number(b.dataset.focusUser);
+    drawProfiles();
+    $("#boxTitle")?.scrollIntoView({block:"start", behavior:matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  });
+  return card;
+}
+
+/* ======================= 3. Demanda ======================= */
+const periodDate = s => new Date(s + "T12:00:00-05:00");
+const dayFmt = new Intl.DateTimeFormat("es-CO", {day:"numeric", month:"short", timeZone:"America/Bogota"});
+const periodLabel = (s, period) => (period === "weekly" ? "Semana del " : "") + dayFmt.format(periodDate(s));
+async function renderDemand(panel) {
+  const horizon = analytics.period === "weekly" ? 4 : 7;
+  const data = analytics.demand = await api("/admin/analytics/demand?period=" + analytics.period + "&horizon=" + horizon);
+  if (stale(panel, "demanda")) return;
+  const products = data.products || [];
+  if (analytics.product !== "global" && !products.some(p => String(p.product_id) === analytics.product)) analytics.product = "global";
+  const tpl = document.createElement("template");
+  // listbox() escapa cada nombre con esc(); es el componente accesible del panel (sin <select> nativo)
+  tpl.innerHTML = listbox({name:"demandProduct", label:"Producto", value:analytics.product,
+    options:[{value:"global", label:"Todos los productos (global)"}, ...products.map(p => ({value:String(p.product_id), label:p.name}))]});
+  const picker = tpl.content.firstElementChild;
+  picker.classList.add("demandPicker");
+  setupListbox(picker);
+  $("input", picker).addEventListener("change", e => { analytics.product = e.target.value; drawDemand(); });
+  panel.replaceChildren(
+    dom("div", {className:"panelBar demandBar"},
+      segmented("Período", [["daily", "Diaria"], ["weekly", "Semanal"]], analytics.period, period => { analytics.period = period; showAnalytics("demanda"); }),
+      picker),
+    dom("div", {id:"demandBody", className:"demandBody"}));
+  drawDemand();
+}
+function drawDemand() {
+  const box = $("#demandBody"), data = analytics.demand;
+  if (!box || !data) return;
+  const series = analytics.product === "global" ? data.global : (data.products || []).find(p => String(p.product_id) === analytics.product);
+  const title = analytics.product === "global" ? "Demanda global" : series?.name || "Producto";
+  if (!series || !(series.history || []).length) {
+    box.replaceChildren(dom("div", {className:"card emptyState compact"}, dom("h2", {text:"Aún no hay ventas para estimar"}),
+      dom("p", {className:"muted", text:"La serie usa pedidos confirmados, en preparación, enviados o entregados. Cuando existan ventas aparecerá aquí."})));
+    return;
+  }
+  const chart = dom("section", {className:"card demandCard", "aria-labelledby":"demandTitle"},
+    dom("div", {className:"cardHead"}, dom("div", {}, dom("h2", {id:"demandTitle", text:title}),
+      dom("p", {className:"muted", text:"Unidades vendidas por " + (data.period === "weekly" ? "semana" : "día") + " · " + series.history.length + " períodos"}))),
+    demandLegend());
+  const plotBox = dom("div", {className:"plotBox"});
+  chart.append(plotBox, demandTable(series, data.period));
+  box.replaceChildren(chart, demandMetrics(series, data.period));
+  responsiveChart(plotBox, w => drawDemandChart(plotBox, series, data.period, w));
+}
+function demandLegend() {
+  const item = (cls, text) => {
+    const s = svgEl("svg", {viewBox:"0 0 24 8", width:24, height:8, "aria-hidden":"true"});
+    s.append(svgEl("line", {x1:0, x2:24, y1:4, y2:4, class:cls}));
+    return dom("li", {}, s, text);
+  };
+  return dom("ul", {className:"chartLegend"}, item("lineObserved", "Demanda observada"), item("lineEstimated", "Estimada por regresión lineal"), item("lineForecast", "Proyección"));
+}
+function drawDemandChart(wrap, s, period, width) {
+  wrap.replaceChildren();
+  const hist = s.history, fc = s.forecast || [];
+  const points = [...hist.map(h => ({period:h.period, observed:h.observed, estimated:h.estimated, split:h.split})),
+    ...fc.map(f => ({period:f.period, predicted:f.predicted, split:"forecast"}))];
+  const n = points.length;
+  const vals = points.flatMap(p => [p.observed, p.estimated, p.predicted]).filter(v => v != null);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals), 4);
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const H = Math.round(width < 480 ? 240 : 300), padL = 40, padR = 12, top = 28, bottom = 34;
+  const x = i => n === 1 ? (padL + width - padR) / 2 : padL + (width - padL - padR) * i / (n - 1);
+  const y = v => top + (H - top - bottom) * (1 - (v - y0) / (y1 - y0 || 1));
+  const svg = svgEl("svg", {viewBox:`0 0 ${width} ${H}`, width, height:H, class:"demandChart", tabindex:"0", role:"img",
+    "aria-label":"Demanda observada frente a estimada. Usa las flechas para recorrer los períodos."});
+  const trainEnd = s.train_periods ? s.train_periods - 1 : -1;
+  const zones = [];
+  if (s.test_periods) zones.push(["Evaluación", trainEnd + 0.5, hist.length - 0.5, "zoneTest"]);
+  if (fc.length) zones.push(["Proyección", hist.length - 0.5, n - 0.5, "zoneForecast"]);
+  if (s.train_periods) zones.unshift(["Entrenamiento", -0.5, trainEnd + 0.5, "zoneTrain"]);
+  const zx = i => Math.max(padL, Math.min(width - padR, n === 1 ? x(0) : padL + (width - padL - padR) * i / (n - 1)));
+  for (const [label, a, b, cls] of zones) {
+    const xa = zx(a), xb = zx(b);
+    svg.append(svgEl("rect", {x:xa, y:top - 4, width:Math.max(0, xb - xa), height:H - top - bottom + 4, class:"zone " + cls}));
+    if (xb - xa > 56) svg.append(svgEl("text", {x:xa + 6, y:top - 10, class:"axisText zoneLabel"}, label));
+  }
+  for (const t of ticks) {
+    svg.append(svgEl("line", {x1:padL, x2:width - padR, y1:y(t), y2:y(t), class:t === 0 ? "baseLine" : "gridLine"}),
+      svgEl("text", {x:padL - 8, y:y(t) + 4, "text-anchor":"end", class:"axisText"}, fmtDec.format(t)));
+  }
+  const labelEvery = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((width - padL - padR) / 84))));
+  points.forEach((p, i) => {
+    if (i % labelEvery === 0 || i === n - 1) {
+      if (i !== n - 1 && n - 1 - i < labelEvery) return; // la ultima etiqueta siempre va; la anterior cede si chocan
+      svg.append(svgEl("text", {x:x(i), y:H - 12, "text-anchor":i === 0 ? "start" : i === n - 1 ? "end" : "middle", class:"axisText"}, dayFmt.format(periodDate(p.period))));
+    }
+  });
+  const path = (list, key) => list.filter(([, v]) => v != null).map(([i, v]) => x(i) + "," + y(v)).join(" ");
+  const histIdx = hist.map((h, i) => [i, h]);
+  svg.append(svgEl("polyline", {points:path(histIdx.map(([i, h]) => [i, h.estimated]), "e"), class:"lineEstimated"}));
+  if (fc.length) {
+    const last = hist[hist.length - 1];
+    const lead = last.estimated != null ? [[hist.length - 1, last.estimated]] : [];
+    svg.append(svgEl("polyline", {points:path([...lead, ...fc.map((f, j) => [hist.length + j, f.predicted])]), class:"lineForecast"}));
+  }
+  svg.append(svgEl("polyline", {points:path(histIdx.map(([i, h]) => [i, h.observed])), class:"lineObserved"}));
+  if (n <= 40) histIdx.forEach(([i, h]) => svg.append(svgEl("circle", {cx:x(i), cy:y(h.observed), r:3, class:"dotObserved"})));
+  const cross = svgEl("line", {y1:top - 4, y2:H - bottom, class:"crosshair", visibility:"hidden"});
+  const mObs = svgEl("circle", {r:5, class:"markObserved", visibility:"hidden"});
+  const mEst = svgEl("circle", {r:5, class:"markEstimated", visibility:"hidden"});
+  svg.append(cross, mEst, mObs);
+  const hit = svgEl("rect", {x:padL, y:top - 4, width:width - padL - padR, height:H - top - bottom + 4, class:"hitArea"});
+  svg.append(hit);
+  wrap.append(svg);
+  const tip = chartTip(wrap);
+  let active = -1;
+  const show = i => {
+    active = Math.max(0, Math.min(n - 1, i));
+    const p = points[active], cx = x(active);
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    const est = p.split === "forecast" ? p.predicted : p.estimated;
+    if (p.observed != null) { mObs.setAttribute("cx", cx); mObs.setAttribute("cy", y(p.observed)); mObs.setAttribute("visibility", "visible"); }
+    else mObs.setAttribute("visibility", "hidden");
+    if (est != null) { mEst.setAttribute("cx", cx); mEst.setAttribute("cy", y(est)); mEst.setAttribute("visibility", "visible"); }
+    else mEst.setAttribute("visibility", "hidden");
+    const zone = {train:"Entrenamiento", test:"Evaluación", forecast:"Proyección"}[p.split] || "";
+    const lines = [];
+    if (p.observed != null) lines.push(["Reales", fmtDec.format(p.observed) + " u.", "swObserved"]);
+    if (est != null) lines.push([p.split === "forecast" ? "Proyectadas" : "Estimadas", fmtDec.format(est) + " u.", p.split === "forecast" ? "swForecast" : "swEstimated"]);
+    tip.show(cx, Math.min(...[p.observed, est].filter(v => v != null).map(y)), periodLabel(p.period, period) + (zone ? " · " + zone : ""), lines);
+  };
+  const hide = () => { active = -1; tip.hide(); [cross, mObs, mEst].forEach(el => el.setAttribute("visibility", "hidden")); };
+  const nearest = e => {
+    const rect = svg.getBoundingClientRect();
+    const px = (e.clientX - rect.left) * (width / rect.width);
+    return n === 1 ? 0 : Math.round((px - padL) / ((width - padL - padR) / (n - 1)));
+  };
+  hit.addEventListener("pointermove", e => show(nearest(e)));
+  hit.addEventListener("pointerleave", hide);
+  svg.addEventListener("focus", () => show(active < 0 ? hist.length - 1 : active));
+  svg.addEventListener("blur", hide);
+  svg.addEventListener("keydown", e => {
+    const step = {ArrowRight:1, ArrowLeft:-1}[e.key];
+    if (step) { e.preventDefault(); show((active < 0 ? hist.length - 1 : active) + step); }
+    else if (e.key === "Home") { e.preventDefault(); show(0); }
+    else if (e.key === "End") { e.preventDefault(); show(n - 1); }
+    else if (e.key === "Escape") hide();
+  });
+}
+function demandTable(s, period) {
+  const rows = [...s.history.map(h => [h.period, h.observed, h.estimated, {train:"Entrenamiento", test:"Evaluación"}[h.split] || h.split]),
+    ...(s.forecast || []).map(f => [f.period, null, f.predicted, "Proyección"])];
+  return dom("details", {className:"dataDetails"},
+    dom("summary", {text:"Ver los datos de la gráfica"}),
+    dom("div", {className:"tableWrap"}, dom("table", {},
+      dom("thead", {}, dom("tr", {}, ["Período", "Unidades reales", "Unidades estimadas", "Tramo"].map(t => dom("th", {scope:"col", text:t})))),
+      dom("tbody", {}, rows.map(([p, o, e, z]) => dom("tr", {},
+        dom("td", {text:periodLabel(p, period)}), dom("td", {className:"num", text:o == null ? "Sin dato" : fmtDec.format(o)}),
+        dom("td", {className:"num", text:e == null ? "Sin dato" : fmtDec.format(e)}), dom("td", {text:z})))))));
+}
+function demandMetrics(s, period) {
+  const m = s.metrics, model = s.model;
+  const unit = period === "weekly" ? "u. por semana" : "u. por día";
+  const metric = (label, value, note) => dom("div", {className:"metric"}, dom("dt", {text:label}), dom("dd", {}, dom("strong", {className:"num", text:value}), note ? dom("span", {className:"muted", text:note}) : null));
+  const card = dom("section", {className:"card metricsCard", "aria-labelledby":"metricsTitle"},
+    dom("div", {className:"cardHead"}, dom("h2", {id:"metricsTitle", text:"Métricas del modelo"}),
+      dom("span", {className:"muted", text:(s.train_periods || 0) + " de entrenamiento · " + (s.test_periods || 0) + " de evaluación"})));
+  if (s.short_series) {
+    card.append(dom("p", {className:"shortNote"}, iconOf("alert"),
+      dom("span", {text:"Serie corta: con menos de cinco períodos las métricas son orientativas" + (m ? "." : " y todavía no hay tramo de evaluación.")})));
+  }
+  if (!model) {
+    card.append(dom("p", {className:"muted", text:"Con uno o ningún período no se puede ajustar una recta."}));
+    return card;
+  }
+  const fmtM = v => v == null ? "No aplica" : fmtDec.format(v);
+  card.append(dom("dl", {className:"metricGrid"},
+    metric("MAE", m ? fmtM(m.mae) : "Sin dato", "unidades"),
+    metric("RMSE", m ? fmtM(m.rmse) : "Sin dato", "unidades"),
+    metric("R²", m ? fmtM(m.r2) : "Sin dato", m && m.r2 == null ? "varianza de prueba cero" : m && m.r2 < 0 ? "peor que la media" : null),
+    metric("Pendiente (m)", fmtM(model.slope), unit),
+    metric("Intercepto (b)", fmtM(model.intercept), "unidades en el primer período")));
+  card.append(dom("p", {className:"muted modelNote", text:"Estimada = m · x + b, con x = 0 en el primer período. La proyección usa una recta ajustada con todo el histórico" +
+    (s.forecast_model ? " (m = " + fmtDec.format(s.forecast_model.slope) + ", b = " + fmtDec.format(s.forecast_model.intercept) + ")" : "") + " y no baja de cero."}));
+  return card;
 }
