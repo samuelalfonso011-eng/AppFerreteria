@@ -2682,6 +2682,7 @@ async function evaluateFraud(form) {
   try {
     const res = await api("/admin/ml/predict/fraud", {method:"POST", body:{[ml.ref]:Number(raw)}});
     renderFraudResult(result, res, ML_REF.find(([k]) => k === ml.ref)[1] + " #" + raw);
+    markFraudLoaded();
   } catch (err) {
     if (err.status === 401) return;
     if (err.status === 404) showFieldErrors(form, {refId:"No existe " + {order_id:"un pedido", invoice_id:"una factura", payment_id:"un pago"}[ml.ref] + " con ese ID."});
@@ -2691,6 +2692,14 @@ async function evaluateFraud(form) {
     result.removeAttribute("aria-busy");
     if (button.isConnected) setBusy(button, false);
   }
+}
+/* La primera prediccion verifica el SHA-256 y carga el .keras: la tarjeta de estado lo refleja sin recargar */
+function markFraudLoaded() {
+  const card = $('.mlModel[aria-label="Estado del clasificador de fraude"]');
+  const badge = card && $(".mlModelHead .badge", card);
+  if (!badge || badge.textContent === "Cargado desde disco .keras") return;
+  badge.replaceWith(pillBadge("ok", "check", "Cargado desde disco .keras"));
+  $(".mlNote", card)?.remove();
 }
 function renderFraudResult(box, res, label) {
   const fraud = res.predicted_label === "fraudulenta";
