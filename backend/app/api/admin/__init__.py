@@ -11,4 +11,4 @@ def guard():
     require_admin()  # 401 sin sesion, 403 si la cuenta no es administradora
 
 
-from app.api.admin import analytics, benchmarks, catalog, customers, dashboard, integrity, inventory, orders, settings, users  # noqa: E402,F401
+from app.api.admin import analytics, benchmarks, catalog, customers, dashboard, integrity, inventory, ml, orders, settings, users  # noqa: E402,F401

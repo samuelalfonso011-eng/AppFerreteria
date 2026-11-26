@@ -1,0 +1,5 @@
+# Versiones operativas y datos derivados se almacenan localmente.
+*
+!.gitignore
+!demo/
+!demo/**

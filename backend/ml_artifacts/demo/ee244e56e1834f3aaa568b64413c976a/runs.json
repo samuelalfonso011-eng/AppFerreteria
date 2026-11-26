@@ -1,0 +1,107 @@
+{
+  "runs": [
+    {
+      "id": 1,
+      "model_name": "fraud_classifier",
+      "version": "ee244e56e1834f3aaa568b64413c976a",
+      "trained_at": "2026-11-26T04:51:23.469977Z",
+      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/fraud_classifier.keras",
+      "seed": 42,
+      "dataset_summary": {
+        "cutoff": "2025-01-01T00:00:00Z",
+        "real_payments": 0,
+        "adjudicated": 0,
+        "late_labels_excluded": 0,
+        "simulated_labels": true,
+        "train": {
+          "size": 256,
+          "fraud_fraction": 0.19921875,
+          "normal": 205,
+          "fraudulenta": 51,
+          "label_sources": {
+            "simulated": 256
+          },
+          "first": "2024-12-21T08:00:00Z",
+          "last": "2024-12-31T23:00:00Z"
+        },
+        "test": {
+          "size": 64,
+          "fraud_fraction": 0.203125,
+          "normal": 51,
+          "fraudulenta": 13,
+          "label_sources": {
+            "simulated": 64
+          },
+          "first": "2025-01-01T00:00:00Z",
+          "last": "2025-01-03T15:00:00Z"
+        },
+        "oversampled_train_rows": 154,
+        "epochs": 16,
+        "tensorflow": "2.21.0",
+        "keras": "3.15.1",
+        "artifact_sha256": "380046c2f6eefb2e3b6cfc4c07151f74acba42bc082172a51ec1d0681c3faa12",
+        "metadata_sha256": "898062ec7290fe2a0aca8680401d695a7b3ab7cb30aea1308f490206272e9ef7"
+      },
+      "metrics": {
+        "precision": 0.8888888888888888,
+        "recall": 0.6153846153846154,
+        "f1": 0.7272727272727273,
+        "confusion_matrix": {
+          "tp": 8,
+          "fp": 1,
+          "tn": 50,
+          "fn": 5
+        },
+        "by_label_source": {
+          "real": null,
+          "simulated": {
+            "precision": 0.8888888888888888,
+            "recall": 0.6153846153846154,
+            "f1": 0.7272727272727273,
+            "confusion_matrix": {
+              "tp": 8,
+              "fp": 1,
+              "tn": 50,
+              "fn": 5
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "model_name": "demand_regressor",
+      "version": "ee244e56e1834f3aaa568b64413c976a",
+      "trained_at": "2026-11-26T04:51:27.863966Z",
+      "artifact_path": "ee244e56e1834f3aaa568b64413c976a/demand_regressor.keras",
+      "seed": 42,
+      "dataset_summary": {
+        "source": "simulated",
+        "real_sale_days": 0,
+        "excluded_products": 0,
+        "cutoff": "2025-03-14",
+        "train_size": 142,
+        "training_examples": 612,
+        "test_size": 36,
+        "products": 2,
+        "epochs": 16,
+        "tensorflow": "2.21.0",
+        "keras": "3.15.1",
+        "artifact_sha256": "67e0c9ee7cf179b29cad66c651f045024db3c12fe14fa0de6604f2a6eae5922d",
+        "metadata_sha256": "ae98ca35509cc677e171945727fe3b61f413f7ba6cdc03a862d73889a37f9595"
+      },
+      "metrics": {
+        "keras": {
+          "mae": 1.4894946946038141,
+          "rmse": 1.7827734681749046,
+          "r2": 0.6415721819072766
+        },
+        "linear_phase4": {
+          "mae": 2.3995354887655034,
+          "rmse": 2.737960526882864,
+          "r2": 0.15459706844655197
+        }
+      }
+    }
+  ]
+}

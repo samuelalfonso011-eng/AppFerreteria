@@ -32,6 +32,9 @@ def _engine_options(uri):
 
 
 class Config:
+    ML_ARTIFACT_DIR = os.getenv("ML_ARTIFACT_DIR") or os.path.join(BACKEND_DIR, "ml_artifacts")
+    ML_LABEL_FILE = os.getenv("ML_LABEL_FILE")
+    ML_EPOCHS = 16
     SECRET_KEY = os.getenv("SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = normalize_db_url(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = _engine_options(SQLALCHEMY_DATABASE_URI)
