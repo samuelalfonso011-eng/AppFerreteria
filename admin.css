@@ -716,3 +716,8 @@ table.stack.errTable th:last-child,table.stack.errTable td:last-child{padding-ri
   .mlDemandBody .demandBody{grid-template-columns:minmax(0,1fr) minmax(16rem,22rem);align-items:start}
 }
 @media(prefers-reduced-motion:reduce){.mlResult>*{animation:none}}
+
+#loginForm .field{gap:var(--space-3)}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}

@@ -113,7 +113,7 @@ function catalog(term = "", {more = false} = {}) {
 // Carga controlada al llegar al final del carrusel (solo si quedan productos)
 const endObserver = "IntersectionObserver" in window ? new IntersectionObserver(entries => {
   if (entries.some(e => e.isIntersecting)) catalog(catalogTerm || "", {more:true});
-}, {root:$("#cards"), rootMargin:"0px 320px 0px 0px"}) : null;
+}, {root:$("#cards"), rootMargin:"0px 320px 0px 0px"}) : null; // ds-allow-hardcode: distancia de precarga horizontal del observador
 function watchCatalogEnd(hasMore) {
   if (!endObserver) return;
   endObserver.disconnect();
@@ -242,7 +242,20 @@ function productDetail(p) {
 
 /* ---------- Checkout ---------- */
 const form = $("#checkoutForm");
-let idempotencyKey = null;
+const pendingCheckoutKey = "ferrepro.checkout.pending";
+let pendingCheckout;
+try { pendingCheckout = JSON.parse(sessionStorage.getItem(pendingCheckoutKey)); } catch {}
+
+async function checkoutKeyFor(body) {
+  const bytes = new TextEncoder().encode(JSON.stringify([account.user?.email || null, body]));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const fingerprint = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  if (pendingCheckout?.fingerprint !== fingerprint) {
+    pendingCheckout = {fingerprint, key:newKey()};
+    try { sessionStorage.setItem(pendingCheckoutKey, JSON.stringify(pendingCheckout)); } catch {}
+  }
+  return pendingCheckout.key;
+}
 const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join(""));
 
 function fillSummary() {
@@ -255,7 +268,6 @@ function fillSummary() {
 function openCheckout() {
   if (!totals().count) return;
   drawer.close();
-  idempotencyKey = newKey();
   clearErrors();
   // Con sesion iniciada, el nombre y el correo se rellenan (sin pisar lo que ya escribio)
   if (account.user) {
@@ -315,6 +327,7 @@ function setBusy(busy) {
 }
 form.addEventListener("submit", async event => {
   event.preventDefault();
+  if (form.querySelector("button[type=submit]").disabled) return;
   clearErrors();
   const fd = new FormData(form);
   const text = name => String(fd.get(name) || "").trim();
@@ -330,12 +343,11 @@ form.addEventListener("submit", async event => {
   if (!t.count) { $("#checkoutError").textContent = "Tu carrito está vacío."; return; }
   setBusy(true);
   try {
-    const {order} = await api("/orders", {method:"POST", body:{
-      ...data,
-      items:Object.entries(cart).map(([id, quantity]) => ({product_id:Number(id), quantity})),
-      idempotency_key:idempotencyKey,
-      expected_total:t.total
-    }});
+    const body = {...data, items:Object.entries(cart).map(([id, quantity]) => ({product_id:Number(id), quantity})), expected_total:t.total};
+    body.idempotency_key = await checkoutKeyFor(body);
+    const {order} = await api("/orders", {method:"POST", body});
+    pendingCheckout = null;
+    try { sessionStorage.removeItem(pendingCheckoutKey); } catch {}
     cart = {};
     saveCart();
     form.reset();
@@ -537,11 +549,12 @@ function openAuth(view, options = {}) {
 }
 
 function setAccount(user) {
+  switchChatOwner(user?.email || "guest");
   account.user = user;
   const avatar = $("#avatar");
   accountBtn.classList.toggle("signedIn", Boolean(user));
   avatar.hidden = !user;
-  $("#adminLink").hidden = user?.role !== "admin";
+  $("#adminLink").hidden = !["admin", "employee"].includes(user?.role);
   if (user) {
     avatar.textContent = (user.name.trim()[0] || "?").toUpperCase();
     accountBtn.setAttribute("aria-label", "Cuenta de " + user.name);
@@ -581,7 +594,7 @@ function signedIn(result, message) {
   csrfToken = result.csrf; // el servidor rota el token al iniciar sesion
   setAccount(result.user);
   if (authDialog.open) authDialog.close();
-  if (result.user.role === "admin") {
+  if (["admin", "employee"].includes(result.user.role)) {
     location.assign("/admin");
     return;
   }
@@ -733,7 +746,7 @@ function whenNear(element, callback) {
   if (!("IntersectionObserver" in window)) { callback(); return; }
   let done = false;
   const run = () => { if (done) return; done = true; watcher.disconnect(); clearTimeout(fallback); callback(); };
-  const watcher = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) run(); }, {rootMargin:"400px 0px"});
+  const watcher = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) run(); }, {rootMargin:"400px 0px"}); // ds-allow-hardcode: distancia de precarga vertical del observador
   const fallback = setTimeout(run, NEAR_FALLBACK_MS);
   watcher.observe(element);
 }
@@ -794,11 +807,28 @@ const chatFab = $("#chatFab"), chatPanel = $("#chatPanel"), chatLog = $("#chatLo
 const chatText = $("#chatText"), chatSend = $("#chatSend"), chatCount = $("#chatCount");
 
 // La conversacion sobrevive a recargar la pagina, solo dentro de la pestana (sessionStorage)
-try {
-  const saved = JSON.parse(sessionStorage.getItem(CHAT_KEY));
-  if (Array.isArray(saved)) chat.history = saved.filter(t => t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string").slice(-CHAT_KEEP);
-} catch {}
-const saveChat = () => { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify(chat.history.slice(-CHAT_KEEP))); } catch {} };
+let chatOwner = null, chatGeneration = 0;
+function switchChatOwner(owner) {
+  if (chatOwner === owner) return;
+  chatGeneration++;
+  chat.history = [];
+  chat.pending = false;
+  chat.lastFailed = null;
+  chatText.value = "";
+  chatSend.removeAttribute("aria-busy");
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CHAT_KEY));
+    sessionStorage.removeItem(CHAT_KEY);
+    if (saved?.owner === owner && Array.isArray(saved.history)) {
+      chat.history = saved.history.filter(t => t && ["user","assistant"].includes(t.role) && typeof t.content === "string").slice(-CHAT_KEEP);
+    }
+  } catch {}
+  chatOwner = owner;
+  saveChat();
+  if (chat.started) renderConversation();
+  updateChatInput();
+}
+const saveChat = () => { try { sessionStorage.setItem(CHAT_KEY, JSON.stringify({owner:chatOwner, history:chat.history.slice(-CHAT_KEEP)})); } catch {} };
 
 // Respuesta del asistente: todo se escapa; solo se respeta **negrita**
 const formatReply = text => esc(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -910,6 +940,7 @@ $("#chatForm").addEventListener("submit", e => { e.preventDefault(); sendChat(ch
 async function sendChat(raw, retry = null) {
   const message = (retry ? retry.message : raw).trim();
   if (chat.pending || !message || message.length > CHAT_MAX) return;
+  const generation = chatGeneration;
   const history = retry ? retry.history : chat.history.slice(-CHAT_HISTORY);
   if (!retry) {
     chatLog.querySelector(".chatChips")?.remove();
@@ -924,6 +955,7 @@ async function sendChat(raw, retry = null) {
   const typing = addMessage("assistant", '<span class="typing" role="img" aria-label="El asistente está escribiendo"><i></i><i></i><i></i></span>');
   try {
     const data = await api("/chat", {method:"POST", body:{message, history}});
+    if (generation !== chatGeneration) return;
     typing.remove();
     const reply = typeof data.reply === "string" && data.reply.trim()
       ? data.reply.trim()
@@ -934,6 +966,7 @@ async function sendChat(raw, retry = null) {
     chat.lastFailed = null;
     if (Array.isArray(data.suggested_products)) renderSuggestions(data.suggested_products);
   } catch (err) {
+    if (generation !== chatGeneration) return;
     typing.remove();
     let text = "No pudimos conectar con el asistente. Revisa tu conexión e inténtalo de nuevo.";
     if (err.status === 429) text = "Enviaste muchos mensajes seguidos. Espera " + (err.data.retry_after || 60) + " segundos y vuelve a intentarlo.";
@@ -942,6 +975,7 @@ async function sendChat(raw, retry = null) {
     const canRetry = err.status !== 400;
     addMessage("assistant", esc(text) + (canRetry ? '<div class="msgActions"><button type="button" class="pill" data-chat-retry>Reintentar</button></div>' : ""), "error");
   } finally {
+    if (generation !== chatGeneration) return;
     chat.pending = false;
     chatSend.removeAttribute("aria-busy");
     updateChatInput();

@@ -51,6 +51,16 @@ def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
         product_id = line["product_id"]
         assert db.session.get(Product, product_id).stock == stock[product_id] - line["quantity"]
 
+    staff_list = employee.get("/api/staff/orders?channel=presencial").get_json()
+    assert [row["id"] for row in staff_list["orders"]] == [order["id"]]
+    assert staff_list["orders"][0]["employee_name"] == "Turno de caja"
+    assert employee.get(f"/api/staff/orders/{order['id']}").get_json()["order"]["allowed_transitions"] == []
+    assert admin_api.get(f"/api/staff/orders/{order['id']}").status_code == 404
+    assert api.get("/api/staff/orders").status_code == 401
+    assert employee.get("/api/admin/orders").status_code == 403
+    accounts = admin_api.get("/api/admin/users?role=employee&q=caja").get_json()
+    assert [user["id"] for user in accounts["users"]] == [employee_id]
+
     invoice_url = f"/api/orders/{order['id']}/invoice"
     assert api.post(invoice_url).status_code == 401
     assert api.get(invoice_url).status_code == 401

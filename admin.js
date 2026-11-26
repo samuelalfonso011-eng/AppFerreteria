@@ -4,7 +4,7 @@
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const money = v => new Intl.NumberFormat("es-CO", {style:"currency", currency:"COP", maximumFractionDigits:0}).format(v || 0);
+const money = v => new Intl.NumberFormat("es-CO", {style:"currency", currency:"COP", minimumFractionDigits:0, maximumFractionDigits:2}).format(v || 0);
 const dateFmt = new Intl.DateTimeFormat("es-CO", {dateStyle:"medium", timeStyle:"short", timeZone:"America/Bogota"});
 const fmtDate = iso => iso ? dateFmt.format(new Date(iso)) : "Sin registro";
 const normalize = v => String(v).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -41,10 +41,16 @@ const badge = (tone, icon, text) => '<span class="badge ' + tone + '">' + icon +
 /* ---------- API ---------- */
 let csrf = null;
 const state = {me:null, meta:null};
+let pendingInvoice = null;
 async function api(path, {method = "GET", body, signal} = {}, retry = true) {
+  const actor = state.me;
   const options = {method, signal, credentials:"same-origin", headers:{Accept:"application/json"}};
   if (method !== "GET") {
-    if (!csrf) csrf = (await (await fetch("/api/auth/csrf", {signal, credentials:"same-origin"})).json()).csrf;
+    if (!csrf) {
+      const token = await api("/auth/csrf", {signal});
+      if (!token.csrf) throw Object.assign(new Error("No se pudo preparar la sesión. Intenta de nuevo."), {status:0, data:{}});
+      csrf = token.csrf;
+    }
     options.headers["X-CSRF-Token"] = csrf;
     if (body instanceof FormData) {
       options.body = body; // multipart: el navegador pone el Content-Type con su boundary
@@ -57,13 +63,21 @@ async function api(path, {method = "GET", body, signal} = {}, retry = true) {
   try { res = await fetch("/api" + path, options); }
   catch { throw Object.assign(new Error(signal?.aborted ? "El servidor tardó demasiado. Vuelve a consultar la pestaña para ver el último resultado." : "Sin conexión con el servidor."), {status:0, data:{}}); }
   const data = await res.json().catch(() => ({}));
+  if (actor && actor !== state.me && !path.startsWith("/auth/"))
+    throw Object.assign(new Error("La sesión cambió."), {status:401, data:{}});
   if (res.status === 403 && data.error === "csrf" && retry) {
     csrf = null;
     return api(path, {method, body, signal}, false);
   }
   if (!res.ok) {
     const err = Object.assign(new Error(data.message || "No pudimos completar la operación."), {status:res.status, data});
-    if (res.status === 401 && path.startsWith("/admin")) showLogin("Tu sesión terminó. Vuelve a iniciar sesión.");
+    if (res.status === 401 && !path.startsWith("/auth/") && state.me) {
+      const form = $("#modalBody form[data-order-id]");
+      const order = path.match(/^\/orders\/(\d+)\/invoice$/);
+      const orderId = order?.[1] || form?.dataset.orderId;
+      pendingInvoice = orderId ? {email:state.me.email, orderId} : null;
+      showLogin("Tu sesión terminó. Vuelve a iniciar sesión.");
+    }
     throw err;
   }
   return data;
@@ -296,31 +310,36 @@ const tableWatcher = new MutationObserver(records => records.forEach(r => {
 }));
 tableWatcher.observe($("#view"), {childList:true, subtree:true});
 tableWatcher.observe($("#modalBody"), {childList:true, subtree:true});
-const currentView = () => { const v = location.hash.slice(1); return VIEWS[v] ? v : "resumen"; };
+const employeeMode = () => state.me?.role === "employee";
+const ordersPath = () => employeeMode() ? "/staff/orders" : "/admin/orders";
+const currentView = () => { if (employeeMode()) return "pedidos"; const v = location.hash.slice(1); return VIEWS[v] ? v : "resumen"; };
 async function route() {
   if (!state.me) return;
   const name = currentView();
   $$("#tabs [role=tab]").forEach(tab => {
     const on = tab.dataset.view === name;
     tab.setAttribute("aria-selected", String(on));
+    tab.hidden = employeeMode() && !on;
     tab.tabIndex = on ? 0 : -1;
   });
-  const view = $("#view");
-  view.setAttribute("aria-labelledby", "tab-" + name);
-  view.hidden = false;
-  view.setAttribute("aria-busy", "true");
+  const panel = $("#view");
+  const view = document.createElement("div");
+  panel.replaceChildren(view);
+  panel.setAttribute("aria-labelledby", "tab-" + name);
+  panel.hidden = false;
+  panel.setAttribute("aria-busy", "true");
   view.innerHTML = '<div class="grid"><div class="skeleton"></div><div class="skeleton"></div></div>';
   try {
     await VIEWS[name](view);
   } catch (err) {
     if (err.status !== 401) view.innerHTML = emptyState("No pudimos cargar esta sección", err.message, '<button class="btn secondary" data-reload>Reintentar</button>');
   } finally {
-    view.removeAttribute("aria-busy");
+    if (view.isConnected) panel.removeAttribute("aria-busy");
   }
 }
 window.addEventListener("hashchange", route);
 $("#tabs").addEventListener("keydown", e => {
-  const tabs = $$("#tabs [role=tab]");
+  const tabs = $$("#tabs [role=tab]:not([hidden])");
   const i = tabs.indexOf(document.activeElement);
   if (i < 0) return;
   const next = {ArrowRight:i + 1, ArrowLeft:i - 1, Home:0, End:tabs.length - 1}[e.key];
@@ -365,7 +384,8 @@ const orderFilter = {status:"", q:"", page:1, channel:""};
 function ordersTable(rows) {
   return '<table><thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Canal</th><th scope="col">Estado</th><th scope="col" class="right">Total</th></tr></thead><tbody>' +
     rows.map(o => {
-      const employee = o.employee_id ? staffName(o.employee_id) : "";
+      if (o.employee_name) staffNames.set(o.employee_id, o.employee_name);
+      const employee = o.employee_name || (o.employee_id ? staffName(o.employee_id) : "");
       return '<tr><td><button class="linkBtn" data-order="' + o.id + '">' + esc(o.order_number) + '</button><span class="cellSub">' + fmtDate(o.created_at) + "</span></td>" +
         '<td><span class="cellMain">' + esc(o.customer_name) + '</span><span class="cellSub">' + esc(o.city || "Sin envío") + " · " + o.item_count + " u." +
         (employee ? " · Atendió " + esc(employee) : "") + "</span></td>" +
@@ -376,8 +396,7 @@ function ordersTable(rows) {
 }
 async function renderOrders(view) {
   const chips = [["", "Todos"], ...state.meta.statuses.map(s => [s.code, s.label])];
-  try { await loadUsersCache(); } catch {} // solo para mostrar quien atendio; sin esto la lista igual carga
-  view.innerHTML = head("Pedidos", "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.",
+  view.innerHTML = head("Pedidos", employeeMode() ? "Registra ventas y consulta las facturas de tus pedidos." : "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.",
       '<button class="btn primary" data-new-order>Nuevo pedido</button>') +
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar pedidos</span><input type="search" id="orderSearch" placeholder="Buscar por número, cliente o correo" value="' + esc(orderFilter.q) + '"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por estado">' +
@@ -389,7 +408,9 @@ async function renderOrders(view) {
   $("#orderSearch").addEventListener("input", debounce(e => { orderFilter.q = e.target.value.trim(); orderFilter.page = 1; loadOrders(); }, 250));
   await loadOrders();
 }
+let orderRequest = 0;
 async function loadOrders() {
+  const request = ++orderRequest;
   const box = $("#ordersBox");
   if (!box) return;
   const params = new URLSearchParams({page:orderFilter.page});
@@ -397,8 +418,17 @@ async function loadOrders() {
   if (orderFilter.channel) params.set("channel", orderFilter.channel);
   if (orderFilter.q) params.set("q", orderFilter.q);
   box.setAttribute("aria-busy", "true");
-  const d = await api("/admin/orders?" + params);
-  box.removeAttribute("aria-busy");
+  let d;
+  try {
+    d = await api(ordersPath() + "?" + params);
+  } catch (err) {
+    if (request === orderRequest && box.isConnected && err.status !== 401)
+      box.innerHTML = emptyState("No pudimos cargar los pedidos", err.message, '<button class="btn secondary" data-reload>Reintentar</button>');
+    return;
+  } finally {
+    if (request === orderRequest) box.removeAttribute("aria-busy");
+  }
+  if (request !== orderRequest || !box.isConnected) return;
   if (!d.orders.length) {
     const filtered = orderFilter.q || orderFilter.status || orderFilter.channel;
     box.innerHTML = emptyState(filtered ? "Ningún pedido coincide" : "Todavía no hay pedidos",
@@ -477,46 +507,51 @@ const ROLE_INFO = {
 const roleBadge = role => { const [tone, icon, label] = ROLE_INFO[role] || ["", ICON.dot, role]; return badge(tone, icon, label); };
 const CHANNEL_INFO = {presencial:[ICON.store, "Presencial"], web:[ICON.globe, "Web"], app:[ICON.phone, "App"], domicilio:[ICON.home, "Domicilio"]};
 const channelBadge = channel => { const [icon, label] = CHANNEL_INFO[channel] || CHANNEL_INFO.web; return badge("", icon, label); };
-const userFilter = {q:"", role:"all"};
-let usersCache = null;
-async function loadUsersCache(force = false) {
-  if (usersCache && !force) return usersCache;
-  const all = [];
-  let page = 1, pages = 1;
-  do {
-    const d = await api("/admin/users?page=" + page);
-    all.push(...d.users);
-    pages = d.pages;
-    page += 1;
-  } while (page <= pages && page <= 40);
-  usersCache = all;
-  return all;
+const userFilter = {q:"", role:"all", page:1};
+let usersCache = [], usersRequest = 0;
+const staffNames = new Map();
+async function loadAdminNames() {
+  let page = 1;
+  while (true) {
+    const data = await api("/admin/users?role=admin&page=" + page);
+    for (const u of data.users) staffNames.set(u.id, u.name);
+    if (page >= data.pages) return;
+    page++;
+  }
 }
-const staffName = id => (usersCache || []).find(u => u.id === id)?.name || "empleado #" + id;
+const staffName = id => staffNames.get(id) || (usersCache || []).find(u => u.id === id)?.name || "empleado #" + id;
 const isMe = u => state.me && u.email === state.me.email;
 function accountState(u) {
   if (u.email_verification_pending) return badge("warn", ICON.clock, "Sin verificar");
   return u.is_active ? badge("ok", ICON.check, "Activa") : badge("", ICON.dot, "Inactiva");
 }
 async function renderUsers(view) {
-  await loadUsersCache(true);
   view.innerHTML = head("Usuarios", "Equipo y clientes. Cambiar el rol o desactivar una cuenta cierra sus sesiones abiertas.",
       '<button class="btn primary" data-new-user>Nuevo usuario</button>') +
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar usuarios</span><input type="search" id="userSearch" placeholder="Buscar por nombre o correo" value="' + esc(userFilter.q) + '" autocomplete="off"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por rol" id="userChips"></div><div class="card flush" id="usersBox"></div>';
-  $("#userSearch").addEventListener("input", debounce(e => { userFilter.q = e.target.value.trim(); drawUsers(); }, 120));
+  $("#userSearch").addEventListener("input", debounce(e => { userFilter.q = e.target.value.trim(); userFilter.page = 1; drawUsers(); }, 120));
   drawUsers();
 }
-function drawUsers() {
+async function drawUsers() {
   const box = $("#usersBox");
   if (!box) return;
-  const all = usersCache || [];
-  const counts = {all:all.length};
-  for (const role of Object.keys(ROLE_INFO)) counts[role] = all.filter(u => u.role === role).length;
+  const request = ++usersRequest;
+  const params = new URLSearchParams({page:userFilter.page, q:userFilter.q});
+  if (userFilter.role !== "all") params.set("role", userFilter.role);
   $("#userChips").innerHTML = [["all", "Todos"], ["admin", "Administradores"], ["employee", "Empleados"], ["customer", "Clientes"]]
-    .map(([v, l]) => '<button class="chip" data-user-role="' + v + '" aria-pressed="' + (v === userFilter.role) + '">' + l + '<span class="count">' + counts[v] + "</span></button>").join("");
-  const q = normalize(userFilter.q);
-  const list = all.filter(u => (userFilter.role === "all" || u.role === userFilter.role) && (!q || normalize(u.name + " " + u.email).includes(q)));
+    .map(([v, label]) => '<button class="chip" data-user-role="' + v + '" aria-pressed="' + (v === userFilter.role) + '">' + label + '</button>').join("");
+  let result;
+  try {
+    result = await api("/admin/users?" + params);
+  } catch (err) {
+    if (request === usersRequest && box.isConnected && err.status !== 401)
+      box.innerHTML = emptyState("No pudimos cargar los usuarios", err.message, '<button class="btn secondary" data-reload>Reintentar</button>');
+    return;
+  }
+  if (request !== usersRequest || !box.isConnected) return;
+  if (userFilter.page > result.pages) { userFilter.page = result.pages; return drawUsers(); }
+  const list = usersCache = result.users;
   if (!list.length) {
     box.innerHTML = emptyState("Ningún usuario coincide", "Prueba con otro nombre, correo o rol.");
     return;
@@ -533,7 +568,9 @@ function drawUsers() {
         "<td>" + roleBadge(u.role) + "</td><td>" + accountState(u) + "</td>" +
         "<td>" + fmtDate(u.created_at) + '<span class="cellSub">' + (u.last_login_at ? "Último acceso " + fmtDate(u.last_login_at) : "Aún no inicia sesión") + "</span></td>" +
         '<td><div class="rowActions"><button class="btn secondary small" data-edit-user="' + u.id + '">Editar</button>' + toggleBtn + "</div></td></tr>";
-    }).join("") + '</tbody></table></div><div class="pager"><span>' + list.length + " de " + all.length + (all.length === 1 ? " cuenta" : " cuentas") + "</span></div>";
+    }).join("") + '</tbody></table></div><div class="pager"><span>'  + result.total + ' cuentas · página ' + result.page + ' de ' + result.pages +
+      '</span><span><button class="btn secondary small" data-user-page="' + (result.page - 1) + '"' + (result.page === 1 ? ' disabled' : '') + '>Anterior</button> ' +
+      '<button class="btn secondary small" data-user-page="' + (result.page + 1) + '"' + (result.page >= result.pages ? ' disabled' : '') + '>Siguiente</button></span></div>';
 }
 const ROLE_CHOICES = [{value:"admin", label:"Administrador"}, {value:"employee", label:"Empleado"}, {value:"customer", label:"Cliente"}];
 function openUserForm(id) {
@@ -572,7 +609,7 @@ async function submitUser(form) {
     drawUsers();
   } catch (err) {
     setBusy(button, false);
-    showFieldErrors(form, err.data.error === "email_taken" ? {email:err.message} : err.data.fields, err.message);
+    showFieldErrors(form, err.data?.error === "email_taken" ? {email:err.message} : err.data?.fields, err.message);
   }
 }
 async function patchUser(id, changes, button) {
@@ -603,7 +640,7 @@ async function submitUserEdit(form) {
   try {
     if (await patchUser(user.id, changes, $("button[type=submit]", form))) modal.close();
   } catch (err) {
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   }
 }
 
@@ -615,8 +652,10 @@ const CHANNEL_CHOICES = [{value:"presencial", label:"Presencial"}, {value:"web",
 const DOC_CHOICES = [{value:"CC", label:"CC"}, {value:"CE", label:"CE"}, {value:"NIT", label:"NIT"}, {value:"PAS", label:"Pasaporte"}];
 const draft = {lines:new Map(), products:[], customers:[], key:null};
 async function openNewOrder() {
-  const [{products}, {customers}] = await Promise.all([api("/admin/products?status=active"), api("/admin/customers?status=verified")]);
-  draft.products = products.filter(p => p.is_active && p.stock > 0);
+  const [{products}, {customers}] = employeeMode()
+    ? [await api("/catalog/products"), {customers:[]}]
+    : await Promise.all([api("/admin/products?status=active"), api("/admin/customers?status=verified")]);
+  draft.products = products.filter(p => (employeeMode() || p.is_active) && p.stock > 0);
   draft.customers = customers;
   draft.lines = new Map();
   draft.key = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
@@ -625,8 +664,8 @@ async function openNewOrder() {
     '<div class="sheetHead"><h2 id="modalTitle">Nuevo pedido</h2>' + closeButton + "</div>" +
     '<div class="sheetBody"><div class="formGrid">' +
       choices("channel", "Canal", CHANNEL_CHOICES, "presencial") +
-      '<div class="full">' + listbox({name:"customer_id", label:"Cliente registrado (opcional)", value:"",
-        options:[{value:"", label:"Sin cuenta"}, ...customers.map(c => ({value:c.id, label:c.name + " · " + c.email}))]}) + "</div>" +
+      (employeeMode() ? '<input type="hidden" name="customer_id">' : '<div class="full">' + listbox({name:"customer_id", label:"Cliente registrado (opcional)", value:"",
+        options:[{value:"", label:"Sin cuenta"}, ...customers.map(c => ({value:c.id, label:c.name + " · " + c.email}))]}) + "</div>") +
       '<div class="full">' + field("name", "Nombre completo", "", 'required minlength="3" maxlength="150" autocomplete="off"') + "</div>" +
       field("email", "Correo electrónico", "", 'required type="email" maxlength="254" autocomplete="off"') +
       field("phone", "Celular", "", 'required inputmode="tel" maxlength="20" autocomplete="off"') +
@@ -697,7 +736,7 @@ async function submitOrder(form) {
     if (order.id) await openOrder(order.id);
   } catch (err) {
     setBusy(button, false);
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   }
 }
 // Canal presencial: sin direccion. El cliente registrado rellena nombre y correo.
@@ -714,7 +753,7 @@ $("#modalBody").addEventListener("change", e => {
 const statusLabel = code => (state.meta.statuses.find(s => s.code === code) || {label:code}).label;
 async function openOrder(id) {
   const [{order:o}, billing] = await Promise.all([
-    api("/admin/orders/" + id),
+    api(ordersPath() + "/" + id),
     api("/orders/" + id + "/invoice").catch(() => null) // sin permiso o sin red: el pedido igual se muestra
   ]);
   const forward = o.allowed_transitions.filter(s => s !== "CANCELLED");
@@ -790,7 +829,7 @@ async function reviewPayment(paymentId, decision, orderId, button) {
   }
 }
 async function openInvoice(orderId) {
-  const [{order:o}, billing] = await Promise.all([api("/admin/orders/" + orderId), api("/orders/" + orderId + "/invoice")]);
+  const [{order:o}, billing] = await Promise.all([api(ordersPath() + "/" + orderId), api("/orders/" + orderId + "/invoice")]);
   if (!billing.invoice) return renderIssueForm(o);
   renderInvoice(o, billing);
 }
@@ -824,7 +863,7 @@ async function submitInvoice(form) {
     if (currentView() === "pedidos") loadOrders();
   } catch (err) {
     setBusy(button, false);
-    const fields = err.data.error === "invalid_discount" ? {discount_amount:err.message} : err.data.fields;
+    const fields = err.data?.error === "invalid_discount" ? {discount_amount:err.message} : err.data?.fields;
     showFieldErrors(form, fields, err.message);
   }
 }
@@ -874,7 +913,8 @@ function renderInvoice(o, billing) {
       '<section class="section"><h3>Pagos</h3><dl class="facts">' + fact("Saldo por cobrar", money(amountOf(billing.balance))) +
         (pending > 0 ? fact("Pendiente de confirmar", money(pending)) : "") + "</dl>" + payments + "</section>" +
       (inv.status === "emitida" ? '<section class="section"><h3>Registrar pago</h3>' + payForm + "</section>" : "") +
-      '<div class="sheetActions">' + backToOrder(o.id) + "</div>" +
+      '<div class="sheetActions">' + backToOrder(o.id) +
+        (state.me?.role === "admin" && inv.status === "emitida" ? '<button class="btn dangerGhost" data-void-invoice="' + inv.id + '" data-order-id="' + o.id + '">Anular factura</button><p class="formError" role="alert" data-void-error></p>' : "") + "</div>" +
     "</div>");
   setupDropzone();
 }
@@ -938,8 +978,8 @@ async function submitPayment(form) {
     await openInvoice(form.dataset.orderId);
   } catch (err) {
     setBusy(button, false);
-    let fields = err.data.fields;
-    if (err.data.error === "payment_exceeds_balance") fields = {amount:err.message};
+    let fields = err.data?.fields;
+    if (err.data?.error === "payment_exceeds_balance") fields = {amount:err.message};
     if (err.status === 413) fields = {receipt:"El archivo supera el máximo de 5 MB."};
     showFieldErrors(form, fields, err.message);
   }
@@ -1037,7 +1077,7 @@ async function submitProduct(form) {
     loadProducts();
   } catch (err) {
     setBusy(button, false);
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   }
 }
 
@@ -1082,7 +1122,7 @@ async function submitCategory(form) {
     route();
   } catch (err) {
     setBusy(button, false);
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   }
 }
 
@@ -1124,7 +1164,7 @@ async function submitAdjust(form) {
     route();
   } catch (err) {
     setBusy(button, false);
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   }
 }
 async function openKardex(id) {
@@ -1171,7 +1211,7 @@ async function submitSettings(form) {
     await api("/admin/settings", {method:"PUT", body});
     toast("Ajustes guardados.");
   } catch (err) {
-    showFieldErrors(form, err.data.fields, err.message);
+    showFieldErrors(form, err.data?.fields, err.message);
   } finally {
     setBusy(button, false);
   }
@@ -1204,6 +1244,17 @@ document.addEventListener("click", async event => {
       await loadOrders();
     } else if ("page" in d) {
       orderFilter.page = Number(d.page); await loadOrders();
+    } else if ("voidInvoice" in d) {
+      if (!await confirmAction({title:"¿Anular la factura?", text:"La anulación queda registrada en el historial de integridad.", action:"Anular factura"})) return;
+      setBusy(el, true, "Anulando…");
+      try {
+        await api("/admin/invoices/" + d.voidInvoice + "/void", {method:"POST", body:{}});
+        await openInvoice(d.orderId);
+        toast("Factura anulada.");
+      } catch (err) {
+        const alert = $("[data-void-error]");
+        if (alert) alert.textContent = err.message;
+      } finally { if (el.isConnected) setBusy(el, false); }
     } else if ("reviewPayment" in d) {
       if (d.decision === "rechazado") {
         const ok = await confirmAction({title:"¿Rechazar el pago de " + d.amount + "?",
@@ -1233,7 +1284,11 @@ document.addEventListener("click", async event => {
     } else if ("userToggle" in d) {
       const user = (usersCache || []).find(u => u.id === Number(d.userToggle));
       if (user) await patchUser(user.id, {is_active:!user.is_active}, el);
+    } else if ("userPage" in d) {
+      userFilter.page = Number(d.userPage);
+      await drawUsers();
     } else if ("userRole" in d) {
+      userFilter.page = 1;
       userFilter.role = d.userRole;
       drawUsers();
     } else if ("newOrder" in d) {
@@ -1305,6 +1360,9 @@ document.addEventListener("submit", event => {
 /* ---------- Sesion ---------- */
 function showLogin(message, signedInWithoutRole = false) {
   state.me = null;
+  usersCache = [];
+  staffNames.clear();
+  if (confirmDialog.open) { settleConfirm(false); confirmDialog.close(); }
   if (modal.open) modal.close();
   $("#tabs").hidden = true;
   $("#view").hidden = true;
@@ -1316,11 +1374,15 @@ function showLogin(message, signedInWithoutRole = false) {
 }
 async function start(user) {
   state.me = user;
-  state.meta = await api("/admin/meta");
+  state.meta = employeeMode() ? {statuses:[]} : await api("/admin/meta");
+  $(".brand .tag").textContent = employeeMode() ? "Ventas" : "Admin";
   $("#loginView").hidden = true;
   $("#tabs").hidden = false;
   $("#logout").hidden = false;
   await route();
+  const invoice = pendingInvoice;
+  pendingInvoice = null;
+  if (invoice?.email === user.email) { await openInvoice(invoice.orderId); return; }
   $("#view").focus({preventScroll:true});
 }
 $("#loginForm").addEventListener("submit", async event => {
@@ -1339,7 +1401,7 @@ $("#loginForm").addEventListener("submit", async event => {
     const res = await api("/auth/login", {method:"POST", body:{email, password}});
     csrf = res.csrf;
     form.reset();
-    if (res.user.role !== "admin") { location.assign("/"); return; }
+    if (!["employee", "admin"].includes(res.user.role)) { location.assign("/"); return; }
     await start(res.user);
   } catch (err) {
     $("#loginError").textContent = err.message;
@@ -1360,7 +1422,7 @@ async function boot() {
   try {
     const me = await api("/auth/me");
     csrf = me.csrf;
-    if (me.user && me.user.role === "admin") await start(me.user);
+    if (me.user && ["employee", "admin"].includes(me.user.role)) await start(me.user);
     else showLogin(me.user ? "Tu cuenta no tiene permisos de administrador." : "", Boolean(me.user));
   } catch {
     showLogin("No pudimos conectar con el servidor. Verifica que el backend esté en ejecución.");
@@ -1482,7 +1544,7 @@ function benchReport(root, data) {
     for (const row of comparison.filter(item => item.operation === operation)) {
       const tr = benchNode(body,"tr");
       for (const value of [row.n,row.before.median_ms,row.after.median_ms]) benchNode(tr,"td",benchNum(value));
-      benchNode(benchNode(tr,"td"),"span",benchNum(row.speedup)+"× / "+benchNum(row.improvement_pct)+" %","benchBadge");
+      benchNode(benchNode(tr,"td"),"span",[row.speedup == null ? null : benchNum(row.speedup)+"×", row.improvement_pct == null ? null : benchNum(row.improvement_pct)+" %"].filter(Boolean).join(" / ") || "Sin dato","benchBadge");
     }
   }
   const business = benchNode(root,"section",null,"benchCard");
@@ -1596,7 +1658,7 @@ function checkedByLabel(value) {
   const id = Number(String(value).split(":")[1]);
   if (state.me && state.me.id === id) return (state.me.name || state.me.full_name || "Tú") + " (tú)";
   const user = (usersCache || []).find(u => u.id === id);
-  return user ? user.name : "Administrador #" + id;
+  return staffNames.get(id) || user?.name || "Administrador #" + id;
 }
 
 /* Botón para copiar el hash completo, con confirmación breve en el propio botón */
@@ -1818,7 +1880,8 @@ async function verifyIntegrity(button) {
 }
 async function renderIntegrity(view) {
   if (state.me?.role !== "admin") return;
-  const [status] = await Promise.all([api("/admin/integrity/status"), loadUsersCache().catch(() => null)]);
+  const [status] = await Promise.all([api("/admin/integrity/status"), loadAdminNames().catch(() => {})]);
+  if (!view.isConnected) return;
   const verify = dom("button", {type:"button", className:"btn primary", id:"verifyIntegrity"}, "Verificar integridad ahora");
   view.replaceChildren(dom("div", {className:"integrity"},
     dom("div", {className:"viewHead"},
@@ -1956,8 +2019,8 @@ async function renderAnalytics(view) {
       dom("h1", {text:"Analítica"}),
       dom("p", {text:"Calidad de los datos, comportamiento de clientes y empleados, y demanda estimada con regresión lineal."}))),
     tabs, panel));
-  try { await loadUsersCache(); } catch {}
-  await showAnalytics(analytics.sub);
+  await loadAdminNames().catch(() => {});
+  if (view.isConnected) await showAnalytics(analytics.sub);
 }
 async function showAnalytics(key) {
   analytics.sub = key;
@@ -2009,7 +2072,7 @@ async function renderQuality(panel) {
 const staffLabel = id => {
   if (id == null) return "Sistema";
   const user = (usersCache || []).find(u => u.id === id);
-  return user ? user.name : "Administrador #" + id;
+  return staffNames.get(id) || user?.name || "Administrador #" + id;
 };
 function scoreTone(score) {
   if (score >= 90) return ["ok", "check", "Excelente"];
@@ -2748,7 +2811,7 @@ async function evaluateFraud(form) {
   } catch (err) {
     if (err.status === 401) return;
     if (err.status === 404) showFieldErrors(form, {refId:"No existe " + {order_id:"un pedido", invoice_id:"una factura", payment_id:"un pago"}[ml.ref] + " con ese ID."});
-    else if (err.status === 400 && err.data?.fields) showFieldErrors(form, {refId:Object.values(err.data.fields)[0]});
+    else if (err.status === 400 && err.data?.fields) showFieldErrors(form, {refId:Object.values(err.data?.fields)[0]});
     else result.replaceChildren(dom("p", {className:"shortNote"}, iconOf("alert"), dom("span", {text:mlErr(err)})));
   } finally {
     result.removeAttribute("aria-busy");

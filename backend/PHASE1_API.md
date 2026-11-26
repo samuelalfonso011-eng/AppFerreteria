@@ -4,7 +4,7 @@ Las rutas usan la sesión de Flask. En escrituras, envía la cookie de sesión c
 
 ## Usuarios | Solo admin
 
-- `GET /api/admin/users?page=1` devuelve `200` con `{"users":[...],"page":1,"pages":1,"total":1}`. Cada página contiene hasta 25 cuentas.
+- `GET /api/admin/users?page=1` devuelve `200` con `{"users":[...],"page":1,"pages":1,"total":1}`. Cada página contiene hasta 25 cuentas. Los filtros opcionales `role` y `q` (nombre o correo) se aplican antes de paginar.
 - `POST /api/admin/users` devuelve `201` con `{"user":{...}}`. Requiere `name`, `email`, `password` y `role`. El estado `is_active` es opcional y su valor inicial es `true`.
 - `PATCH /api/admin/users/{user_id}` acepta uno o ambos campos de `{"role":"employee","is_active":false}`. Devuelve `200` con `{"user":{...}}`. Al cambiar el rol o establecer el estado se revocan las sesiones. El administrador autenticado conserva su rol y estado activo.
 
@@ -55,6 +55,8 @@ Devuelve `201` con `{"order":{...},"created":true}`. Un reintento con la misma c
 ## Listado de pedidos | GET /api/admin/orders
 
 Solo admin. El filtro opcional `channel` admite `presencial`, `web`, `app` y `domicilio`. Se combina con `status`, `q` y `page`. Si se omite, el listado incluye todos los canales. Un valor vacío o inválido devuelve `400` con `fields.channel`.
+
+El panel de empleados usa `GET /api/staff/orders` con los mismos filtros y paginación. Devuelve únicamente pedidos registrados por el operador autenticado. Cada fila incluye `employee_name` cuando existe. `GET /api/staff/orders/{id}` devuelve `{"order": ...}` con detalle, sin transiciones administrativas, y responde `404` para pedidos ajenos.
 
 Ejemplo de respuesta `200` para `GET /api/admin/orders?channel=web`.
 

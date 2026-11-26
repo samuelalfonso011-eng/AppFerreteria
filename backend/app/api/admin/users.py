@@ -1,6 +1,7 @@
 """Administración de cuentas. Las bajas son reversibles y revocan sesiones."""
 from flask import abort, jsonify, request
 
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
 from app.api.admin import admin_bp
@@ -22,7 +23,15 @@ def _view(user):
 @admin_bp.get("/users")
 def list_users():
     page = max(1, min(request.args.get("page", 1, type=int), 10_000))
-    result = User.query.order_by(User.id).paginate(page=page, per_page=25, error_out=False)
+    query = User.query
+    role = request.args.get("role")
+    if role:
+        query = query.filter_by(role=role)
+    term = request.args.get("q", "").strip()[:150]
+    if term:
+        query = query.filter(or_(User.full_name.icontains(term, autoescape=True),
+                                 User.email.icontains(term, autoescape=True)))
+    result = query.order_by(User.id).paginate(page=page, per_page=25, error_out=False)
     return jsonify(users=[_view(user) for user in result.items], page=page,
                    pages=max(1, result.pages), total=result.total)
 

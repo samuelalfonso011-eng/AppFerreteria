@@ -1,9 +1,10 @@
 from flask import abort, jsonify, request
 from sqlalchemy import or_
 
+from app.api import api_bp
 from app.api.admin import admin_bp
 from app.extensions import db
-from app.models import Order, OrderStatus, PrivacyConsent
+from app.models import Order, OrderStatus, PrivacyConsent, User
 from app.models.order import ORDER_CHANNELS
 from app.services import order_service
 from app.utils.http import no_store
@@ -15,12 +16,38 @@ PER_PAGE = 25
 
 @admin_bp.get("/orders")
 def list_orders():
+    order_service.maybe_expire_stale_orders()
+    return _orders_page(Order.query)
+
+
+@api_bp.get("/staff/orders")
+def own_orders():
+    actor = current_user()
+    if actor is None:
+        abort(401)
+    if not actor.is_staff:
+        abort(403)
+    return _orders_page(Order.query.filter_by(employee_id=actor.id))
+
+
+@api_bp.get("/staff/orders/<int:order_id>")
+def own_order(order_id):
+    actor = current_user()
+    if actor is None:
+        abort(401)
+    if not actor.is_staff:
+        abort(403)
+    order = Order.query.filter_by(id=order_id, employee_id=actor.id).first_or_404()
+    data = order.admin_detail()
+    data["allowed_transitions"] = []
+    return no_store(jsonify(order=data))
+
+
+def _orders_page(query):
     channel = request.args.get("channel")
     if channel is not None and channel not in ORDER_CHANNELS:
         raise ValidationError({"channel": "Elige un canal válido."})
 
-    order_service.maybe_expire_stale_orders()
-    query = Order.query
     if channel is not None:
         query = query.filter(Order.channel == channel)
     status = request.args.get("status", "")
@@ -39,7 +66,9 @@ def list_orders():
     total = query.count()
     rows = (query.order_by(Order.created_at.desc(), Order.id.desc())
             .offset((page - 1) * PER_PAGE).limit(PER_PAGE).all())
-    return no_store(jsonify(orders=[o.summary() for o in rows], page=page,
+    staff_ids = {order.employee_id for order in rows if order.employee_id is not None}
+    names = dict(db.session.query(User.id, User.full_name).filter(User.id.in_(staff_ids)).all()) if staff_ids else {}
+    return no_store(jsonify(orders=[dict(o.summary(), employee_name=names.get(o.employee_id)) for o in rows], page=page,
                             pages=max(1, -(-total // PER_PAGE)), total=total))
 
 
