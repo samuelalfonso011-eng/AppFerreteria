@@ -265,7 +265,7 @@ const numberValue = raw => {
 
 /* ---------- Router por pestañas ---------- */
 const VIEWS = {resumen:renderDashboard, pedidos:renderOrders, clientes:renderCustomers, usuarios:renderUsers, productos:renderProducts,
-  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings, benchmarks:renderBenchmarks, integridad:renderIntegrity, analitica:renderAnalytics};
+  categorias:renderCategories, inventario:renderInventory, ajustes:renderSettings, benchmarks:renderBenchmarks, integridad:renderIntegrity, analitica:renderAnalytics, modelos:renderModels};
 
 /* Tablas que se apilan en el telefono: cada celda recibe la etiqueta de su columna (data-label),
    la primera es la principal (cellLead) y la de botones va aparte (cellActions). El CSS de
@@ -2437,4 +2437,442 @@ function demandMetrics(s, period) {
   card.append(dom("p", {className:"muted modelNote", text:"Estimada = m · x + b, con x = 0 en el primer período. La proyección usa una recta ajustada con todo el histórico" +
     (s.forecast_model ? " (m = " + fmtDec.format(s.forecast_model.slope) + ", b = " + fmtDec.format(s.forecast_model.intercept) + ")" : "") + " y no baja de cero."}));
   return card;
+}
+
+/* ---------- Modelos IA: clasificador de fraude y regresor de demanda Keras (contrato en backend/PHASE5_API.md) ----------
+   GET /admin/ml/status, POST /admin/ml/train {}, POST /admin/ml/predict/fraud {order_id|invoice_id|payment_id},
+   GET /admin/ml/predict/demand?horizon. Reutiliza dom(), svgEl(), segmented(), chartTip(), responsiveChart() y niceTicks(). */
+const ML_SIGNAL = {
+  log_amount:"Monto de la operación", log_prior_frequency:"Frecuencia previa de la cuenta", discount_fraction:"Descuento aplicado",
+  cancellation_rate:"Tasa de cancelaciones", hash_invalid:"Integridad del hash (divergencia)", hash_unknown:"Integridad del hash (sin auditoría)",
+  hour_sin:"Hora del día", hour_cos:"Hora del día", efectivo:"Método: efectivo", tarjeta:"Método: tarjeta", transferencia:"Método: transferencia",
+  pse:"Método: PSE", nequi:"Método: Nequi", presencial:"Canal: presencial", web:"Canal: web", app:"Canal: app", domicilio:"Canal: domicilio"
+};
+const ML_REF = [["order_id", "Pedido"], ["invoice_id", "Factura"], ["payment_id", "Pago"]];
+const ML_ERROR = {
+  model_not_trained:"Todavía no hay modelos entrenados.", training_busy:"Ya hay un entrenamiento en curso.",
+  insufficient_test:"No hay suficientes datos en el tramo de prueba.", insufficient_history:"No hay historial suficiente para entrenar.",
+  invalid_label_file:"El archivo de etiquetas adjudicadas no es válido.", artifact_unavailable:"Los archivos del modelo no están disponibles."
+};
+const ml = {status:null, ref:"order_id", product:null, demand:null, recent:null};
+const pctFmt = new Intl.NumberFormat("es-CO", {style:"percent", maximumFractionDigits:1});
+const mlPct = v => v == null ? "Sin dato" : pctFmt.format(v);
+const probText = p => p == null ? "Sin dato" : p > 0 && p < 0.001 ? "menos de 0,1 %" : p > 0.999 && p < 1 ? "más de 99,9 %" : pctFmt.format(p);
+const mlErr = err => ML_ERROR[err.data?.error] || err.message;
+
+async function renderModels(view) {
+  if (state.me?.role !== "admin") return;
+  const train = dom("button", {type:"button", className:"btn primary", id:"trainModels", text:"Entrenar / Actualizar modelos"});
+  train.addEventListener("click", () => trainModels(train));
+  view.replaceChildren(dom("div", {className:"mlView"},
+    dom("div", {className:"viewHead"},
+      dom("div", {}, dom("h1", {text:"Modelos IA"}),
+        dom("p", {text:"Redes neuronales Keras para estimar fraude y demanda, evaluadas en un tramo de prueba cronológico que el entrenamiento nunca ve."})),
+      dom("div", {}, train)),
+    dom("p", {id:"mlLive", className:"sr", role:"status", "aria-live":"polite"}),
+    dom("div", {id:"mlBody", className:"mlBody"})));
+  await loadModels();
+}
+async function loadModels() {
+  const body = $("#mlBody");
+  if (!body) return;
+  body.setAttribute("aria-busy", "true");
+  try {
+    ml.status = await api("/admin/ml/status");
+    if (!body.isConnected) return;
+    const fraud = ml.status.models?.fraud_classifier, demand = ml.status.models?.demand_regressor;
+    if (!fraud?.run && !demand?.run) {
+      body.replaceChildren(dom("div", {className:"card emptyState mlEmpty"},
+        dom("h2", {text:"Todavía no hay modelos entrenados"}),
+        dom("p", {className:"muted", text:"Entrena para crear el clasificador de fraude y el regresor de demanda. El proceso tarda unos segundos y queda registrado con su versión y semilla."})));
+      return;
+    }
+    body.replaceChildren(...[
+      dom("section", {className:"mlSection", "aria-labelledby":"mlStatusTitle"},
+        dom("h2", {id:"mlStatusTitle", className:"sectionTitle", text:"Estado y procedencia de los datos"}),
+        dom("div", {className:"mlModels"}, modelCard("Clasificador de fraude", fraud, fraudProvenance), modelCard("Regresor de demanda", demand, demandProvenance))),
+      fraud?.run ? fraudSection(fraud.run) : null,
+      demand?.run ? dom("section", {className:"mlSection", id:"mlDemand", "aria-labelledby":"mlDemandTitle"},
+        dom("h2", {id:"mlDemandTitle", className:"sectionTitle", text:"Demanda: Keras frente a regresión lineal"}),
+        dom("div", {id:"mlDemandBody", className:"mlDemandBody"})) : null].filter(Boolean));
+    if (demand?.run) loadDemandComparison();
+  } catch (err) {
+    if (err.status === 401 || !body.isConnected) return;
+    const retry = dom("button", {type:"button", className:"btn secondary", text:"Reintentar"});
+    retry.addEventListener("click", loadModels);
+    body.replaceChildren(dom("div", {className:"card emptyState mlEmpty"}, dom("h2", {text:"No pudimos consultar los modelos"}), dom("p", {className:"muted", text:mlErr(err)}), retry));
+  } finally {
+    body.removeAttribute("aria-busy");
+  }
+}
+async function trainModels(button) {
+  if (button.disabled) return;
+  setBusy(button, true, "Entrenando…");
+  const live = $("#mlLive");
+  if (live) live.textContent = "Entrenando los modelos. Puede tardar unos segundos.";
+  try {
+    const res = await api("/admin/ml/train", {method:"POST", body:{}});
+    const version = res.runs?.[0]?.version;
+    const message = "Modelos entrenados" + (version ? ": versión " + version.slice(0, 8) : "") + ".";
+    toast(message);
+    if (live) live.textContent = message;
+    await loadModels();
+  } catch (err) {
+    if (err.status === 401) return;
+    toast(mlErr(err) || "No pudimos entrenar los modelos.");
+    if (live) live.textContent = "";
+  } finally {
+    if (button.isConnected) setBusy(button, false);
+  }
+}
+
+/* ======================= 1. Estado y procedencia ======================= */
+function modelCard(title, model, provenance) {
+  const run = model?.run;
+  const card = dom("section", {className:"card mlModel", "aria-label":"Estado del " + title.toLowerCase()});
+  if (!run) {
+    card.append(dom("h3", {text:title}), pillBadge("warn", "clock", "Sin entrenar"), dom("p", {className:"muted", text:"Este modelo aún no tiene una versión registrada."}));
+    return card;
+  }
+  const loadState = model.loaded ? ["ok", "check", "Cargado desde disco .keras"]
+    : model.on_disk ? ["ok", "check", "Guardado en disco .keras"] : ["bad", "alert", "Archivo .keras no disponible"];
+  const ds = run.dataset_summary || {};
+  card.append(...[
+    dom("div", {className:"mlModelHead"}, dom("h3", {text:title}), pillBadge(...loadState)),
+    !model.loaded && model.on_disk ? dom("p", {className:"muted mlNote", text:"Se verifica su SHA-256 y se carga en memoria con la primera predicción."}) : null,
+    dom("dl", {className:"mlFacts"},
+      dom("div", {}, dom("dt", {text:"Versión"}), dom("dd", {}, hashCell(run.version, "versión del modelo"))),
+      dom("div", {}, dom("dt", {text:"Entrenado"}), dom("dd", {text:fmtDate(run.trained_at)})),
+      dom("div", {}, dom("dt", {text:"Semilla"}), dom("dd", {className:"num", text:String(run.seed)})),
+      dom("div", {}, dom("dt", {text:"Épocas"}), dom("dd", {className:"num", text:ds.epochs == null ? "Sin dato" : String(ds.epochs)})),
+      dom("div", {}, dom("dt", {text:"Motor"}), dom("dd", {text:"TensorFlow " + (ds.tensorflow || "?") + " · Keras " + (ds.keras || "?")}))),
+    provenance(ds)].filter(Boolean)); // append() escribiria "null" como texto
+  return card;
+}
+const sourceList = sources => Object.entries(sources || {}).map(([k, v]) => fmtInt.format(v) + (k === "real" ? " reales" : k === "simulated" ? " simulados" : " " + k)).join(" · ") || "Sin datos";
+function fraudProvenance(ds) {
+  const simulated = ds.simulated_labels || ["train", "test"].some(s => ds[s]?.label_sources?.simulated);
+  const split = (label, s) => dom("div", {className:"splitRow"},
+    dom("span", {className:"splitName", text:label}),
+    dom("strong", {className:"num", text:fmtInt.format(s?.size ?? 0)}),
+    dom("span", {className:"muted", text:sourceList(s?.label_sources) + " · " + mlPct(s?.fraud_fraction) + " fraude"}));
+  return dom("div", {className:"provenance"},
+    dom("div", {className:"provHead"}, dom("h4", {text:"Procedencia de las etiquetas"}),
+      simulated ? pillBadge("info", "dot", "Incluye casos simulados documentados") : pillBadge("ok", "check", "Solo etiquetas reales")),
+    split("Entrenamiento", ds.train), split("Prueba", ds.test),
+    dom("p", {className:"muted provNote", text:"Corte cronológico: " + (ds.cutoff ? fmtDate(ds.cutoff) : "sin dato") + ". Pagos reales: " + fmtInt.format(ds.real_payments ?? 0) +
+      ", adjudicados: " + fmtInt.format(ds.adjudicated ?? 0) + ", etiquetas tardías excluidas: " + fmtInt.format(ds.late_labels_excluded ?? 0) + "."}));
+}
+function demandProvenance(ds) {
+  const simulated = ds.source === "simulated";
+  return dom("div", {className:"provenance"},
+    dom("div", {className:"provHead"}, dom("h4", {text:"Procedencia de los datos"}),
+      simulated ? pillBadge("info", "dot", "Incluye casos simulados documentados") : pillBadge("ok", "check", "Ventas reales")),
+    dom("div", {className:"splitRow"}, dom("span", {className:"splitName", text:"Entrenamiento"}), dom("strong", {className:"num", text:fmtInt.format(ds.train_size ?? 0)}),
+      dom("span", {className:"muted", text:"producto-días · " + fmtInt.format(ds.training_examples ?? 0) + " ejemplos"})),
+    dom("div", {className:"splitRow"}, dom("span", {className:"splitName", text:"Prueba"}), dom("strong", {className:"num", text:fmtInt.format(ds.test_size ?? 0)}),
+      dom("span", {className:"muted", text:"producto-días reservados"})),
+    dom("p", {className:"muted provNote", text:"Corte: " + (ds.cutoff || "sin dato") + ". " + fmtInt.format(ds.products ?? 0) + " productos, " +
+      fmtInt.format(ds.real_sale_days ?? 0) + " días de venta reales" + (simulated ? "; serie sintética identificada porque el calendario real cubre menos de 14 días." : ".")}));
+}
+
+/* ======================= 2. Clasificador de fraude ======================= */
+function fraudSection(run) {
+  const m = run.metrics || {}, cm = m.confusion_matrix || {};
+  const real = m.by_label_source?.real;
+  const kpi = (label, value, note, lead) => dom("div", {className:"card mlKpi" + (lead ? " lead" : "")},
+    dom("span", {className:"kpiLabel", text:label}), dom("strong", {className:"num", text:mlPct(value)}), dom("span", {className:"muted", text:note}));
+  return dom("section", {className:"mlSection", "aria-labelledby":"mlFraudTitle"},
+    dom("h2", {id:"mlFraudTitle", className:"sectionTitle", text:"Clasificador de fraude"}),
+    real === null ? dom("p", {className:"shortNote"}, iconOf("alert"), dom("span", {text:"No hubo casos reales etiquetados en prueba: estas métricas describen el simulador, no el fraude real de la tienda."})) : null,
+    dom("div", {className:"mlFraudGrid"},
+      dom("div", {className:"mlKpis"},
+        kpi("F1-Score", m.f1, "equilibrio entre precisión y sensibilidad", true),
+        kpi("Precisión", m.precision, "de lo marcado como fraude, cuánto lo era"),
+        kpi("Sensibilidad (Recall)", m.recall, "del fraude real, cuánto se detectó")),
+      confusionMatrix(cm, run.dataset_summary?.test?.size)),
+    fraudEvaluator());
+}
+function confusionMatrix(cm, size) {
+  const total = (cm.tp || 0) + (cm.fp || 0) + (cm.tn || 0) + (cm.fn || 0);
+  const max = Math.max(1, cm.tp || 0, cm.fp || 0, cm.tn || 0, cm.fn || 0);
+  const cell = (key, title, ok) => {
+    const value = cm[key] || 0;
+    const el = dom("div", {className:"cmCell " + (ok ? "hit" : "miss"), role:"cell"},
+      dom("span", {className:"cmCode", text:key.toUpperCase()}),
+      dom("strong", {className:"num", text:fmtInt.format(value)}),
+      dom("span", {className:"cmLabel", text:title}),
+      dom("span", {className:"cmShare muted", text:total ? pctFmt.format(value / total) : "0 %"}));
+    // Intensidad proporcional al recuento, un solo tono (escala secuencial)
+    el.style.setProperty("--cm-mix", Math.round(8 + 42 * value / max) + "%");
+    return el;
+  };
+  return dom("section", {className:"card cmCard", "aria-labelledby":"cmTitle"},
+    dom("div", {className:"cardHead"}, dom("h3", {id:"cmTitle", text:"Matriz de confusión"}),
+      dom("span", {className:"muted", text:fmtInt.format(size ?? total) + " casos de prueba · umbral 0,5"})),
+    dom("div", {className:"cmGrid", role:"table", "aria-label":"Matriz de confusión: filas reales, columnas predichas"},
+      dom("div", {role:"row", className:"cmRow cmHeadRow"},
+        dom("span", {role:"columnheader", className:"cmCorner", text:"Real \\ Predicho"}),
+        dom("span", {role:"columnheader", className:"cmAxis", text:"Fraudulenta"}),
+        dom("span", {role:"columnheader", className:"cmAxis", text:"Normal"})),
+      dom("div", {role:"row", className:"cmRow"},
+        dom("span", {role:"rowheader", className:"cmAxis", text:"Fraudulenta"}),
+        cell("tp", "Verdaderos positivos", true), cell("fn", "Falsos negativos", false)),
+      dom("div", {role:"row", className:"cmRow"},
+        dom("span", {role:"rowheader", className:"cmAxis", text:"Normal"}),
+        cell("fp", "Falsos positivos", false), cell("tn", "Verdaderos negativos", true))));
+}
+function fraudEvaluator() {
+  const input = dom("input", {id:"mlRefId", name:"refId", type:"text", inputmode:"numeric", autocomplete:"off", "aria-describedby":"mlRefHint"});
+  const form = dom("form", {className:"mlEval", id:"mlEvalForm", novalidate:true},
+    segmented("Tipo de operación", ML_REF, ml.ref, key => { ml.ref = key; refreshRefLabel(); }),
+    dom("div", {className:"mlEvalRow"},
+      dom("label", {className:"field"}, dom("span", {id:"mlRefLabel", text:"ID del pedido"}), input),
+      dom("button", {type:"submit", className:"btn secondary", id:"mlEvalBtn", text:"Evaluar operación"})),
+    dom("p", {id:"mlRefHint", className:"muted mlHint", text:"Escribe el número interno o elige un pedido reciente."}),
+    dom("div", {id:"mlRecent", className:"mlRecent"}));
+  form.addEventListener("submit", e => { e.preventDefault(); evaluateFraud(form); });
+  const card = dom("section", {className:"card mlEvalCard", "aria-labelledby":"mlEvalTitle"},
+    dom("div", {className:"cardHead"}, dom("h3", {id:"mlEvalTitle", text:"Evaluar una operación"}),
+      dom("span", {className:"muted", text:"La probabilidad es descriptiva: la tienda no rechaza pagos con ella."})),
+    dom("div", {className:"mlEvalGrid"}, form, dom("div", {id:"mlResult", className:"mlResult", "aria-live":"polite"},
+      dom("p", {className:"muted mlResultEmpty", text:"El resultado aparecerá aquí con la probabilidad y las señales que más influyeron."}))));
+  loadRecentOrders();
+  return card;
+}
+function refreshRefLabel() {
+  const label = $("#mlRefLabel"), recent = $("#mlRecent");
+  if (label) label.textContent = "ID " + {order_id:"del pedido", invoice_id:"de la factura", payment_id:"del pago"}[ml.ref];
+  if (recent) recent.hidden = ml.ref !== "order_id";
+}
+async function loadRecentOrders() {
+  try {
+    if (!ml.recent) ml.recent = (await api("/admin/orders?page=1")).orders.slice(0, 5);
+  } catch { ml.recent = []; }
+  const box = $("#mlRecent");
+  if (!box || !ml.recent.length) return;
+  box.replaceChildren(dom("span", {className:"baLabel", text:"Pedidos recientes"}),
+    dom("span", {className:"mlRecentChips"}, ml.recent.map(o => {
+      const chip = dom("button", {type:"button", className:"chip", "aria-pressed":"false", text:o.order_number});
+      chip.addEventListener("click", () => {
+        $$(".chip", box).forEach(c => c.setAttribute("aria-pressed", String(c === chip)));
+        const input = $("#mlRefId");
+        input.value = String(o.id);
+        input.removeAttribute("aria-invalid");
+        $("#mlEvalForm .fieldError")?.remove();
+        evaluateFraud($("#mlEvalForm"));
+      });
+      return chip;
+    })));
+  refreshRefLabel();
+}
+async function evaluateFraud(form) {
+  const input = $("#mlRefId", form), button = $("#mlEvalBtn", form), result = $("#mlResult");
+  clearFieldErrors(form);
+  input.setAttribute("aria-describedby", "mlRefHint"); // clearFieldErrors quita la ayuda junto con el error
+  const raw = input.value.trim();
+  if (!/^\d+$/.test(raw) || Number(raw) < 1) {
+    showFieldErrors(form, {refId:"Escribe un número de identificación válido (entero positivo)."});
+    input.focus();
+    return;
+  }
+  if (button.disabled) return;
+  setBusy(button, true, "Evaluando…");
+  result.setAttribute("aria-busy", "true");
+  try {
+    const res = await api("/admin/ml/predict/fraud", {method:"POST", body:{[ml.ref]:Number(raw)}});
+    renderFraudResult(result, res, ML_REF.find(([k]) => k === ml.ref)[1] + " #" + raw);
+  } catch (err) {
+    if (err.status === 401) return;
+    if (err.status === 404) showFieldErrors(form, {refId:"No existe " + {order_id:"un pedido", invoice_id:"una factura", payment_id:"un pago"}[ml.ref] + " con ese ID."});
+    else if (err.status === 400 && err.data?.fields) showFieldErrors(form, {refId:Object.values(err.data.fields)[0]});
+    else result.replaceChildren(dom("p", {className:"shortNote"}, iconOf("alert"), dom("span", {text:mlErr(err)})));
+  } finally {
+    result.removeAttribute("aria-busy");
+    if (button.isConnected) setBusy(button, false);
+  }
+}
+function renderFraudResult(box, res, label) {
+  const fraud = res.predicted_label === "fraudulenta";
+  const p = Math.max(0, Math.min(1, Number(res.fraud_probability) || 0));
+  const bar = dom("div", {className:"scoreMeter", role:"meter", "aria-valuemin":"0", "aria-valuemax":"100", "aria-valuenow":String(Math.round(p * 1000) / 10), "aria-label":"Probabilidad de fraude"},
+    dom("span", {className:"meterFill " + (fraud ? "bad" : "info")}));
+  bar.firstChild.style.width = Math.max(p * 100, p > 0 ? 1 : 0) + "%";
+  const signals = (res.signals || []).map(s => {
+    const d = Number(s.delta_probability) || 0;
+    const up = d > 0;
+    const pp = Math.abs(d * 100);
+    return dom("li", {className:"signal"},
+      dom("span", {text:ML_SIGNAL[s.feature] || s.feature}),
+      dom("span", {className:"signalDelta " + (up ? "up" : "down"), title:(up ? "Aumenta" : "Reduce") + " la probabilidad"},
+        pp < 0.01 ? "Efecto mínimo (" + (up ? "sube" : "baja") + ")" : (up ? "+" : "-") + fmtDec.format(pp) + " pp"));
+  });
+  box.replaceChildren(...[
+    dom("div", {className:"mlResultHead"}, dom("span", {className:"cellMain", text:label}),
+      fraud ? pillBadge("bad", "alert", "Fraudulenta") : pillBadge("ok", "check", "Normal")),
+    dom("div", {className:"mlProb"}, dom("strong", {className:"num", text:probText(p)}), dom("span", {className:"muted", text:"probabilidad de fraude"})),
+    bar,
+    signals.length ? dom("div", {}, dom("h4", {className:"signalsTitle", text:"Señales con más peso"}), dom("ol", {className:"signals"}, signals),
+      dom("p", {className:"muted mlHint", text:"pp = puntos porcentuales que cambia la probabilidad si esa señal tomara su valor medio de entrenamiento."})) : null,
+    dom("p", {className:"muted mlHint", text:"Modelo " + String(res.version || "").slice(0, 8) + " · predicción #" + res.id + " guardada."})].filter(Boolean));
+}
+
+/* ======================= 3. Demanda: Keras frente a regresion lineal ======================= */
+async function loadDemandComparison() {
+  const box = $("#mlDemandBody");
+  if (!box) return;
+  try {
+    ml.demand = await api("/admin/ml/predict/demand?horizon=7");
+  } catch (err) {
+    if (err.status === 401 || !box.isConnected) return;
+    box.replaceChildren(dom("div", {className:"card emptyState mlEmpty"}, dom("h3", {text:"No pudimos cargar la comparación"}), dom("p", {className:"muted", text:mlErr(err)})));
+    return;
+  }
+  if (!box.isConnected) return;
+  const products = ml.demand.products || [];
+  if (!products.some(p => String(p.product_id) === String(ml.product))) ml.product = products[0] ? String(products[0].product_id) : null;
+  let picker = null;
+  if (products.length > 1) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = listbox({name:"mlProduct", label:"Producto", value:ml.product, options:products.map(p => ({value:String(p.product_id), label:p.name}))});
+    picker = tpl.content.firstElementChild;
+    picker.classList.add("demandPicker");
+    setupListbox(picker);
+    $("input", picker).addEventListener("change", e => { ml.product = e.target.value; drawComparison(); });
+  }
+  box.replaceChildren(
+    dom("div", {className:"panelBar"},
+      dom("p", {className:"muted", text:"Ambos modelos se evalúan en las mismas fechas reservadas después del corte (" + (ml.demand.cutoff || "sin dato") + ")."}),
+      ml.demand.source === "simulated" ? pillBadge("info", "dot", "Serie simulada documentada") : null, picker),
+    dom("div", {id:"mlCompare", className:"demandBody"}));
+  drawComparison();
+}
+function drawComparison() {
+  const box = $("#mlCompare"), d = ml.demand;
+  if (!box || !d) return;
+  const product = (d.products || []).find(p => String(p.product_id) === String(ml.product));
+  if (!product || !(product.test || []).length) {
+    box.replaceChildren(dom("div", {className:"card emptyState mlEmpty"}, dom("h3", {text:"Sin tramo de prueba para este producto"}),
+      dom("p", {className:"muted", text:"Un producto necesita al menos tres períodos previos para entrar en la comparación."})));
+    return;
+  }
+  const legendItem = (cls, text) => {
+    const s = svgEl("svg", {viewBox:"0 0 24 8", width:24, height:8, "aria-hidden":"true"});
+    s.append(svgEl("line", {x1:0, x2:24, y1:4, y2:4, class:cls}));
+    return dom("li", {}, s, text);
+  };
+  const chart = dom("section", {className:"card demandCard", "aria-labelledby":"mlChartTitle"},
+    dom("div", {className:"cardHead"}, dom("div", {}, dom("h3", {id:"mlChartTitle", text:product.name}),
+      dom("p", {className:"muted", text:"Unidades por día · " + product.test.length + " días de prueba" + ((product.forecast || []).length ? " y " + product.forecast.length + " proyectados" : "")}))),
+    dom("ul", {className:"chartLegend"}, legendItem("mlObserved", "Demanda observada"), legendItem("mlKeras", "Predicción Keras (red neuronal)"), legendItem("mlLinear", "Regresión lineal simple (Fase 4)")));
+  const plot = dom("div", {className:"plotBox"});
+  chart.append(plot, comparisonTable(product));
+  box.replaceChildren(chart, errorTable(d.metrics || {}));
+  responsiveChart(plot, w => drawCompareChart(plot, product, w));
+}
+function drawCompareChart(wrap, product, width) {
+  wrap.replaceChildren();
+  const test = product.test, fc = product.forecast || [];
+  const pts = [...test.map(t => ({...t, zone:"test"})), ...fc.map(f => ({...f, zone:"forecast"}))];
+  const n = pts.length;
+  const vals = pts.flatMap(p => [p.observed, p.keras, p.linear_phase4]).filter(v => v != null);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(1, ...vals), 4);
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const H = width < 480 ? 240 : 300, padL = 40, padR = 12, top = 28, bottom = 34;
+  const x = i => n === 1 ? (padL + width - padR) / 2 : padL + (width - padL - padR) * i / (n - 1);
+  const y = v => top + (H - top - bottom) * (1 - (v - y0) / (y1 - y0 || 1));
+  const svg = svgEl("svg", {viewBox:`0 0 ${width} ${H}`, width, height:H, class:"demandChart", tabindex:"0", role:"img",
+    "aria-label":"Demanda observada frente a las predicciones de Keras y de la regresión lineal. Usa las flechas para recorrer los días."});
+  const step = n > 1 ? (width - padL - padR) / (n - 1) : 0;
+  if (fc.length) {
+    const xa = x(test.length - 1) + step / 2;
+    svg.append(svgEl("rect", {x:xa, y:top - 4, width:Math.max(0, width - padR - xa), height:H - top - bottom + 4, class:"zone zoneForecast"}),
+      svgEl("text", {x:xa + 6, y:top - 10, class:"axisText zoneLabel"}, "Proyección"));
+  }
+  svg.append(svgEl("text", {x:padL, y:top - 10, class:"axisText zoneLabel"}, "Prueba reservada"));
+  for (const t of ticks) svg.append(svgEl("line", {x1:padL, x2:width - padR, y1:y(t), y2:y(t), class:t === 0 ? "baseLine" : "gridLine"}),
+    svgEl("text", {x:padL - 8, y:y(t) + 4, "text-anchor":"end", class:"axisText"}, fmtDec.format(t)));
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((width - padL - padR) / 84))));
+  pts.forEach((p, i) => {
+    if ((i % every === 0 && (i === n - 1 || n - 1 - i >= every)) || i === n - 1)
+      svg.append(svgEl("text", {x:x(i), y:H - 12, "text-anchor":i === 0 ? "start" : i === n - 1 ? "end" : "middle", class:"axisText"}, dayFmt.format(periodDate(p.period))));
+  });
+  const line = (key, cls) => svg.append(svgEl("polyline", {class:cls, points:pts.map((p, i) => p[key] == null ? null : x(i) + "," + y(p[key])).filter(Boolean).join(" ")}));
+  line("linear_phase4", "mlLinear");
+  line("keras", "mlKeras");
+  line("observed", "mlObserved");
+  const cross = svgEl("line", {y1:top - 4, y2:H - bottom, class:"crosshair", visibility:"hidden"});
+  const marks = {observed:svgEl("circle", {r:5, class:"markObservedMl", visibility:"hidden"}), keras:svgEl("circle", {r:5, class:"markKeras", visibility:"hidden"}),
+    linear_phase4:svgEl("circle", {r:5, class:"markLinear", visibility:"hidden"})};
+  const hit = svgEl("rect", {x:padL, y:top - 4, width:width - padL - padR, height:H - top - bottom + 4, class:"hitArea"});
+  svg.append(cross, ...Object.values(marks), hit);
+  wrap.append(svg);
+  const tip = chartTip(wrap);
+  let active = -1;
+  const show = i => {
+    active = Math.max(0, Math.min(n - 1, i));
+    const p = pts[active], cx = x(active);
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    for (const [k, m] of Object.entries(marks)) {
+      if (p[k] == null) { m.setAttribute("visibility", "hidden"); continue; }
+      m.setAttribute("cx", cx); m.setAttribute("cy", y(p[k])); m.setAttribute("visibility", "visible");
+    }
+    const lines = [];
+    if (p.observed != null) lines.push(["Observada", fmtDec.format(p.observed) + " u.", "swObservedMl"]);
+    lines.push(["Keras", fmtDec.format(p.keras) + " u.", "swObserved"], ["Regresión lineal", fmtDec.format(p.linear_phase4) + " u.", "swEstimated"]);
+    tip.show(cx, Math.min(...[p.observed, p.keras, p.linear_phase4].filter(v => v != null).map(y)),
+      periodLabel(p.period, "daily") + (p.zone === "forecast" ? " · Proyección" : ""), lines);
+  };
+  const hide = () => { active = -1; tip.hide(); cross.setAttribute("visibility", "hidden"); Object.values(marks).forEach(m => m.setAttribute("visibility", "hidden")); };
+  hit.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect();
+    show(n === 1 ? 0 : Math.round(((e.clientX - r.left) * (width / r.width) - padL) / step));
+  });
+  hit.addEventListener("pointerleave", hide);
+  svg.addEventListener("focus", () => show(active < 0 ? test.length - 1 : active));
+  svg.addEventListener("blur", hide);
+  svg.addEventListener("keydown", e => {
+    const mv = {ArrowRight:1, ArrowLeft:-1}[e.key];
+    if (mv) { e.preventDefault(); show((active < 0 ? test.length - 1 : active) + mv); }
+    else if (e.key === "Home") { e.preventDefault(); show(0); }
+    else if (e.key === "End") { e.preventDefault(); show(n - 1); }
+    else if (e.key === "Escape") hide();
+  });
+}
+function comparisonTable(product) {
+  const rows = [...product.test.map(t => [t, "Prueba"]), ...(product.forecast || []).map(f => [f, "Proyección"])];
+  const v = x => x == null ? "Sin dato" : fmtDec.format(x);
+  return dom("details", {className:"dataDetails"}, dom("summary", {text:"Ver los datos de la gráfica"}),
+    dom("div", {className:"tableWrap"}, dom("table", {},
+      dom("thead", {}, dom("tr", {}, ["Día", "Observada", "Keras", "Regresión lineal", "Tramo"].map(t => dom("th", {scope:"col", text:t})))),
+      dom("tbody", {}, rows.map(([p, zone]) => dom("tr", {},
+        dom("td", {text:periodLabel(p.period, "daily")}), dom("td", {className:"num", text:v(p.observed)}),
+        dom("td", {className:"num", text:v(p.keras)}), dom("td", {className:"num", text:v(p.linear_phase4)}), dom("td", {text:zone})))))));
+}
+function errorTable(metrics) {
+  const k = metrics.keras || {}, l = metrics.linear_phase4 || {};
+  const rows = [["MAE", "mae", "lower", "unidades"], ["RMSE", "rmse", "lower", "unidades"], ["R²", "r2", "higher", "1 es ajuste perfecto"]];
+  const better = (a, b, dir) => a == null || b == null || a === b ? null : (dir === "lower" ? a < b : a > b) ? "keras" : "linear";
+  const winsKeras = rows.filter(([, key, dir]) => better(k[key], l[key], dir) === "keras").length;
+  const winsLinear = rows.filter(([, key, dir]) => better(k[key], l[key], dir) === "linear").length;
+  const maeWinner = better(k.mae, l.mae, "lower");
+  // El ganador se decide una vez por métrica (Keras contra lineal) y la insignia va solo en su celda
+  const cell = (who, key, dir) => {
+    const val = (who === "keras" ? k : l)[key];
+    const won = better(k[key], l[key], dir) === who;
+    return dom("td", {className:"num errCell" + (won ? " winner" : "")},
+      dom("span", {text:val == null ? (key === "r2" ? "No aplica" : "Sin dato") : fmtDec.format(val)}),
+      won ? pillBadge("ok", "check", key === "r2" ? "Mejor ajuste" : "Menor error") : null);
+  };
+  return dom("section", {className:"card metricsCard", "aria-labelledby":"mlErrTitle"},
+    dom("div", {className:"cardHead"}, dom("h3", {id:"mlErrTitle", text:"Error en el tramo reservado"})),
+    maeWinner ? dom("p", {className:"mlVerdict"},
+      dom("strong", {text:maeWinner === "keras" ? "Keras" : "La regresión lineal"}),
+      " obtiene menor error medio (MAE) y gana " + (maeWinner === "keras" ? winsKeras : winsLinear) + " de 3 métricas.") : null,
+    dom("div", {className:"tableWrap"}, dom("table", {className:"errTable"},
+      dom("thead", {}, dom("tr", {}, dom("th", {scope:"col", text:"Métrica"}), dom("th", {scope:"col", text:"Keras"}), dom("th", {scope:"col", text:"Regresión lineal"}))),
+      dom("tbody", {}, rows.map(([label, key, dir, note]) => dom("tr", {},
+        dom("td", {}, dom("span", {className:"cellMain", text:label}), dom("span", {className:"cellSub", text:note})),
+        cell("keras", key, dir), cell("linear", key, dir)))))),
+    dom("p", {className:"muted modelNote", text:"Métricas agregadas por producto y día. No se exige que Keras supere al modelo lineal: la tabla muestra el resultado tal cual."}));
 }
