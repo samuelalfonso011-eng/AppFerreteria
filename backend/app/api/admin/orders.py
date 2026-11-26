@@ -4,18 +4,25 @@ from sqlalchemy import or_
 from app.api.admin import admin_bp
 from app.extensions import db
 from app.models import Order, OrderStatus, PrivacyConsent
+from app.models.order import ORDER_CHANNELS
 from app.services import order_service
 from app.utils.http import no_store
 from app.utils.security import current_user
-from app.utils.validation import Validator
+from app.utils.validation import ValidationError, Validator
 
 PER_PAGE = 25
 
 
 @admin_bp.get("/orders")
 def list_orders():
+    channel = request.args.get("channel")
+    if channel is not None and channel not in ORDER_CHANNELS:
+        raise ValidationError({"channel": "Elige un canal válido."})
+
     order_service.maybe_expire_stale_orders()
     query = Order.query
+    if channel is not None:
+        query = query.filter(Order.channel == channel)
     status = request.args.get("status", "")
     if status in OrderStatus.ALL:
         query = query.filter(Order.status == status)

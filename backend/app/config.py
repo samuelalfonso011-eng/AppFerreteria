@@ -1,6 +1,7 @@
 import os
 import secrets
 from datetime import timedelta
+from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -54,6 +55,7 @@ class Config:
 
     CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
     ORDER_PENDING_EXPIRY_MINUTES = int(os.getenv("ORDER_PENDING_EXPIRY_MINUTES", "2880"))
+    INVOICE_TAX_RATE = Decimal(os.getenv("INVOICE_TAX_RATE", "0"))
     AUTO_CREATE_DB = False
     FRONTEND_DIR = PROJECT_ROOT
 

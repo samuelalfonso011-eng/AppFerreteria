@@ -1,6 +1,7 @@
 from app.extensions import db
 from app.utils.timeutils import iso, money, utcnow
 
+ORDER_CHANNELS = ("presencial", "web", "app", "domicilio")
 DOC_TYPES = ("CC", "CE", "NIT", "PAS")
 
 
@@ -47,6 +48,10 @@ class Order(db.Model):
     total = db.Column(db.Numeric(12, 2), nullable=False)
     idempotency_key = db.Column(db.String(64), unique=True)
 
+    channel = db.Column(db.String(12), nullable=False, server_default="web")
+    customer_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), index=True)
+
     customer_name = db.Column(db.String(150), nullable=False)
     customer_email = db.Column(db.String(254), nullable=False, index=True)
     customer_phone = db.Column(db.String(30), nullable=False)
@@ -69,6 +74,7 @@ class Order(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     __table_args__ = (
+        db.CheckConstraint("channel IN ('presencial', 'web', 'app', 'domicilio')", name="check_order_channel"),
         db.Index("ix_orders_status_created", "status", "created_at"),
         db.CheckConstraint("subtotal >= 0", name="check_order_subtotal"),
         db.CheckConstraint("shipping_cost >= 0", name="check_order_shipping"),
@@ -103,6 +109,9 @@ class Order(db.Model):
             "order_number": self.order_number,
             "status": self.status,
             "status_label": self.status_label,
+            "channel": self.channel,
+            "customer_id": self.customer_id,
+            "employee_id": self.employee_id,
             "customer_name": self.customer_name,
             "city": self.city,
             "total": money(self.total),
@@ -116,6 +125,7 @@ class Order(db.Model):
             "order_number": self.order_number,
             "status": self.status,
             "status_label": self.status_label,
+            "channel": self.channel,
             "items": self._items(),
             "subtotal": money(self.subtotal),
             "shipping_cost": money(self.shipping_cost),

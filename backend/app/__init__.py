@@ -53,6 +53,10 @@ def create_app(config_name=None):
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY no esta definida (ver backend/.env.example).")
 
+    rate = app.config["INVOICE_TAX_RATE"]
+    if not rate.is_finite() or not 0 <= rate <= 1:
+        raise ValueError("INVOICE_TAX_RATE debe ser una fracción entre 0 y 1.")
+
     hops = app.config["TRUSTED_PROXY_HOPS"]
     if not 0 <= hops <= 5:
         raise ValueError("TRUSTED_PROXY_HOPS debe estar entre 0 y 5")

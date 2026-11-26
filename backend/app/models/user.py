@@ -8,11 +8,13 @@ from app.utils.timeutils import iso, utcnow
 
 
 class User(db.Model):
-    """Cuentas con acceso a la plataforma. Solo el rol admin entra al backoffice."""
+    """Cuentas con acceso a la plataforma. Los permisos dependen del rol."""
     __tablename__ = "users"
 
     ROLE_ADMIN = "admin"
+    ROLE_EMPLOYEE = "employee"
     ROLE_CUSTOMER = "customer"
+    ROLES = (ROLE_ADMIN, ROLE_EMPLOYEE, ROLE_CUSTOMER)
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(254), unique=True, nullable=False, index=True)
@@ -26,7 +28,7 @@ class User(db.Model):
 
     __table_args__ = (
         db.Index("uq_users_normalized_email", func.lower(func.trim(email)), unique=True),
-        db.CheckConstraint("role IN ('admin', 'customer')", name="check_user_role"),
+        db.CheckConstraint("role IN ('admin', 'employee', 'customer')", name="check_user_role"),
     )
 
     @classmethod
@@ -41,6 +43,10 @@ class User(db.Model):
     @property
     def is_admin(self):
         return self.role == self.ROLE_ADMIN
+
+    @property
+    def is_staff(self):
+        return self.role in (self.ROLE_ADMIN, self.ROLE_EMPLOYEE)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

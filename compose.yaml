@@ -44,6 +44,7 @@ services:
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
       CACHE_TTL: ${CACHE_TTL:-300}
       ORDER_PENDING_EXPIRY_MINUTES: ${ORDER_PENDING_EXPIRY_MINUTES:-2880}
+      INVOICE_TAX_RATE: ${INVOICE_TAX_RATE:-0}
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
       # Correo de cuentas (activacion y recuperacion). Sin SMTP_HOST no se envia nada.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}

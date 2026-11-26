@@ -51,4 +51,23 @@ grant usage, select on sequence public.inventory_movements_id_seq to ferrepro_ba
 drop policy if exists server_access on public.order_items;
 create policy server_access on public.order_items to ferrepro_backend using (true) with check (true);
 grant usage, select on sequence public.order_items_id_seq to ferrepro_backend, service_role;
+
+-- Los permisos de admin y empleado se verifican en Flask. Los comprobantes son privados.
+alter table public.invoices enable row level security;
+alter table public.invoice_items enable row level security;
+alter table public.payments enable row level security;
+revoke all on public.invoices, public.invoice_items, public.payments
+    from public, anon, authenticated, service_role;
+revoke all on sequence public.invoices_id_seq, public.invoice_items_id_seq, public.payments_id_seq
+    from public, anon, authenticated, service_role;
+grant select, insert on public.invoices, public.invoice_items, public.payments to ferrepro_backend;
+grant usage on sequence public.invoices_id_seq, public.invoice_items_id_seq, public.payments_id_seq
+    to ferrepro_backend;
+drop policy if exists server_access on public.invoices;
+create policy server_access on public.invoices to ferrepro_backend using (true) with check (true);
+drop policy if exists server_access on public.invoice_items;
+create policy server_access on public.invoice_items to ferrepro_backend using (true) with check (true);
+drop policy if exists server_access on public.payments;
+create policy server_access on public.payments to ferrepro_backend using (true) with check (true);
+
 commit;

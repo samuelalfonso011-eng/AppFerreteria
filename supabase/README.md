@@ -1,6 +1,6 @@
 # FerrePro en Supabase
 
-1. En SQL Editor, ejecuta `schema.sql`, luego `rls_policies.sql` y finalmente `seed.sql` en el proyecto destinado a FerrePro. El seed agrega los productos que falten y conserva el inventario existente.
+1. En SQL Editor, ejecuta `schema.sql`, `migrations/20261125233808_phase1_billing.sql`, `rls_policies.sql` y `seed.sql` en ese orden en el proyecto destinado a FerrePro. El seed agrega los productos que falten y conserva el inventario existente.
 2. Asigna una contraseña aleatoria al rol PostgreSQL `ferrepro_backend` desde una sesión administrativa segura (en psql, `\password ferrepro_backend`). Es la identidad del proceso Flask.
 3. Desde Connect copia la URI del **Session pooler**. Conserva el host, puerto y sufijo del usuario que proporciona Supabase. Sustituye el prefijo postgres por ferrepro_backend y usa la contraseña de ese rol codificada para URL. Conserva `sslmode=require` o configura `verify-full` con el certificado del proyecto.
 4. En `backend/.env` configura `DATABASE_URL` con esa URI. Si el archivo aún no existe, copia primero `.env.example`. Genera `SECRET_KEY` con `python -c "import secrets; print(secrets.token_hex(32))"`. En producción configura `FLASK_ENV=production`, `TRUSTED_HOSTS` y HTTPS.
@@ -32,3 +32,9 @@ having count(*) > 1;
 ```
 
 Flask usa SMTP directamente. Los proveedores, plantillas y SMTP del panel de Supabase Auth no intervienen en este flujo. Consulta la configuración SMTP en `backend/README.md`.
+
+## Actualización de facturación en una base existente
+
+Aplica `migrations/20261125233808_phase1_billing.sql` después de la migración de autenticación y antes de desplegar el backend. La migración incluye sus propias políticas y es repetible. Los pedidos anteriores quedan con canal `web` y referencias de usuario nulas. Para Docker con un volumen existente, aplica la migración con el propietario de la base. Los scripts de arranque se ejecutan al inicializar un volumen vacío.
+
+Los comprobantes se guardan como bytes privados en `payments` y se descargan mediante Flask. La sesión y el rol se comprueban en Flask porque la aplicación no usa Supabase Auth. Consulta [los contratos de la Fase 1](../backend/PHASE1_API.md).
