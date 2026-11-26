@@ -1,5 +1,6 @@
 """CRUD de productos y categorias. Cada commit cambia el token de cache del catalogo."""
 import re
+from decimal import Decimal
 
 from flask import abort, jsonify, request
 from sqlalchemy import func, or_
@@ -60,7 +61,7 @@ def _product_fields(data, product=None):
         "name": v.text("name", 200, min_len=3),
         "sku": (v.text("sku", 50, min_len=2) or "").upper(),
         "category_id": v.integer("category_id", 1, 2_000_000_000),
-        "price": v.money("price", 0, 1_000_000_000),
+        "price": v.money("price", Decimal("0.01"), 1_000_000_000),
         "min_stock_alert": v.integer("min_stock_alert", 0, 100_000, required=False, default=5),
         "art": v.choice("art", ART_KEYS, default="wrench"),
         "description": v.text("description", 2000, required=False, multiline=True),
@@ -155,6 +156,7 @@ def _category_fields(data, category=None):
         "is_active": v.boolean("is_active", default=True),
     }
     if fields["name"] and "name" not in v.errors:
+        fields["name"] = fields["name"].capitalize()
         clash = Category.query.filter(func.lower(Category.name) == fields["name"].lower())
         if category is not None:
             clash = clash.filter(Category.id != category.id)
