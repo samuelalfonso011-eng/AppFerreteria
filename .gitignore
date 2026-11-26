@@ -11,3 +11,6 @@ __pycache__/
 !.env.example
 !.env.docker.example
 .pytest_cache/
+
+# Reportes de benchmark (contienen correos reales de clientes)
+backend/reports/*.json
