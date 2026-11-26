@@ -784,7 +784,7 @@ async function openOrder(id) {
 }
 /* ---------- Factura y pagos ----------
    Contrato (backend de Codex):
-   GET  /api/orders/{id}/invoice  -> {invoice | null, payments: [...], balance: numero COP}
+   GET  /api/orders/{id}/invoice  -> {invoice | null, payments: [...], balance: "117810.00" (texto COP)}
    POST /api/orders/{id}/invoice  {discount_amount?: "1000.00"} -> {invoice, created} (idempotente)
    POST /api/invoices/{id}/payments  JSON {payment_method, amount} o FormData con receipt (PDF/PNG/JPEG, 5 MiB)
    balance solo descuenta pagos aprobados, pero al registrar el backend tambien cuenta los pendientes:
@@ -2148,7 +2148,10 @@ function drawIssues() {
         dom("td", {className:"cellWide"}, dom("span", {className:"beforeAfter"},
           dom("span", {}, dom("span", {className:"baLabel", text:"Original"}), issueValue(i.original_value)),
           dom("span", {}, dom("span", {className:"baLabel", text:"Normalizado"}), i.normalized_value == null ? dom("span", {className:"muted", text:"Sin propuesta"}) : issueValue(i.normalized_value)))),
-        dom("td", {}, pillBadge(st, sti, stl)));
+        dom("td", {}, dom("span", {className:"issueState"}, pillBadge(st, sti, stl),
+          i.status === "pending_review"
+            ? dom("button", {type:"button", className:"btn secondary small", "data-resolve-issue":i.id, text:"Marcar resuelta"})
+            : null)));
     });
     body = dom("div", {className:"tableWrap"}, dom("table", {className:"issuesTable"},
       dom("thead", {}, dom("tr", {}, ["Módulo y origen", "Problema", "Severidad", "Valor original y normalizado", "Estado"].map(t => dom("th", {scope:"col", text:t})))),
@@ -2159,7 +2162,25 @@ function drawIssues() {
         dom("button", {type:"button", className:"btn secondary small", "data-more-issues":"", text:"Mostrar más"}))
     : null;
   card.replaceChildren(...[head, dom("div", {className:"cardPad"}, filters), body, more].filter(Boolean));
+  card.onclick = event => {
+    const button = event.target.closest("[data-resolve-issue]");
+    if (button && !button.disabled) resolveIssue(Number(button.dataset.resolveIssue), button);
+  };
   more?.querySelector("button").addEventListener("click", () => { analytics.qShown += 20; drawIssues(); });
+}
+/* POST /admin/data-quality/issues/{id}/resolve: cierra una incidencia corregida a mano */
+async function resolveIssue(issueId, button) {
+  setBusy(button, true, "Guardando…");
+  try {
+    const {issue} = await api("/admin/data-quality/issues/" + issueId + "/resolve", {method:"POST", body:{}});
+    const item = (analytics.quality?.issues || []).find(i => i.id === issue.id);
+    if (item) item.status = issue.status;
+    toast("Incidencia marcada como resuelta.");
+    drawIssues();
+  } catch (err) {
+    if (err.status !== 401) toast(err.message || "No pudimos actualizar la incidencia.");
+    if (button.isConnected) setBusy(button, false);
+  }
 }
 async function runAudit(button) {
   if (button.disabled) return;
@@ -2180,7 +2201,8 @@ async function runAudit(button) {
 
 /* ======================= 2. Perfiles y anomalias ======================= */
 async function renderProfiles(panel) {
-  const data = analytics.users = await api("/admin/analytics/users");
+  // POST recalcula y guarda las alertas para que tengan ID estable; GET quedó como lectura pura
+  const data = analytics.users = await api("/admin/analytics/users", {method:"POST", body:{}});
   if (stale(panel, "perfiles")) return;
   panel.replaceChildren(
     dom("div", {className:"panelBar"},
@@ -2532,6 +2554,8 @@ function demandMetrics(s, period) {
    GET /admin/ml/status, POST /admin/ml/train {}, POST /admin/ml/predict/fraud {order_id|invoice_id|payment_id},
    GET /admin/ml/predict/demand?horizon. Reutiliza dom(), svgEl(), segmented(), chartTip(), responsiveChart() y niceTicks(). */
 const ML_SIGNAL = {
+  // Bloques que el backend explica juntos (PHASE5_API.md): hora, estado del hash, método y canal
+  hour:"Hora del día", hash_state:"Integridad del hash", payment_method:"Método de pago", channel:"Canal de venta",
   log_amount:"Monto de la operación", log_prior_frequency:"Frecuencia previa de la cuenta", discount_fraction:"Descuento aplicado",
   cancellation_rate:"Tasa de cancelaciones", hash_invalid:"Integridad del hash (divergencia)", hash_unknown:"Integridad del hash (sin auditoría)",
   hour_sin:"Hora del día", hour_cos:"Hora del día", efectivo:"Método: efectivo", tarjeta:"Método: tarjeta", transferencia:"Método: transferencia",

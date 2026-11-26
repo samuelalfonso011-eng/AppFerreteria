@@ -66,7 +66,7 @@ def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
     assert api.get(invoice_url).status_code == 401
     empty = employee.get(invoice_url)
     assert empty.status_code == 200
-    assert empty.get_json() == {"invoice": None, "payments": [], "balance": 0}
+    assert empty.get_json() == {"invoice": None, "payments": [], "balance": "0.00"}
     assert admin_api.get("/api/orders/2147483647/invoice").status_code == 404
     response = employee.post(invoice_url, {"discount_amount": "1000.05"})
     assert response.status_code == 201

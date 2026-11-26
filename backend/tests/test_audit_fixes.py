@@ -76,7 +76,7 @@ def test_approve_pending_payment_updates_balance_and_chain(admin_api, invoiced):
     body = response.get_json()
     assert body["changed"] is True and body["payment"]["status"] == "aprobado" and body["payment"]["paid_at"]
     after = admin_api.get(f"/api/orders/{order['id']}/invoice").get_json()["balance"]
-    assert after == pytest.approx(before - 1000)
+    assert isinstance(after, str) and Decimal(after) == Decimal(before) - Decimal("1000.00")  # texto exacto, sin float
 
     events = LedgerEntry.query.filter_by(entity_type="payment", entity_id=payment["id"]).order_by(LedgerEntry.seq_no).all()
     assert [e.event_type for e in events] == ["payment_recorded", "adjustment"]

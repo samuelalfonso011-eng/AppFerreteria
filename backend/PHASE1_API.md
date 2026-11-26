@@ -119,10 +119,10 @@ Admin puede consultar cualquier pedido. Empleado puede consultar los pedidos que
 Si el pedido existe y todavía no tiene factura, devuelve `200`.
 
 ```json
-{"invoice": null, "payments": [], "balance": 0}
+{"invoice": null, "payments": [], "balance": "0.00"}
 ```
 
-Si hay factura, devuelve `200` con el mismo objeto `invoice` de la emisión y el historial completo de pagos, ordenado por ID ascendente. `balance` es un número JSON en COP. El servidor resta del total únicamente los pagos con estado `aprobado` y devuelve cero si el resultado es negativo. Cada pago incluye su `receipt_url` privada o `null`.
+Si hay factura, devuelve `200` con el mismo objeto `invoice` de la emisión y el historial completo de pagos, ordenado por ID ascendente. `balance` es texto con dos decimales en COP, igual que los importes de la factura, para no redondear dinero con números de punto flotante. El servidor resta del total únicamente los pagos con estado `aprobado` y devuelve `"0.00"` si el resultado es negativo. Cada pago incluye su `receipt_url` privada o `null`.
 
 ```json
 {
@@ -155,7 +155,7 @@ Si hay factura, devuelve `200` con el mismo objeto `invoice` de la emisión y el
       "created_at": "2026-11-25T15:05:00Z"
     }
   ],
-  "balance": 92810
+  "balance": "92810.00"
 }
 ```
 

@@ -8,7 +8,6 @@ from app.extensions import db
 from app.models.billing import PAYMENT_METHODS, Invoice, Payment
 from app.services import billing_service
 from app.utils.security import current_user
-from app.utils.timeutils import money
 from app.utils.validation import ValidationError, Validator
 
 MAX_RECEIPT_SIZE = 5 * 1024 * 1024
@@ -33,11 +32,12 @@ def get_invoice(order_id):
     order = billing_service.staff_order(order_id, _staff())
     invoice = Invoice.query.filter_by(order_id=order.id).one_or_none()
     if invoice is None:
-        return jsonify(invoice=None, payments=[], balance=0)
+        return jsonify(invoice=None, payments=[], balance="0.00")
 
     payments = Payment.query.filter_by(invoice_id=invoice.id).order_by(Payment.id).all()
     approved = sum((payment.amount for payment in payments if payment.status == "aprobado"), Decimal("0"))
-    balance = money(max(Decimal("0"), invoice.total_amount - approved))
+    # Texto con 2 decimales, como todos los importes de la factura: un número JSON (float) redondea dinero.
+    balance = format(max(Decimal("0"), invoice.total_amount - approved).quantize(Decimal("0.01")), ".2f")
     return jsonify(invoice=invoice.to_dict(), payments=[payment.to_dict() for payment in payments], balance=balance)
 
 
