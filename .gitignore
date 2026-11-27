@@ -16,3 +16,5 @@ __pycache__/
 
 # Reportes de benchmark (contienen correos reales de clientes)
 backend/reports/*.json
+
+.vercel

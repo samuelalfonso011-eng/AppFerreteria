@@ -15,4 +15,10 @@ scripts/*
 !scripts/build-vercel.mjs
 !api/
 api/*
-!api/unavailable.mjs
+!api/index.py
+!requirements.txt
+!backend/
+backend/*
+!backend/app/
+!backend/app/**
+backend/app/**/__pycache__/

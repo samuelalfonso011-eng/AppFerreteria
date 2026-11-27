@@ -299,3 +299,18 @@ def test_failed_commit_removes_published_artifacts(app, tmp_path, monkeypatch):
         train_models.train(42)
     root = tmp_path / "models"
     assert [p.name for p in root.iterdir() if not p.name.startswith(".")] == []  # sin versiones huérfanas
+
+
+def test_ml_routes_report_unavailable_without_tensorflow(admin_api, monkeypatch):
+    """En Vercel no hay TensorFlow: status sigue funcionando y entrenar o predecir responden 503 con motivo."""
+    import importlib.util
+
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec",
+                        lambda name, *a, **k: None if name == "tensorflow" else real(name, *a, **k))
+    status = admin_api.get("/api/admin/ml/status")
+    assert status.status_code == 200 and status.get_json()["available"] is False
+    for method, path, body in (("post", "/api/admin/ml/train", {}), ("post", "/api/admin/ml/predict/fraud", {"order_id": 1}),
+                               ("get", "/api/admin/ml/predict/demand", None)):
+        response = admin_api.post(path, body) if method == "post" else admin_api.get(path)
+        assert response.status_code == 503 and response.get_json()["error"] == "ml_unavailable", path

@@ -1,3 +1,4 @@
+import importlib.util
 import math
 
 from flask import current_app, jsonify, request
@@ -5,7 +6,23 @@ from flask import current_app, jsonify, request
 from app.api.admin import admin_bp
 from app.ml import data_pipeline as pipeline, inference_service as inference
 from app.ml.train_models import start_training, train, training_state
+from app.services.errors import BusinessError
 from app.utils.validation import ValidationError, Validator
+
+
+def ml_available():
+    """TensorFlow no cabe en una función serverless (Vercel limita el paquete a 250 MB).
+
+    Sin TensorFlow la app funciona igual; solo entrenar y predecir responden 503 con un motivo claro,
+    en vez de un 500 por ImportError. El backend en Docker sí incluye TensorFlow.
+    """
+    return importlib.util.find_spec("tensorflow") is not None
+
+
+def require_ml():
+    if not ml_available():
+        raise BusinessError("Los modelos de IA no están disponibles en este despliegue. Usa el backend con "
+                            "TensorFlow (Docker) para entrenar y predecir.", code="ml_unavailable", status=503)
 
 
 def payload():
@@ -20,6 +37,7 @@ def train_models():
     v = Validator(payload())
     seed = v.integer("seed", 0, 2_147_483_647, required=False, default=42)
     v.raise_if_errors()
+    require_ml()
     if current_app.config["ML_TRAIN_ASYNC"]:
         return jsonify(training=start_training(seed)), 202
     return jsonify(runs=train(seed)), 201
@@ -27,7 +45,7 @@ def train_models():
 
 @admin_bp.get("/ml/status")
 def model_status():
-    return jsonify(models=inference.status(), training=training_state())
+    return jsonify(models=inference.status(), training=training_state(), available=ml_available())
 
 
 def transaction(raw):
@@ -62,6 +80,7 @@ def transaction(raw):
 
 @admin_bp.post("/ml/predict/fraud")
 def predict_fraud():
+    require_ml()
     raw = payload()
     modes = [key for key in ("order_id", "invoice_id", "payment_id", "transaction") if key in raw]
     if len(modes) != 1:
@@ -79,6 +98,7 @@ def predict_fraud():
 
 @admin_bp.get("/ml/predict/demand")
 def predict_demand():
+    require_ml()
     v = Validator(request.args.to_dict())
     horizon = v.integer("horizon", 1, 30, required=False, default=7)
     pid = v.integer("product_id", -2_147_483_648, 2_147_483_647, required=False)

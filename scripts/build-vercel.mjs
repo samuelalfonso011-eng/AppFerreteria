@@ -5,7 +5,8 @@ const output = new URL("dist/", root);
 const config = JSON.parse(await readFile(new URL("vercel.json", root), "utf8"));
 const api = config.rewrites.find(rule => rule.source === "/api/:path*");
 const offline = api?.destination === "/api/unavailable";
-if (!offline && !/^https:\/\/[a-z0-9.-]+(?::\d+)?\/api\/:path\*$/i.test(api?.destination || "")) {
+const local = api?.destination === "/api/index"; // función Flask de este mismo proyecto (api/index.py)
+if (!offline && !local && !/^https:\/\/[a-z0-9.-]+(?::\d+)?\/api\/:path\*$/i.test(api?.destination || "")) {
   throw new Error("Configura en vercel.json el destino HTTPS de la API.");
 }
 const assets = [

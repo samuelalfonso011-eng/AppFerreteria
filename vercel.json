@@ -9,7 +9,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "/api/unavailable"
+      "destination": "/api/index"
     }
   ],
   "headers": [
@@ -48,5 +48,11 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "includeFiles": "backend/app/**"
+    }
+  }
 }

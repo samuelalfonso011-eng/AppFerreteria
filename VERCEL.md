@@ -1,13 +1,28 @@
 # FerrePro en Vercel
 
-Importa este repositorio desde su raíz. La configuración publica la tienda en `/` y el panel en `/admin`. El build copia a `dist/` los ocho archivos públicos del frontend. Los permisos de administrador y trabajador se siguen validando en Flask.
+El proyecto `appferreteria` publica la tienda en `https://appferreteria.vercel.app/` y el panel en `/admin`.
 
-Mientras Flask solo corra en el PC, las consultas `/api/*` del despliegue devuelven HTTP 503. Para habilitar el catálogo, el inicio de sesión y los pedidos, despliega el backend con el Dockerfile existente, su PostgreSQL y almacenamiento persistente para los modelos y reportes. Configura estas variables:
+- **Frontend estático:** `scripts/build-vercel.mjs` copia a `dist/` los ocho archivos públicos.
+- **API:** `vercel.json` reescribe `/api/:path*` hacia la función Python `api/index.py`, que carga la app Flask de `backend/` con las dependencias de `requirements.txt` (raíz). Flask recibe la ruta original y valida sesión, CSRF, origen y roles como en local.
+- **Base de datos:** Supabase mediante el **Session pooler** (IPv4). La conexión directa `db.<ref>.supabase.co` solo tiene IPv6 y falla desde muchas redes.
 
-| Servicio | Variable | Valor |
-| --- | --- | --- |
-| Vercel | `vercel.json`, regla `/api/:path*` | Cambia el destino `/api/unavailable` por `https://HOST-DEL-BACKEND/api/:path*`. |
-| Flask | `PUBLIC_BASE_URL` | Origen HTTPS exacto de la tienda en Vercel. También se utiliza para los enlaces de correo. |
-| Flask | `TRUSTED_HOSTS` | Nombre de host del backend, además de los demás hosts autorizados para Flask. |
+## Variables de entorno
 
-Vuelve a desplegar el frontend después de cambiar el origen de la API. Comprueba que `GET /api/auth/csrf` devuelve JSON y que un empleado puede iniciar sesión y consultar pedidos. Las credenciales de PostgreSQL, correo y Gemini pertenecen al entorno de Flask.
+Se cargan una vez en el entorno Production. Desde la raíz, con `vercel login` hecho y el proyecto vinculado:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\vercel-env.ps1
+```
+
+El script lee `backend/.env` sin mostrar valores, genera una `SECRET_KEY` nueva y define `FLASK_ENV=production`, `TRUSTED_HOSTS`, `TRUSTED_PROXY_HOPS=1` y `PUBLIC_BASE_URL`. La conexión, la clave secreta, la contraseña SMTP y la clave de Gemini quedan como secretos. Después hay que volver a desplegar.
+
+## Límites del entorno serverless
+
+- **Modelos IA:** TensorFlow supera el límite de 250 MB de una función, así que `requirements.txt` no lo incluye. `GET /api/admin/ml/status` responde con `available: false` y muestra las corridas registradas; entrenar y predecir responden `503 ml_unavailable`. Para la pestaña Modelos IA completa usa el backend con Docker (`Dockerfile`), que sí instala TensorFlow y tiene disco persistente para `backend/ml_artifacts/`.
+- **Disco de solo lectura:** el reporte de benchmarks queda solo en memoria de la instancia (`report_file: null`).
+- **Límites por instancia:** el límite de intentos y la caché viven en la memoria de cada instancia; la caché se invalida con el token compartido de la base.
+- **Duración:** `maxDuration` es 60 s (plan Hobby). El benchmark con los tamaños por defecto tarda unos 11 s.
+
+## Comprobación
+
+`GET /api/store` y `GET /api/catalog/products` deben responder 200 y `GET /api/admin/ml/status` 401 sin sesión. Un host que no esté en `TRUSTED_HOSTS` recibe 400.

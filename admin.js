@@ -2575,7 +2575,7 @@ const ML_SIGNAL = {
 };
 const ML_REF = [["order_id", "Pedido"], ["invoice_id", "Factura"], ["payment_id", "Pago"]];
 const ML_ERROR = {
-  model_not_trained:"Todavía no hay modelos entrenados.", training_busy:"Ya hay un entrenamiento en curso.", training_stalled:"El entrenamiento anterior no terminó. Vuelve a iniciarlo.",
+  model_not_trained:"Todavía no hay modelos entrenados.", training_busy:"Ya hay un entrenamiento en curso.", ml_unavailable:"Este despliegue no incluye TensorFlow: los modelos se entrenan y consultan en el backend con Docker.", training_stalled:"El entrenamiento anterior no terminó. Vuelve a iniciarlo.",
   insufficient_test:"No hay suficientes datos en el tramo de prueba.", insufficient_history:"No hay historial suficiente para entrenar.",
   invalid_label_file:"El archivo de etiquetas adjudicadas no es válido.", artifact_unavailable:"Los archivos del modelo no están disponibles."
 };
@@ -2621,7 +2621,7 @@ async function loadModels() {
       demand?.run ? dom("section", {className:"mlSection", id:"mlDemand", "aria-labelledby":"mlDemandTitle"},
         dom("h2", {id:"mlDemandTitle", className:"sectionTitle", text:"Demanda: Keras frente a regresión lineal"}),
         dom("div", {id:"mlDemandBody", className:"mlDemandBody"})) : null].filter(Boolean));
-    if (demand?.run) loadDemandComparison();
+    if (demand?.run && ml.status.available !== false) loadDemandComparison();
   } catch (err) {
     if (err.status === 401 || !body.isConnected) return;
     const retry = dom("button", {type:"button", className:"btn secondary", text:"Reintentar"});
@@ -2629,6 +2629,12 @@ async function loadModels() {
     body.replaceChildren(dom("div", {className:"card emptyState mlEmpty"}, dom("h2", {text:"No pudimos consultar los modelos"}), dom("p", {className:"muted", text:mlErr(err)}), retry));
   } finally {
     body.removeAttribute("aria-busy");
+    // Despliegue sin TensorFlow (Vercel): se muestran las corridas registradas, pero no se entrena ni se predice
+    if (ml.status?.available === false && body.isConnected) {
+      if (!$(".mlUnavailable", body)) body.prepend(dom("p", {className:"shortNote mlUnavailable"}, iconOf("alert"), dom("span", {text:ML_ERROR.ml_unavailable})));
+      const train = $("#trainModels");
+      if (train) { train.disabled = true; train.title = ML_ERROR.ml_unavailable; }
+    }
   }
 }
 async function trainModels(button) {
