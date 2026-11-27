@@ -31,10 +31,18 @@ foreach ($name in $copy) {
 }
 if (-not $set.Contains("DATABASE_URL")) { throw "backend\.env no tiene DATABASE_URL" }
 
+# La CLI de Vercel escribe su versión por stderr; en Windows PowerShell 5.1, con "Stop", eso se toma como
+# error y corta el script. Para los comandos nativos se decide solo por el código de salida.
+$ErrorActionPreference = "Continue"
 foreach ($name in $set.Keys) {
     $kind = if ($secret -contains $name) { "--sensitive" } else { "--no-sensitive" }
-    & vercel env add $name --environment production --value $set[$name] $kind --force --yes *> $null
-    if ($LASTEXITCODE -ne 0) { throw "No se pudo cargar $name (revisa vercel login y el proyecto vinculado)" }
+    $output = & vercel env add $name --environment production --value $set[$name] $kind --force --yes 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $detail = ($output | ForEach-Object { "$_" } | Where-Object { $_ -notmatch "Vercel CLI" } | Select-Object -Last 3) -join " "
+        Write-Host "No se pudo cargar $name. $detail" -ForegroundColor Red
+        Write-Host "Revisa que hayas hecho 'vercel login' y vuelve a ejecutar el script." -ForegroundColor Red
+        exit 1
+    }
     Write-Host "Cargada: $name"
 }
 Write-Host "Listo: $($set.Count) variables en Production. Vuelve a desplegar para que se apliquen."
