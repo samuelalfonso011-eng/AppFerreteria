@@ -312,14 +312,18 @@ tableWatcher.observe($("#view"), {childList:true, subtree:true});
 tableWatcher.observe($("#modalBody"), {childList:true, subtree:true});
 const employeeMode = () => state.me?.role === "employee";
 const ordersPath = () => employeeMode() ? "/staff/orders" : "/admin/orders";
-const currentView = () => { if (employeeMode()) return "pedidos"; const v = location.hash.slice(1); return VIEWS[v] ? v : "resumen"; };
+function currentView() {
+  const view = location.hash.slice(1);
+  if (employeeMode()) return view === "usuarios" ? "usuarios" : "pedidos";
+  return Object.hasOwn(VIEWS, view) ? view : "resumen";
+}
 async function route() {
   if (!state.me) return;
   const name = currentView();
   $$("#tabs [role=tab]").forEach(tab => {
     const on = tab.dataset.view === name;
     tab.setAttribute("aria-selected", String(on));
-    tab.hidden = employeeMode() && !on;
+    tab.hidden = employeeMode() && !["pedidos", "usuarios"].includes(tab.dataset.view);
     tab.tabIndex = on ? 0 : -1;
   });
   const panel = $("#view");
@@ -396,8 +400,8 @@ function ordersTable(rows) {
 }
 async function renderOrders(view) {
   const chips = [["", "Todos"], ...state.meta.statuses.map(s => [s.code, s.label])];
-  view.innerHTML = head("Pedidos", employeeMode() ? "Registra ventas y consulta las facturas de tus pedidos." : "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.",
-      '<button class="btn primary" data-new-order>Nuevo pedido</button>') +
+  view.innerHTML = head("Pedidos", employeeMode() ? "Consulta los pedidos de la tienda por cliente, número o canal." : "Confirma, prepara y despacha. Cancelar un pedido devuelve su stock al inventario.",
+      employeeMode() ? "" : '<button class="btn primary" data-new-order>Nuevo pedido</button>') +
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar pedidos</span><input type="search" id="orderSearch" placeholder="Buscar por número, cliente o correo" value="' + esc(orderFilter.q) + '"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por estado">' +
     chips.map(([code, label]) => '<button class="chip" data-order-status="' + code + '" aria-pressed="' + (code === orderFilter.status) + '">' + esc(label) + "</button>").join("") +
@@ -526,8 +530,8 @@ function accountState(u) {
   return u.is_active ? badge("ok", ICON.check, "Activa") : badge("", ICON.dot, "Inactiva");
 }
 async function renderUsers(view) {
-  view.innerHTML = head("Usuarios", "Equipo y clientes. Cambiar el rol o desactivar una cuenta cierra sus sesiones abiertas.",
-      '<button class="btn primary" data-new-user>Nuevo usuario</button>') +
+  view.innerHTML = head("Usuarios", employeeMode() ? "Consulta las cuentas por nombre, correo o rol." : "Equipo y clientes. Cambiar el rol o desactivar una cuenta cierra sus sesiones abiertas.",
+      employeeMode() ? "" : '<button class="btn primary" data-new-user>Nuevo usuario</button>') +
     '<div class="toolbar"><label class="field search"><span class="sr">Buscar usuarios</span><input type="search" id="userSearch" placeholder="Buscar por nombre o correo" value="' + esc(userFilter.q) + '" autocomplete="off"></label></div>' +
     '<div class="chips" role="group" aria-label="Filtrar por rol" id="userChips"></div><div class="card flush" id="usersBox"></div>';
   $("#userSearch").addEventListener("input", debounce(e => { userFilter.q = e.target.value.trim(); userFilter.page = 1; drawUsers(); }, 120));
@@ -543,7 +547,7 @@ async function drawUsers() {
     .map(([v, label]) => '<button class="chip" data-user-role="' + v + '" aria-pressed="' + (v === userFilter.role) + '">' + label + '</button>').join("");
   let result;
   try {
-    result = await api("/admin/users?" + params);
+    result = await api((employeeMode() ? "/staff/users?" : "/admin/users?") + params);
   } catch (err) {
     if (request === usersRequest && box.isConnected && err.status !== 401)
       box.innerHTML = emptyState("No pudimos cargar los usuarios", err.message, '<button class="btn secondary" data-reload>Reintentar</button>');
@@ -556,7 +560,7 @@ async function drawUsers() {
     box.innerHTML = emptyState("Ningún usuario coincide", "Prueba con otro nombre, correo o rol.");
     return;
   }
-  box.innerHTML = '<div class="tableWrap"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Registro</th><th scope="col" class="right"><span class="sr">Acciones</span></th></tr></thead><tbody>' +
+  box.innerHTML = '<div class="tableWrap"><table><thead><tr><th scope="col">Usuario</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Registro</th>' + (employeeMode() ? "" : '<th scope="col" class="right"><span class="sr">Acciones</span></th>') + '</tr></thead><tbody>' +
     list.map(u => {
       const me = isMe(u);
       const toggleBtn = me ? ""
@@ -567,8 +571,8 @@ async function drawUsers() {
         '<span><span class="cellMain">' + esc(u.name) + (me ? ' <span class="muted">(tú)</span>' : "") + '</span><span class="cellSub">' + esc(u.email) + "</span></span></div></td>" +
         "<td>" + roleBadge(u.role) + "</td><td>" + accountState(u) + "</td>" +
         "<td>" + fmtDate(u.created_at) + '<span class="cellSub">' + (u.last_login_at ? "Último acceso " + fmtDate(u.last_login_at) : "Aún no inicia sesión") + "</span></td>" +
-        '<td><div class="rowActions"><button class="btn secondary small" data-edit-user="' + u.id + '">Editar</button>' + toggleBtn + "</div></td></tr>";
-    }).join("") + '</tbody></table></div><div class="pager"><span>'  + result.total + ' cuentas · página ' + result.page + ' de ' + result.pages +
+        (employeeMode() ? "" : '<td><div class="rowActions"><button class="btn secondary small" data-edit-user="' + u.id + '">Editar</button>' + toggleBtn + "</div></td>") + "</tr>";
+    }).join("") + '</tbody></table></div><div class="pager"><span>'  + result.total + (result.total === 1 ? ' cuenta' : ' cuentas') + ' · página ' + result.page + ' de ' + result.pages +
       '</span><span><button class="btn secondary small" data-user-page="' + (result.page - 1) + '"' + (result.page === 1 ? ' disabled' : '') + '>Anterior</button> ' +
       '<button class="btn secondary small" data-user-page="' + (result.page + 1) + '"' + (result.page >= result.pages ? ' disabled' : '') + '>Siguiente</button></span></div>';
 }
@@ -652,10 +656,8 @@ const CHANNEL_CHOICES = [{value:"presencial", label:"Presencial"}, {value:"web",
 const DOC_CHOICES = [{value:"CC", label:"CC"}, {value:"CE", label:"CE"}, {value:"NIT", label:"NIT"}, {value:"PAS", label:"Pasaporte"}];
 const draft = {lines:new Map(), products:[], customers:[], key:null};
 async function openNewOrder() {
-  const [{products}, {customers}] = employeeMode()
-    ? [await api("/catalog/products"), {customers:[]}]
-    : await Promise.all([api("/admin/products?status=active"), api("/admin/customers?status=verified")]);
-  draft.products = products.filter(p => (employeeMode() || p.is_active) && p.stock > 0);
+  const [{products}, {customers}] = await Promise.all([api("/admin/products?status=active"), api("/admin/customers?status=verified")]);
+  draft.products = products.filter(p => p.is_active && p.stock > 0);
   draft.customers = customers;
   draft.lines = new Map();
   draft.key = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
@@ -664,8 +666,8 @@ async function openNewOrder() {
     '<div class="sheetHead"><h2 id="modalTitle">Nuevo pedido</h2>' + closeButton + "</div>" +
     '<div class="sheetBody"><div class="formGrid">' +
       choices("channel", "Canal", CHANNEL_CHOICES, "presencial") +
-      (employeeMode() ? '<input type="hidden" name="customer_id">' : '<div class="full">' + listbox({name:"customer_id", label:"Cliente registrado (opcional)", value:"",
-        options:[{value:"", label:"Sin cuenta"}, ...customers.map(c => ({value:c.id, label:c.name + " · " + c.email}))]}) + "</div>") +
+      '<div class="full">' + listbox({name:"customer_id", label:"Cliente registrado (opcional)", value:"",
+        options:[{value:"", label:"Sin cuenta"}, ...customers.map(c => ({value:c.id, label:c.name + " · " + c.email}))]}) + "</div>" +
       '<div class="full">' + field("name", "Nombre completo", "", 'required minlength="3" maxlength="150" autocomplete="off"') + "</div>" +
       field("email", "Correo electrónico", "", 'required type="email" maxlength="254" autocomplete="off"') +
       field("phone", "Celular", "", 'required inputmode="tel" maxlength="20" autocomplete="off"') +
@@ -752,6 +754,16 @@ $("#modalBody").addEventListener("change", e => {
 
 const statusLabel = code => (state.meta.statuses.find(s => s.code === code) || {label:code}).label;
 async function openOrder(id) {
+  if (employeeMode()) {
+    const {order} = await api(ordersPath() + "/" + id);
+    const lines = order.items.map(item => "<li><span>" + esc(item.name) + " × " + esc(item.quantity) +
+      '</span><span class="num">' + money(item.subtotal) + "</span></li>").join("");
+    openModal('<div class="sheetHead"><h2 id="modalTitle">' + esc(order.order_number) + "</h2>" + closeButton + '</div><div class="sheetBody"><dl class="facts">' +
+      fact("Cliente", order.customer_name) + fact("Estado", order.status_label) + fact("Canal", order.channel) +
+      fact("Fecha", fmtDate(order.created_at)) + '</dl><section class="section"><h3>Productos</h3><ul class="list">' + lines +
+      '</ul><dl class="facts">' + fact("Envío", money(order.shipping_cost)) + fact("Total", money(order.total)) + "</dl></section></div>");
+    return;
+  }
   const [{order:o}, billing] = await Promise.all([
     api(ordersPath() + "/" + id),
     api("/orders/" + id + "/invoice").catch(() => null) // sin permiso o sin red: el pedido igual se muestra
@@ -1375,7 +1387,7 @@ function showLogin(message, signedInWithoutRole = false) {
 async function start(user) {
   state.me = user;
   state.meta = employeeMode() ? {statuses:[]} : await api("/admin/meta");
-  $(".brand .tag").textContent = employeeMode() ? "Ventas" : "Admin";
+  $(".brand .tag").textContent = employeeMode() ? "Trabajadores" : "Admin";
   $("#loginView").hidden = true;
   $("#tabs").hidden = false;
   $("#logout").hidden = false;

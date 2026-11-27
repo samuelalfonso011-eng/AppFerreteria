@@ -1,6 +1,6 @@
 from flask import Blueprint, abort, request
 
-from app.utils.security import verify_csrf, verify_origin
+from app.utils.security import current_user, verify_csrf, verify_origin
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -14,6 +14,10 @@ def protect_writes():
         return
     verify_origin()
     verify_csrf()
+    if request.endpoint in {"api.create_order", "api.register"}:
+        user = current_user()
+        if user and user.role == user.ROLE_EMPLOYEE:
+            abort(403)
     if request.endpoint == "api.register_payment" and request.mimetype == "multipart/form-data":
         request.max_content_length = 5 * 1024 * 1024 + 64 * 1024
         request.max_form_parts = 6

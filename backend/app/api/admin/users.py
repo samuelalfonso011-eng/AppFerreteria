@@ -4,13 +4,14 @@ from flask import abort, jsonify, request
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
+from app.api import api_bp
 from app.api.admin import admin_bp
 from app.extensions import db
 from app.models import User
 from app.models.user import AuthSession
 from app.services.auth_service import password_problem
 from app.utils.http import json_error
-from app.utils.security import current_user
+from app.utils.security import current_user, require_staff
 from app.utils.timeutils import iso
 from app.utils.validation import Validator
 
@@ -18,6 +19,12 @@ from app.utils.validation import Validator
 def _view(user):
     return dict(user.to_session(), id=user.id, is_active=user.is_active,
                 email_verification_pending=user.email_verification_pending, created_at=iso(user.created_at))
+
+
+@api_bp.get("/staff/users")
+def staff_users():
+    require_staff()
+    return list_users()
 
 
 @admin_bp.get("/users")

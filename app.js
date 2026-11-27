@@ -551,6 +551,8 @@ function openAuth(view, options = {}) {
 function setAccount(user) {
   switchChatOwner(user?.email || "guest");
   account.user = user;
+  $("#checkout").hidden = user?.role === "employee";
+  $("#adminLink").textContent = user?.role === "employee" ? "Panel de trabajadores" : "Modo Admin";
   const avatar = $("#avatar");
   accountBtn.classList.toggle("signedIn", Boolean(user));
   avatar.hidden = !user;

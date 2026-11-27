@@ -27,7 +27,7 @@ Los roles son `admin`, `employee` y `customer`. La contraseña inicial se valida
 
 ## Pedidos | POST /api/orders
 
-Conserva el checkout existente. `channel` admite `web` (valor inicial), `app`, `presencial` y `domicilio`. Los canales presencial y domicilio requieren admin o empleado. El backend toma el ID del cliente de su sesión cuando compra con su cuenta. Admin y empleado pueden enviar `customer_id` de un cliente activo. El servidor registra el ID del operador desde su sesión.
+Conserva el checkout existente. `channel` admite `web` (valor inicial), `app`, `presencial` y `domicilio`. Los canales presencial y domicilio requieren admin. El backend toma el ID del cliente de su sesión cuando compra con su cuenta. Admin puede enviar `customer_id` de un cliente activo. El servidor registra el ID del operador desde su sesión.
 
 ```json
 {
@@ -56,7 +56,7 @@ Devuelve `201` con `{"order":{...},"created":true}`. Un reintento con la misma c
 
 Solo admin. El filtro opcional `channel` admite `presencial`, `web`, `app` y `domicilio`. Se combina con `status`, `q` y `page`. Si se omite, el listado incluye todos los canales. Un valor vacío o inválido devuelve `400` con `fields.channel`.
 
-El panel de empleados usa `GET /api/staff/orders` con los mismos filtros y paginación. Devuelve únicamente pedidos registrados por el operador autenticado. Cada fila incluye `employee_name` cuando existe. `GET /api/staff/orders/{id}` devuelve `{"order": ...}` con detalle, sin transiciones administrativas, y responde `404` para pedidos ajenos.
+El panel de trabajadores es de solo lectura. `GET /api/staff/users` admite los mismos filtros y paginación que la consulta administrativa de usuarios. El listado de pedidos usa `GET /api/staff/orders` con los mismos filtros y paginación. Devuelve pedidos de todos los canales y operadores. Cada fila incluye `employee_name` cuando existe. `GET /api/staff/orders/{id}` devuelve `{"order": ...}` con el resumen público, nombre de cliente e ítems. Un pedido inexistente devuelve `404`. Crear pedidos, emitir facturas, registrar pagos o modificar usuarios con sesión de empleado devuelve `403`.
 
 Ejemplo de respuesta `200` para `GET /api/admin/orders?channel=web`.
 
@@ -86,7 +86,7 @@ Ejemplo de respuesta `200` para `GET /api/admin/orders?channel=web`.
 
 ## Facturas | POST /api/orders/{id}/invoice
 
-Admin puede facturar cualquier pedido. Empleado puede facturar los pedidos que registró. Envía `{}` o `{"discount_amount":"1000.00"}`. El descuento es opcional y se aplica al subtotal de productos. El impuesto se calcula sobre el subtotal descontado con `INVOICE_TAX_RATE`, una fracción configurable en el servidor que comienza en cero. El envío se suma después. La emisión confirma el pedido si estaba pendiente.
+Admin puede facturar cualquier pedido. La emisión requiere rol admin. Envía `{}` o `{"discount_amount":"1000.00"}`. El descuento es opcional y se aplica al subtotal de productos. El impuesto se calcula sobre el subtotal descontado con `INVOICE_TAX_RATE`, una fracción configurable en el servidor que comienza en cero. El envío se suma después. La emisión confirma el pedido si estaba pendiente.
 
 Devuelve `201` al emitir y `200` con la misma factura y `created:false` en reintentos. El consecutivo es único y puede tener saltos por transacciones fallidas. La facturación no modifica el stock. Devuelve `409 order_cancelled` para un pedido cancelado y `400 invalid_discount` si el descuento supera el subtotal.
 
@@ -114,7 +114,7 @@ Devuelve `201` al emitir y `200` con la misma factura y `created:false` en reint
 
 ## Factura y saldo | GET /api/orders/{id}/invoice
 
-Admin puede consultar cualquier pedido. Empleado puede consultar los pedidos que registró. El ID de la URL es el del pedido. Si el pedido no existe o queda fuera del alcance del empleado, la API devuelve `404`.
+Admin puede consultar cualquier pedido. La consulta de facturas requiere rol admin. El ID de la URL es el del pedido. Si el pedido no existe, la API devuelve `404`.
 
 Si el pedido existe y todavía no tiene factura, devuelve `200`.
 
@@ -161,7 +161,7 @@ Si hay factura, devuelve `200` con el mismo objeto `invoice` de la emisión y el
 
 ## Pagos | POST /api/invoices/{id}/payments
 
-Admin y empleado tienen el mismo alcance que para facturar. Sin comprobante, envía `{"payment_method":"efectivo","amount":"25000.00"}`. Con comprobante usa `FormData` con los campos `payment_method`, `amount` y `receipt` (un archivo PDF, PNG o JPEG de hasta 5 MiB). El navegador genera el encabezado multipart. El ID de la ruta es `invoice.id`.
+El registro de pagos y la descarga de comprobantes requieren rol admin. Sin comprobante, envía `{"payment_method":"efectivo","amount":"25000.00"}`. Con comprobante usa `FormData` con los campos `payment_method`, `amount` y `receipt` (un archivo PDF, PNG o JPEG de hasta 5 MiB). El navegador genera el encabezado multipart. El ID de la ruta es `invoice.id`.
 
 Métodos admitidos: `efectivo`, `tarjeta`, `transferencia`, `pse`, `nequi`. Efectivo y tarjeta se registran como aprobados por el operador, sin conexión a una pasarela. Los otros métodos quedan pendientes. Los pagos pendientes y aprobados consumen saldo disponible. La API devuelve `409 payment_exceeds_balance` si se excede ese saldo. Cada POST exitoso crea un pago.
 

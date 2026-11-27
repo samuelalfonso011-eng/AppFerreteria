@@ -96,6 +96,15 @@ def current_user():
     return user
 
 
+def require_staff():
+    user = current_user()
+    if user is None:
+        abort(401)
+    if not user.is_staff:
+        abort(403)
+    return user
+
+
 def require_admin():
     user = current_user()
     if user is None:

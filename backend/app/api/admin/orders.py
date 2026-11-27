@@ -8,7 +8,7 @@ from app.models import Order, OrderStatus, PrivacyConsent, User
 from app.models.order import ORDER_CHANNELS
 from app.services import order_service
 from app.utils.http import no_store
-from app.utils.security import current_user
+from app.utils.security import current_user, require_staff
 from app.utils.validation import ValidationError, Validator
 
 PER_PAGE = 25
@@ -21,26 +21,16 @@ def list_orders():
 
 
 @api_bp.get("/staff/orders")
-def own_orders():
-    actor = current_user()
-    if actor is None:
-        abort(401)
-    if not actor.is_staff:
-        abort(403)
-    return _orders_page(Order.query.filter_by(employee_id=actor.id))
+def staff_orders():
+    require_staff()
+    return _orders_page(Order.query)
 
 
 @api_bp.get("/staff/orders/<int:order_id>")
-def own_order(order_id):
-    actor = current_user()
-    if actor is None:
-        abort(401)
-    if not actor.is_staff:
-        abort(403)
-    order = Order.query.filter_by(id=order_id, employee_id=actor.id).first_or_404()
-    data = order.admin_detail()
-    data["allowed_transitions"] = []
-    return no_store(jsonify(order=data))
+def staff_order_detail(order_id):
+    require_staff()
+    order = db.session.get(Order, order_id) or abort(404)
+    return no_store(jsonify(order=dict(order.public_view(), customer_name=order.customer_name)))
 
 
 def _orders_page(query):

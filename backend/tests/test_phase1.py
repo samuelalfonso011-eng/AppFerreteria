@@ -31,6 +31,7 @@ def employee_login(app, admin_api):
 def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
     app.config["INVOICE_TAX_RATE"] = Decimal("0.19")
     employee, employee_id = employee_login(app, admin_api)
+    operator = User.by_email("admin@ferrepro.test")
     products = Product.query.order_by(Product.id).limit(2).all()
     stock = {product.id: product.stock for product in products}
     customer_id = User.by_email("cliente@ferrepro.test").id
@@ -39,36 +40,36 @@ def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
     payload = checkout_payload(items, channel="presencial", customer_id=customer_id)
     for field in ("department", "city", "neighborhood", "street_address"):
         payload.pop(field)
-    response = employee.post("/api/orders", payload)
+    response = admin_api.post("/api/orders", payload)
     assert response.status_code == 201
     order = response.get_json()["order"]
     assert (order["channel"], order["customer_id"], order["employee_id"]) == (
-        "presencial", customer_id, employee_id,
+        "presencial", customer_id, operator.id,
     )
     assert order["shipping_cost"] == 0
-    assert employee.post("/api/orders", payload).status_code == 200
+    assert admin_api.post("/api/orders", payload).status_code == 200
     for line in items:
         product_id = line["product_id"]
         assert db.session.get(Product, product_id).stock == stock[product_id] - line["quantity"]
 
     staff_list = employee.get("/api/staff/orders?channel=presencial").get_json()
     assert [row["id"] for row in staff_list["orders"]] == [order["id"]]
-    assert staff_list["orders"][0]["employee_name"] == "Turno de caja"
-    assert employee.get(f"/api/staff/orders/{order['id']}").get_json()["order"]["allowed_transitions"] == []
-    assert admin_api.get(f"/api/staff/orders/{order['id']}").status_code == 404
+    assert staff_list["orders"][0]["employee_name"] == operator.full_name
+    assert employee.get(f"/api/staff/orders/{order['id']}").get_json()["order"]["order_number"] == order["order_number"]
+    assert employee.get("/api/staff/orders/2147483647").status_code == 404
     assert api.get("/api/staff/orders").status_code == 401
     assert employee.get("/api/admin/orders").status_code == 403
-    accounts = admin_api.get("/api/admin/users?role=employee&q=caja").get_json()
+    accounts = employee.get("/api/staff/users?role=employee&q=caja").get_json()
     assert [user["id"] for user in accounts["users"]] == [employee_id]
 
     invoice_url = f"/api/orders/{order['id']}/invoice"
     assert api.post(invoice_url).status_code == 401
     assert api.get(invoice_url).status_code == 401
-    empty = employee.get(invoice_url)
+    empty = admin_api.get(invoice_url)
     assert empty.status_code == 200
     assert empty.get_json() == {"invoice": None, "payments": [], "balance": "0.00"}
     assert admin_api.get("/api/orders/2147483647/invoice").status_code == 404
-    response = employee.post(invoice_url, {"discount_amount": "1000.05"})
+    response = admin_api.post(invoice_url, {"discount_amount": "1000.05"})
     assert response.status_code == 201
     invoice = response.get_json()["invoice"]
     subtotal = Decimal(invoice["subtotal"])
@@ -79,27 +80,27 @@ def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
     assert Decimal(invoice["total_amount"]) == subtotal - discount + tax + Decimal(invoice["shipping_cost"])
     assert invoice["invoice_number"] > 0 and len(invoice["items"]) == 2
 
-    retry = employee.post(invoice_url, {"discount_amount": "0.00"})
+    retry = admin_api.post(invoice_url, {"discount_amount": "0.00"})
     assert retry.status_code == 200
     assert retry.get_json() == {"invoice": invoice, "created": False}
     assert Invoice.query.filter_by(order_id=order["id"]).count() == 1
-    assert InventoryMovement.query.filter_by(reference=order["order_number"], user_id=employee_id).count() == 2
+    assert InventoryMovement.query.filter_by(reference=order["order_number"], user_id=operator.id).count() == 2
     for line in items:
         product_id = line["product_id"]
         assert db.session.get(Product, product_id).stock == stock[product_id] - line["quantity"]
 
-    other_order = employee.post("/api/orders", checkout_payload(items, channel="domicilio")).get_json()["order"]
-    next_invoice = employee.post(f"/api/orders/{other_order['id']}/invoice").get_json()["invoice"]
+    other_order = admin_api.post("/api/orders", checkout_payload(items, channel="domicilio")).get_json()["order"]
+    next_invoice = admin_api.post(f"/api/orders/{other_order['id']}/invoice").get_json()["invoice"]
     assert next_invoice["invoice_number"] == invoice["invoice_number"] + 1
 
     payment_url = f"/api/invoices/{invoice['id']}/payments"
 
     def upload(data, mime="image/png", csrf=True):
-        return employee.client.post(
+        return admin_api.client.post(
             payment_url,
             data={"payment_method": "transferencia", "amount": "10000.00",
                   "receipt": (BytesIO(data), "comprobante.png", mime)},
-            headers={"X-CSRF-Token": employee.token()} if csrf else {},
+            headers={"X-CSRF-Token": admin_api.token()} if csrf else {},
         )
 
     assert upload(RECEIPT, csrf=False).status_code == 403
@@ -114,14 +115,14 @@ def test_sale_invoice_retry_and_private_payment(app, api, admin_api):
     assert api.get(payment["receipt_url"]).status_code == 401
     assert api.login("cliente@ferrepro.test", CUSTOMER_PASSWORD).status_code == 200
     assert api.get(payment["receipt_url"]).status_code == 403
-    receipt = employee.get(payment["receipt_url"])
+    receipt = admin_api.get(payment["receipt_url"])
     assert receipt.data == RECEIPT and receipt.mimetype == "image/png"
     assert receipt.headers["Content-Disposition"].startswith("attachment;")
     assert receipt.headers["Cache-Control"] == "private, no-store"
     assert admin_api.get(payment["receipt_url"]).status_code == 200
-    assert employee.post(payment_url, {"payment_method": "efectivo",
+    assert admin_api.post(payment_url, {"payment_method": "efectivo",
                                        "amount": invoice["total_amount"]}).status_code == 409
-    approved = employee.post(payment_url, {"payment_method": "efectivo", "amount": "2500.15"})
+    approved = admin_api.post(payment_url, {"payment_method": "efectivo", "amount": "2500.15"})
     assert approved.status_code == 201
     details = admin_api.get(invoice_url)
     assert details.status_code == 200
@@ -164,8 +165,16 @@ def test_user_permissions_session_revocation_and_customer_link(app, api, admin_a
     assert response.status_code == 201
     order = Order.query.filter_by(order_number=response.get_json()["order"]["order_number"]).one()
     assert order.customer_id == User.by_email("cliente@ferrepro.test").id and order.employee_id is None
-    assert employee.post(f"/api/orders/{order.id}/invoice").status_code == 404
-    assert employee.get(f"/api/orders/{order.id}/invoice").status_code == 404
+    assert employee.post("/api/orders", checkout_payload(items)).status_code == 403
+    assert employee.post("/api/invoices/1/payments", {"amount":"1", "payment_method":"efectivo"}).status_code == 403
+    assert employee.send("PATCH", f"/api/admin/users/{user_id}", {"role":"admin"}).status_code == 403
+    assert employee.post(f"/api/admin/orders/{order.id}/status", {"status":"CANCELLED"}).status_code == 403
+    assert employee.get("/api/staff/users").status_code == 200
+    assert api.get("/api/staff/users").status_code == 403
+    detail = employee.get(f"/api/staff/orders/{order.id}").get_json()["order"]
+    assert detail["order_number"] == order.order_number and "customer" not in detail
+    assert employee.post(f"/api/orders/{order.id}/invoice").status_code == 403
+    assert employee.get(f"/api/orders/{order.id}/invoice").status_code == 403
 
     users = admin_api.get("/api/admin/users").get_json()["users"]
     assert any(user["id"] == user_id and user["role"] == "employee" for user in users)

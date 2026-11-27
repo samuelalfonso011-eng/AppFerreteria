@@ -7,7 +7,7 @@ from app.api import api_bp
 from app.extensions import db
 from app.models.billing import PAYMENT_METHODS, Invoice, Payment
 from app.services import billing_service
-from app.utils.security import current_user
+from app.utils.security import require_admin
 from app.utils.validation import ValidationError, Validator
 
 MAX_RECEIPT_SIZE = 5 * 1024 * 1024
@@ -18,18 +18,9 @@ RECEIPT_FORMATS = {
 }
 
 
-def _staff():
-    user = current_user()
-    if user is None:
-        abort(401)
-    if not user.is_staff:
-        abort(403)
-    return user
-
-
 @api_bp.get("/orders/<int:order_id>/invoice")
 def get_invoice(order_id):
-    order = billing_service.staff_order(order_id, _staff())
+    order = billing_service.staff_order(order_id, require_admin())
     invoice = Invoice.query.filter_by(order_id=order.id).one_or_none()
     if invoice is None:
         return jsonify(invoice=None, payments=[], balance="0.00")
@@ -43,7 +34,7 @@ def get_invoice(order_id):
 
 @api_bp.post("/orders/<int:order_id>/invoice")
 def issue_invoice(order_id):
-    actor = _staff()
+    actor = require_admin()
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         raise ValidationError({"invoice": "Envía un objeto JSON con los datos de facturación."})
@@ -77,7 +68,7 @@ def _receipt():
 
 @api_bp.post("/invoices/<int:invoice_id>/payments")
 def register_payment(invoice_id):
-    actor = _staff()
+    actor = require_admin()
     if request.mimetype == "multipart/form-data":
         payload = request.form.to_dict()
     else:
@@ -93,7 +84,7 @@ def register_payment(invoice_id):
 
 @api_bp.get("/payments/<int:payment_id>/receipt")
 def download_receipt(payment_id):
-    actor = _staff()
+    actor = require_admin()
     payment = db.session.get(Payment, payment_id)
     if payment is None or not payment.receipt_type:
         abort(404)
