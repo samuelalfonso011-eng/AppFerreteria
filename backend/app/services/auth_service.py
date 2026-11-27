@@ -113,12 +113,13 @@ def send_password_reset(user, base_url):
 # Flujos
 # ---------------------------------------------------------------------------
 
-def register(full_name, email, password, ip_address):
+def register(full_name, email, password, ip_address, verified=False):
+    """Crea la cuenta de cliente. verified=True la deja activa (sin confirmación de correo)."""
     if User.by_email(email) is not None:
         return None
     now = utcnow()
-    user = User(email=email, full_name=full_name, role=User.ROLE_CUSTOMER, is_active=False,
-                email_verification_pending=True, password_hash=generate_password_hash(password), created_at=now)
+    user = User(email=email, full_name=full_name, role=User.ROLE_CUSTOMER, is_active=verified,
+                email_verification_pending=not verified, password_hash=generate_password_hash(password), created_at=now)
     try:
         db.session.add(user)
         db.session.flush()

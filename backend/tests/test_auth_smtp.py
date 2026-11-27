@@ -56,6 +56,7 @@ def integration_app(app, monkeypatch):
 
 
 def test_registration_smtp_and_roles(integration_app, smtp_server):
+    integration_app.config["ACCOUNT_EMAIL_VERIFICATION"] = True  # este test cubre el envío del enlace de activación
     port, messages = smtp_server
     app = integration_app
     app.config.update(TEST_REAL_SMTP=True, SMTP_HOST="127.0.0.1", SMTP_PORT=port,

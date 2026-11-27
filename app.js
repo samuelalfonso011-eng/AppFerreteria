@@ -506,10 +506,9 @@ const submitRow = label => '<p class="formError" role="alert"></p><button class=
 const AUTH_VIEWS = {
   login: () => MARK + '<h2 id="authTitle">Inicia sesión en FerrePro</h2><p class="lead">Accede a tu cuenta para comprar más rápido.</p>' +
     '<form id="authForm" data-auth="login" novalidate>' + emailField("username") + passwordField("password", "Contraseña", "current-password") + submitRow("Iniciar sesión") + "</form>" +
-    '<p class="authHint">¿Te registraste hace poco? Primero abre el enlace de activación que te enviamos por correo.</p>' +
-    '<div class="authLinks"><button type="button" class="inline" data-auth-view="resend">Reenviar enlace de activación</button><button type="button" class="inline" data-auth-view="forgot">¿Olvidaste tu contraseña?</button>' +
+    '<div class="authLinks"><button type="button" class="inline" data-auth-view="forgot">¿Olvidaste tu contraseña?</button>' +
     '<span>¿No tienes cuenta? <button type="button" class="inline" data-auth-view="register">Crea una</button></span></div>',
-  register: () => MARK + '<h2 id="authTitle">Crea tu cuenta</h2><p class="lead">Te enviaremos un enlace para confirmar tu correo.</p>' +
+  register: () => MARK + '<h2 id="authTitle">Crea tu cuenta</h2><p class="lead">Regístrate y empieza a comprar de inmediato.</p>' +
     '<form id="authForm" data-auth="register" novalidate>' +
     '<label class="field"><span>Nombre completo</span><input name="name" autocomplete="name" required minlength="3" maxlength="150"></label>' +
     emailField() + passwordField("password", "Contraseña", "new-password", "Mínimo 12 caracteres, con letras y números.") +
@@ -518,7 +517,6 @@ const AUTH_VIEWS = {
     '<label class="check"><input type="checkbox" name="accept_terms" required><span>Leí y acepto los <button type="button" class="inline" data-legal="terminos">Términos y condiciones</button>.</span></label>' +
     '<label class="check"><input type="checkbox" name="accept_privacy" required><span>Autorizo de forma previa, expresa e informada el tratamiento de mis datos personales según la <button type="button" class="inline" data-legal="datos">Política de tratamiento de datos</button> (Ley 1581 de 2012).</span></label></fieldset>' +
     submitRow("Crear cuenta") + "</form>" +
-    '<div class="authLinks"><button type="button" class="inline" data-auth-view="resend">Reenviar enlace de activación</button></div>' +
     '<div class="authLinks"><span>¿Ya tienes cuenta? <button type="button" class="inline" data-auth-view="login">Inicia sesión</button></span></div>',
   resend: () => MARK + '<h2 id="authTitle">Reenvía tu enlace de activación</h2>' +
     '<form id="authForm" data-auth="resend" novalidate>' + emailField() + submitRow("Reenviar enlace") + "</form>" +
@@ -664,7 +662,9 @@ async function submitAuth(f) {
         name:f.elements.name.value.trim(), email, password:f.elements.password.value,
         accept_terms:true, accept_privacy:true
       }});
-      openAuth("sent", {message:result.message});
+      // Sin confirmación de correo el servidor responde 201 con la sesión iniciada; con ella, 202 y un aviso
+      if (result.user) signedIn(result, "Bienvenido a FerrePro, " + result.user.name.split(" ")[0] + ". Tu cuenta quedó lista.");
+      else openAuth("sent", {message:result.message});
     } else if (kind === "resend") {
       const result = await api("/auth/activation/resend", {method:"POST", body:{email}});
       openAuth("sent", {message:result.message});

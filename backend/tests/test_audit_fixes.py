@@ -12,7 +12,7 @@ from app.models import Product
 from app.models.billing import Payment
 from app.models.integrity import LedgerEntry
 from app.services.errors import BusinessError
-from tests.conftest import CUSTOMER_PASSWORD
+from tests.conftest import CUSTOMER_PASSWORD, ApiClient
 from tests.test_api import checkout_payload
 from tests.test_phase1 import employee_login
 
@@ -329,3 +329,28 @@ def test_top_products_use_current_name_after_rename(admin_api, api):
     top = admin_api.get("/api/admin/dashboard").get_json()["top_products"]
     rows = [t for t in top if t["name"] in ("Nombre provisional", "Nombre definitivo") or t["name"].startswith("Rodillo")]
     assert rows == [{"name": "Nombre definitivo", "units": 4, "revenue": rows[0]["revenue"]}]
+
+
+# ------------------------------------------------------------ registro sin confirmación de correo
+
+def test_register_without_email_verification_signs_in(app, api):
+    """Valor por defecto: la cuenta queda activa, con sesión, consentimientos y sin enviar correos."""
+    assert app.config["ACCOUNT_EMAIL_VERIFICATION"] is False
+    sent_before = len(app.extensions.setdefault("mail_outbox", []))
+    payload = {"name": "Andrés Cliente", "email": "Andres@Example.com", "password": "TornilloSeguro2026",
+               "accept_terms": True, "accept_privacy": True}
+    response = api.post("/api/auth/register", payload)
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["user"]["email"] == "andres@example.com" and body["user"]["role"] == "customer" and body["csrf"]
+    assert api.get("/api/auth/me").get_json()["user"]["email"] == "andres@example.com"  # sesión iniciada
+    user = User.query.filter_by(email="andres@example.com").one()
+    assert user.is_active and not user.email_verification_pending
+    from app.models import PrivacyConsent
+    assert PrivacyConsent.query.filter_by(user_id=user.id).count() == 2
+    assert len(app.extensions["mail_outbox"]) == sent_before  # no se envía correo de activación
+    # Puede cerrar sesión y volver a entrar con su contraseña
+    api.post("/api/auth/logout")
+    assert api.login("andres@example.com", "TornilloSeguro2026").status_code == 200
+    duplicate = ApiClient(app.test_client()).post("/api/auth/register", payload)
+    assert duplicate.status_code == 409 and "activación" not in duplicate.get_json()["message"]

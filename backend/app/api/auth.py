@@ -133,11 +133,16 @@ def register():
     v.accepted("accept_privacy", "Para crear tu cuenta debes autorizar el tratamiento de tus datos personales.")
     v.raise_if_errors()
 
-    base_url = _base_url()
-    user = auth_service.register(name, email, password, ip)
+    verification = current_app.config["ACCOUNT_EMAIL_VERIFICATION"]
+    user = auth_service.register(name, email, password, ip, verified=not verification)
     if user is None:
-        message = "Este correo ya está registrado. Inicia sesión o solicita un enlace de activación."
+        message = ("Este correo ya está registrado. Inicia sesión o solicita un enlace de activación." if verification
+                   else "Este correo ya está registrado. Inicia sesión.")
         return json_error(409, "email_taken", message, fields={"email": message})
+    if not verification:
+        # Sin confirmación de correo: la cuenta queda activa y con la sesión iniciada
+        return _signed_in(user, 201)
+    base_url = _base_url()
     if not base_url or not auth_service.send_activation(user, base_url):
         return _mail_unavailable("Tu cuenta quedó pendiente. Solicita otro enlace de activación.")
     return no_store(jsonify(ok=True, message="Revisa tu correo para activar tu cuenta."), 202)

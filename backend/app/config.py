@@ -68,6 +68,10 @@ class Config:
     # Cuentas: vida de los enlaces enviados por correo (segundos)
     PASSWORD_RESET_MAX_AGE = int(os.getenv("PASSWORD_RESET_MAX_AGE", "1800"))        # 30 minutos
     ACCOUNT_ACTIVATION_MAX_AGE = int(os.getenv("ACCOUNT_ACTIVATION_MAX_AGE", "172800"))  # 48 horas
+    # Confirmación de correo al registrarse. Apagada por defecto: la cuenta queda activa y con sesión al
+    # crearla. Con ACCOUNT_EMAIL_VERIFICATION=1 vuelve el flujo de enlace de activación (requiere SMTP).
+    ACCOUNT_EMAIL_VERIFICATION = os.getenv("ACCOUNT_EMAIL_VERIFICATION", "0") == "1"
+
     # URL publica para los enlaces de los correos; vacio = el host de la peticion (validado por TRUSTED_HOSTS)
     PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 

@@ -1,5 +1,7 @@
 import re
 
+import pytest
+
 from app.extensions import db
 from app.models import PrivacyConsent, User
 from tests.conftest import ADMIN_PASSWORD, ApiClient
@@ -22,6 +24,13 @@ def register_payload(**overrides):
                "accept_terms": True, "accept_privacy": True}
     payload.update(overrides)
     return payload
+
+
+@pytest.fixture(autouse=True)
+def email_verification(app):
+    """Este archivo cubre el flujo con confirmación de correo, que sigue disponible con
+    ACCOUNT_EMAIL_VERIFICATION=1. El registro directo (valor por defecto) está en test_audit_fixes.py."""
+    app.config["ACCOUNT_EMAIL_VERIFICATION"] = True
 
 
 # ---------------------------------------------------------------- registro y activacion
