@@ -1,6 +1,6 @@
 # FerrePro en Vercel
 
-El proyecto `appferreteria` publica la tienda en `https://appferreteria.vercel.app/` y el panel en `/admin`.
+El proyecto `appferreteria` publica la tienda en `https://ferrepro-co.vercel.app/` y el panel en `/admin`. El dominio anterior, `https://appferreteria.vercel.app/`, sigue activo y autorizado en `TRUSTED_HOSTS`; los enlaces de los correos usan el nuevo (`PUBLIC_BASE_URL`).
 
 - **Frontend estático:** `scripts/build-vercel.mjs` copia a `dist/` los ocho archivos públicos.
 - **API:** `vercel.json` reescribe `/api/:path*` hacia la función Python `api/index.py`, que carga la app Flask de `backend/` con las dependencias de `requirements.txt` (raíz). Flask recibe la ruta original y valida sesión, CSRF, origen y roles como en local.

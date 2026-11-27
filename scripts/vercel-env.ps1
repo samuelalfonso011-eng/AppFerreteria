@@ -4,7 +4,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\vercel-env.ps1
 $ErrorActionPreference = "Stop"
 $EnvFile = Join-Path $PSScriptRoot "..\backend\.env"
-$Domain = "appferreteria.vercel.app"
+$Domain = "ferrepro-co.vercel.app"
 
 if (-not (Test-Path $EnvFile)) { throw "No existe backend\.env" }
 $values = @{}
@@ -22,7 +22,7 @@ $bytes = New-Object byte[] 32
 $set = [ordered]@{
     FLASK_ENV          = "production"
     SECRET_KEY         = -join ($bytes | ForEach-Object { $_.ToString("x2") })
-    TRUSTED_HOSTS      = "$Domain,appferreteria-samuelalfonso011-eng.vercel.app,appferreteria-git-main-samuelalfonso011-eng.vercel.app"
+    TRUSTED_HOSTS      = "$Domain,appferreteria.vercel.app,appferreteria-samuelalfonso011-eng.vercel.app,appferreteria-git-main-samuelalfonso011-eng.vercel.app"
     TRUSTED_PROXY_HOPS = "1"
     PUBLIC_BASE_URL    = "https://$Domain"
 }
