@@ -117,12 +117,15 @@ def load_real_data() -> Dataset:
     item_rows = (db.session.query(OrderItem.product_id, OrderItem.product_name, OrderItem.quantity,
                                   OrderItem.subtotal, Order.status)
                  .join(Order, OrderItem.order_id == Order.id).all())
+    from app.models import Product
+    # Nombre actual del catálogo para el ranking; el de la línea solo si el producto ya no existe
+    current = dict(db.session.query(Product.id, Product.name).all())
     db_fetch_ms = (time.perf_counter() - started) * 1000
 
     orders = [{"id": r.id, "order_number": r.order_number, "created_at": as_utc(r.created_at),
                "total": r.total, "status": r.status, "customer": (r.customer_email or "").strip().lower()}
               for r in order_rows]
-    items = [{"product_id": r.product_id, "name": r.product_name, "quantity": r.quantity,
+    items = [{"product_id": r.product_id, "name": current.get(r.product_id, r.product_name), "quantity": r.quantity,
               "subtotal": r.subtotal, "status": r.status} for r in item_rows]
     return Dataset(orders, items, _round(db_fetch_ms), "real")
 

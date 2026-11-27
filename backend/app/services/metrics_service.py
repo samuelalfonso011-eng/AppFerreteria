@@ -33,12 +33,17 @@ def dashboard():
 
     counts = dict(db.session.query(Order.status, func.count(Order.id)).group_by(Order.status).all())
 
-    top = (db.session.query(OrderItem.product_name, func.sum(OrderItem.quantity), func.sum(OrderItem.subtotal))
+    # Agrupado por producto, no por el nombre guardado en cada línea: un producto renombrado no se parte
+    # en dos filas y se muestra con su nombre actual (el de la línea queda solo si el producto ya no existe).
+    top = (db.session.query(OrderItem.product_id, func.max(OrderItem.product_name),
+                            func.sum(OrderItem.quantity), func.sum(OrderItem.subtotal))
            .join(Order, OrderItem.order_id == Order.id)
            .filter(Order.status.in_(OrderStatus.SALES))
-           .group_by(OrderItem.product_name)
-           .order_by(func.sum(OrderItem.quantity).desc())
+           .group_by(OrderItem.product_id)
+           .order_by(func.sum(OrderItem.quantity).desc(), OrderItem.product_id)
            .limit(5).all())
+    current = dict(db.session.query(Product.id, Product.name)
+                   .filter(Product.id.in_([row[0] for row in top])).all()) if top else {}
 
     low_stock = (Product.query.filter(Product.is_active.is_(True), Product.stock <= Product.min_stock_alert)
                  .order_by(Product.stock.asc(), Product.name.asc()).limit(8).all())
@@ -55,8 +60,8 @@ def dashboard():
         "trend": [{"date": d.isoformat(), "label": d.strftime("%d/%m"), "total": money(trend[d])} for d in days],
         "status_counts": [{"status": s, "label": OrderStatus.LABELS[s], "count": counts.get(s, 0)}
                           for s in OrderStatus.ALL],
-        "top_products": [{"name": name, "units": int(units or 0), "revenue": money(revenue)}
-                         for name, units, revenue in top],
+        "top_products": [{"name": current.get(pid, snapshot), "units": int(units or 0), "revenue": money(revenue)}
+                         for pid, snapshot, units, revenue in top],
         "low_stock": [{"id": p.id, "name": p.name, "sku": p.sku, "stock": p.stock,
                        "min_stock_alert": p.min_stock_alert} for p in low_stock],
         "recent_orders": [o.summary() for o in recent],

@@ -314,3 +314,18 @@ def test_ml_routes_report_unavailable_without_tensorflow(admin_api, monkeypatch)
                                ("get", "/api/admin/ml/predict/demand", None)):
         response = admin_api.post(path, body) if method == "post" else admin_api.get(path)
         assert response.status_code == 503 and response.get_json()["error"] == "ml_unavailable", path
+
+
+def test_top_products_use_current_name_after_rename(admin_api, api):
+    """Renombrar un producto no parte "Más vendidos" en dos filas ni conserva el nombre anterior."""
+    product = Product.query.filter_by(sku="FP-0004").first()
+    for _ in range(2):
+        response = admin_api.post("/api/orders", checkout_payload([{"product_id": product.id, "quantity": 2}],
+                                                                  channel="presencial"))
+        order = response.get_json()["order"]
+        admin_api.post(f"/api/orders/{order['id']}/invoice", {})  # facturar confirma el pedido (cuenta como venta)
+        product.name = "Nombre provisional" if _ == 0 else "Nombre definitivo"
+        db.session.commit()
+    top = admin_api.get("/api/admin/dashboard").get_json()["top_products"]
+    rows = [t for t in top if t["name"] in ("Nombre provisional", "Nombre definitivo") or t["name"].startswith("Rodillo")]
+    assert rows == [{"name": "Nombre definitivo", "units": 4, "revenue": rows[0]["revenue"]}]
