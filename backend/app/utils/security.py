@@ -41,7 +41,12 @@ def verify_csrf():
 def verify_origin():
     """Defensa adicional: si el navegador envia Origin, debe ser este mismo sitio."""
     origin = request.headers.get("Origin")
-    if origin and urlparse(origin).netloc != request.host:
+    if not origin:
+        return
+    public_origin = current_app.config.get("PUBLIC_BASE_URL")
+    if origin.startswith("https://") and origin == public_origin:
+        return
+    if urlparse(origin).netloc != request.host:
         abort(403, description="origin")
 
 
