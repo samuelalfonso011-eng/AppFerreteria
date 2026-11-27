@@ -6,7 +6,7 @@ Mientras Flask solo corra en el PC, las consultas `/api/*` del despliegue devuel
 
 | Servicio | Variable | Valor |
 | --- | --- | --- |
-| Vercel | `FLASK_API_ORIGIN` | Origen HTTPS público del backend, sin ruta. |
+| Vercel | `vercel.json`, regla `/api/:path*` | Cambia el destino `/api/unavailable` por `https://HOST-DEL-BACKEND/api/:path*`. |
 | Flask | `PUBLIC_BASE_URL` | Origen HTTPS exacto de la tienda en Vercel. También se utiliza para los enlaces de correo. |
 | Flask | `TRUSTED_HOSTS` | Nombre de host del backend, además de los demás hosts autorizados para Flask. |
 
